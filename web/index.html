@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TW DB 장비 검색</title>
+    <link rel="stylesheet" href="./assets/styles.css?v=20260710-material-3col" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <nav class="top-tabs" aria-label="상단 메뉴">
+        <button class="tab-button is-active" type="button" aria-current="page">장비 검색</button>
+        <button class="tab-button" type="button">계산기</button>
+        <button class="tab-button" type="button">추가 메뉴</button>
+        <button class="tab-button" type="button">추가 메뉴</button>
+      </nav>
+
+      <section class="toolbar" aria-label="장비 검색 조건">
+        <div class="brand-block">
+          <p class="eyebrow">TW DB</p>
+          <h1>장비 검색</h1>
+        </div>
+
+        <div class="control-grid">
+          <label class="field">
+            <span>카테고리</span>
+            <select id="categorySelect"></select>
+          </label>
+          <label class="field">
+            <span>분류</span>
+            <select id="typeSelect"></select>
+          </label>
+          <label class="field search-field">
+            <span>검색</span>
+            <input id="searchInput" type="search" placeholder="장비명, 재료, 캐릭터" autocomplete="off" />
+          </label>
+        </div>
+      </section>
+
+      <section class="result-band" aria-live="polite">
+        <div class="result-meta">
+          <strong id="resultCount">0개</strong>
+          <span id="dataStatus">데이터 준비 중</span>
+        </div>
+
+        <div class="pager">
+          <button id="prevButton" type="button" class="icon-button" aria-label="이전 장비">‹</button>
+          <span id="pageLabel">0 / 0</span>
+          <button id="nextButton" type="button" class="icon-button" aria-label="다음 장비">›</button>
+        </div>
+      </section>
+
+      <section class="workspace">
+        <article id="equipmentCard" class="equipment-card"></article>
+
+        <aside class="compare-panel" aria-label="장비 비교">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Compare</p>
+              <h2>장비 비교</h2>
+            </div>
+            <label class="limit-toggle">
+              <input id="limitCompareToggle" type="checkbox" />
+              <span>한계작 비교</span>
+            </label>
+          </div>
+
+          <label class="field">
+            <span>비교 장비</span>
+            <select id="compareSelect"></select>
+          </label>
+
+          <div id="compareSummary" class="compare-summary"></div>
+        </aside>
+      </section>
+    </main>
+
+    <template id="emptyTemplate">
+      <div class="empty-state">
+        <strong>검색 결과가 없습니다</strong>
+        <span>조건을 조금 넓혀보세요.</span>
+      </div>
+    </template>
+
+    <script src="./assets/app.js?v=20260710-material-am" type="module"></script>
+  </body>
+</html>
