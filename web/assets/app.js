@@ -1,6 +1,7 @@
 const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS78PnupM0NaJzkrkFCr2Llja9TJKrLcRZqeCqlCUV4GPGlsJd3xSIn3SQAvHwzy_tGtxDbTFtl8oZQ/pub?gid=898941035&single=true&output=csv";
 const SNAPSHOT_URL = "./data/equipment-snapshot.json";
 const IMAGE_BASE = "./equipment-images/";
+const CHARACTER_IMAGE_BASE = "./character-images/";
 
 const STAT_NAMES = [
   "찌르기",
@@ -16,6 +17,62 @@ const STAT_NAMES = [
 
 const LIMIT_COMPARE_STATS = ["찌르기", "베기", "마법공격", "마법방어"];
 const CATEGORY_ORDER = ["무기", "손목", "갑옷", "장비 세트", "아티팩트"];
+const CHARACTER_NAMES = [
+  "나야트레이",
+  "녹턴",
+  "란지에",
+  "로아미니",
+  "루시안",
+  "리체",
+  "막시민",
+  "밀라",
+  "벤야",
+  "보리스",
+  "시벨린",
+  "아나이스",
+  "예프넨",
+  "이솔렛",
+  "이스핀",
+  "이자크",
+  "조슈아",
+  "클로에",
+  "티치엘",
+];
+const CHARACTER_COEFFICIENT_TYPES = {
+  나야트레이: ["찌르기", "베기", "물리복합"],
+  녹턴: ["찌르기"],
+  란지에: ["찌르기", "마법공격"],
+  로아미니: ["마법공격"],
+  루시안: ["찌르기", "베기", "물리복합"],
+  리체: ["베기"],
+  막시민: ["물리복합", "베기", "마법베기"],
+  밀라: ["베기", "물리복합"],
+  벤야: ["베기", "마법방어"],
+  보리스: ["베기", "물리복합", "마법베기"],
+  시벨린: ["찌르기", "물리복합"],
+  아나이스: ["마법공격", "마법방어"],
+  예프넨: ["베기"],
+  이솔렛: ["베기", "마법방어"],
+  이스핀: ["찌르기", "베기", "물리복합"],
+  이자크: ["찌르기", "베기"],
+  조슈아: ["찌르기", "마법공격"],
+  클로에: ["마법공격"],
+  티치엘: ["마법공격", "마법방어", "물리복합"],
+};
+const SIMULATOR_COPY = {
+  encrypt: {
+    title: "인크립트 시뮬",
+    description: "인크립트 종류, 비용, 성공/실패 로그 영역을 붙일 자리입니다.",
+  },
+  core: {
+    title: "코어 강화 시뮬",
+    description: "코어 강화 기대값 UI를 붙일 메뉴 구조만 준비했습니다.",
+  },
+  relic: {
+    title: "신조 렐릭 시뮬",
+    description: "신조 렐릭 기대값 UI를 붙일 메뉴 구조만 준비했습니다.",
+  },
+};
 
 const state = {
   records: [],
@@ -30,6 +87,22 @@ const state = {
 };
 
 const els = {
+  mainTabButtons: document.querySelectorAll(".top-tabs [data-main-tab]"),
+  mainTabTriggers: document.querySelectorAll("[data-main-tab]"),
+  mainPanels: document.querySelectorAll("[data-main-panel]"),
+  calculatorTabButtons: document.querySelectorAll("[data-calculator-tab]"),
+  calculatorPanels: document.querySelectorAll("[data-calculator-panel]"),
+  simulatorTabButtons: document.querySelectorAll("[data-simulator-tab]"),
+  simulatorSlots: document.querySelectorAll("[data-simulator-card]"),
+  simulatorPanelTitle: document.querySelector("#simulatorPanelTitle"),
+  simulatorPanelDescription: document.querySelector("#simulatorPanelDescription"),
+  characterGrid: document.querySelector("#characterGrid"),
+  coefficientSelectView: document.querySelector("#coefficientSelectView"),
+  coefficientDetailView: document.querySelector("#coefficientDetailView"),
+  coefficientBackButton: document.querySelector("#coefficientBackButton"),
+  coefficientSelectedImage: document.querySelector("#coefficientSelectedImage"),
+  coefficientSelectedName: document.querySelector("#coefficientSelectedName"),
+  coefficientTypeSelect: document.querySelector("#coefficientTypeSelect"),
   categorySelect: document.querySelector("#categorySelect"),
   typeSelect: document.querySelector("#typeSelect"),
   searchInput: document.querySelector("#searchInput"),
@@ -47,6 +120,10 @@ const els = {
 
 async function boot() {
   resetControls();
+  renderCharacterGrid();
+  activateMainTab("equipment");
+  activateCalculatorTab("coefficient");
+  activateSimulatorTab("encrypt");
   wireEvents();
 
   try {
@@ -280,7 +357,98 @@ function orderedCategories(values) {
   return [...known, ...rest];
 }
 
+function activateMainTab(key) {
+  els.mainPanels.forEach((panel) => {
+    const isActive = panel.dataset.mainPanel === key;
+    panel.hidden = !isActive;
+    panel.classList.toggle("is-active", isActive);
+  });
+
+  els.mainTabButtons.forEach((button) => {
+    const isActive = button.dataset.mainTab === key;
+    button.classList.toggle("is-active", isActive);
+    button.toggleAttribute("aria-current", isActive);
+  });
+}
+
+function activateCalculatorTab(key) {
+  els.calculatorTabButtons.forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.calculatorTab === key);
+  });
+  els.calculatorPanels.forEach((panel) => {
+    const isActive = panel.dataset.calculatorPanel === key;
+    panel.hidden = !isActive;
+    panel.classList.toggle("is-active", isActive);
+  });
+}
+
+function activateSimulatorTab(key) {
+  const copy = SIMULATOR_COPY[key] || SIMULATOR_COPY.encrypt;
+  els.simulatorPanelTitle.textContent = copy.title;
+  els.simulatorPanelDescription.textContent = copy.description;
+
+  els.simulatorTabButtons.forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.simulatorTab === key);
+  });
+  els.simulatorSlots.forEach((slot) => {
+    slot.classList.toggle("is-active", slot.dataset.simulatorCard === key);
+  });
+}
+
+function renderCharacterGrid() {
+  if (!els.characterGrid) return;
+
+  els.characterGrid.innerHTML = CHARACTER_NAMES.map((name) => `
+    <button class="character-card" type="button" data-character="${escapeHtml(name)}">
+      <span class="character-portrait">
+        <img src="${CHARACTER_IMAGE_BASE}${encodeURIComponent(`${name}.png`)}" alt="" loading="lazy" decoding="async" />
+      </span>
+      <strong>${escapeHtml(name)}</strong>
+    </button>
+  `).join("");
+}
+
+function showCoefficientDetail(characterName) {
+  const types = CHARACTER_COEFFICIENT_TYPES[characterName] || ["찌르기", "베기", "마법공격"];
+  els.coefficientSelectedName.textContent = characterName;
+  els.coefficientSelectedImage.src = `${CHARACTER_IMAGE_BASE}${encodeURIComponent(`${characterName}.png`)}`;
+  els.coefficientTypeSelect.innerHTML = types.map((type) => optionHtml(type, type)).join("");
+  els.coefficientSelectView.hidden = true;
+  els.coefficientDetailView.hidden = false;
+}
+
+function showCoefficientSelect() {
+  els.coefficientDetailView.hidden = true;
+  els.coefficientSelectView.hidden = false;
+}
+
 function wireEvents() {
+  els.mainTabTriggers.forEach((button) => {
+    button.addEventListener("click", () => {
+      activateMainTab(button.dataset.mainTab);
+    });
+  });
+
+  els.calculatorTabButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      activateCalculatorTab(button.dataset.calculatorTab);
+    });
+  });
+
+  els.simulatorTabButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      activateSimulatorTab(button.dataset.simulatorTab);
+    });
+  });
+
+  els.characterGrid?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-character]");
+    if (!button) return;
+    showCoefficientDetail(button.dataset.character);
+  });
+
+  els.coefficientBackButton?.addEventListener("click", showCoefficientSelect);
+
   els.categorySelect.addEventListener("change", () => {
     state.category = els.categorySelect.value;
     state.type = "all";
