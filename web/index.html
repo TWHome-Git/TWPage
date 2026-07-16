@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>TW DB</title>
-    <link rel="stylesheet" href="./assets/styles.css?v=20260710-fixed-outer-frame" />
+    <link rel="stylesheet" href="./assets/styles.css?v=20260716-coefficient-calc-16" />
   </head>
   <body>
     <main class="app-shell">
@@ -104,104 +104,54 @@
                   <img id="coefficientSelectedImage" src="" alt="" />
                   <strong id="coefficientSelectedName">나야트레이</strong>
                 </div>
+                <button id="coefficientResetButton" class="ghost-button reset-button" type="button">↺ 초기화</button>
                 <label class="dark-field">
                   <span>계산 타입</span>
-                  <select id="coefficientTypeSelect">
-                    <option>찌르기</option>
-                    <option>베기</option>
-                    <option>물리복합</option>
-                  </select>
+                  <select id="coefficientTypeSelect"></select>
                 </label>
               </div>
 
               <div class="coefficient-grid">
                 <div class="coefficient-table-card">
-                  <table class="coefficient-table" aria-label="계수 입력 테이블 UI 샘플">
+                  <table class="coefficient-table" aria-label="부위별 계수 입력 테이블">
                     <thead>
-                      <tr>
-                        <th>부위</th>
-                        <th>아이템</th>
-                        <th>찌르기</th>
-                        <th>강화 찌르기</th>
-                        <th>베기</th>
-                        <th>강화 베기</th>
-                        <th>명중</th>
-                        <th>계수</th>
-                      </tr>
+                      <tr id="coefficientTableHead"></tr>
                     </thead>
-                    <tbody>
-                      <tr><th>무기</th><td>선택 예정</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
-                      <tr><th>무기 어빌리티</th><td>수동 입력</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
-                      <tr><th>갑옷</th><td>선택 예정</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
-                      <tr><th>갑옷 어빌리티</th><td>수동 입력</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
-                      <tr><th>손목</th><td>선택 예정</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
-                      <tr><th>손목 어빌리티</th><td>수동 입력</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
-                      <tr><th>투구</th><td>수동 입력</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
-                      <tr><th>머리</th><td>수동 입력</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
-                      <tr><th>몸</th><td>수동 입력</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
-                      <tr><th>손</th><td>수동 입력</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
-                      <tr><th>다리</th><td>수동 입력</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
-                      <tr><th>아티팩트</th><td>선택 예정</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
-                    </tbody>
+                    <tbody id="coefficientTableBody"></tbody>
                   </table>
+                  <div id="coefficientMainTotal" class="coefficient-maintotal" aria-label="합계"></div>
                 </div>
 
                 <aside class="coefficient-side">
-                  <table class="side-score-table" aria-label="보조 계수 UI 샘플">
+                  <table class="side-score-table" aria-label="보조 계수 입력">
                     <thead>
-                      <tr><th></th><th>명중</th><th>주스탯</th><th>부스탯</th><th>계수</th></tr>
+                      <tr>
+                        <th></th>
+                        <th>명중</th>
+                        <th id="sideHeadPrimary">주스탯</th>
+                        <th id="sideHeadSecondary">부스탯</th>
+                        <th>계수</th>
+                      </tr>
                     </thead>
-                    <tbody>
-                      <tr><th>스탯</th><td></td><td>0</td><td></td><td>0</td></tr>
-                      <tr><th>덱스</th><td colspan="4">0</td></tr>
-                      <tr><th>아바타</th><td>15</td><td>15</td><td>15</td><td>412</td></tr>
-                      <tr><th>커프</th><td>50</td><td>50</td><td>50</td><td>1375</td></tr>
-                      <tr><th>렐릭</th><td>17</td><td>17</td><td>17</td><td>468</td></tr>
-                      <tr><th>칭호</th><td></td><td>50</td><td></td><td>1188</td></tr>
-                      <tr><th>코어</th><td></td><td>120</td><td></td><td>3900</td></tr>
-                    </tbody>
+                    <tbody id="coefficientSideBody"></tbody>
                   </table>
                   <label class="toggle-row">
                     <span>아바타 강화(주스탯)</span>
-                    <input type="checkbox" />
+                    <input id="avatarMainEnhance" type="checkbox" />
                   </label>
                   <label class="toggle-row">
                     <span>아바타 강화(부스탯)</span>
-                    <input type="checkbox" />
+                    <input id="avatarSubEnhance" type="checkbox" />
                   </label>
                 </aside>
               </div>
 
-              <div class="coefficient-summary">
-                <div><span>총 찌르기</span><strong>493</strong></div>
-                <div><span>최후의 결전</span><strong>불가능</strong></div>
-                <div><span>아페 어려움</span><strong>불가능</strong></div>
-                <div><span>이클 5보스</span><strong>불가능</strong></div>
-                <div><span>오딘 전면전</span><strong>불가능</strong></div>
-              </div>
+              <div id="coefficientContentSummary" class="coefficient-summary"></div>
             </div>
           </section>
 
           <section class="addon-content" data-calculator-panel="damage" hidden>
-            <div class="damage-layout">
-              <section class="dark-card">
-                <h3>기본 정보</h3>
-                <label class="dark-field"><span>캐릭터</span><select><option>캐릭터 선택</option></select></label>
-                <label class="dark-field"><span>계산 타입</span><select><option>찌르기</option><option>베기</option><option>마법공격</option></select></label>
-                <label class="dark-field"><span>목표 몬스터</span><select><option>몬스터 선택</option></select></label>
-              </section>
-              <section class="dark-card">
-                <h3>대미지 입력</h3>
-                <label class="dark-field"><span>기본 대미지</span><input type="number" value="0" /></label>
-                <label class="dark-field"><span>추가 대미지</span><input type="number" value="0" /></label>
-                <label class="dark-field"><span>최종 대미지</span><input type="number" value="0" /></label>
-              </section>
-              <section class="dark-card result-card">
-                <h3>결과 영역</h3>
-                <strong>계산 준비 중</strong>
-                <p>Project의 대미지 계산기 로직을 연결할 자리입니다.</p>
-              </section>
-            </div>
+            <div class="coming-soon">준비중</div>
           </section>
         </div>
       </section>
@@ -223,37 +173,12 @@
         </div>
 
         <div class="addon-window">
-          <section class="simulator-menu-shell">
-            <div class="simulator-menu-copy">
-              <p class="addon-kicker">Simulator</p>
-              <h2 id="simulatorPanelTitle">인크립트 시뮬</h2>
-              <p id="simulatorPanelDescription">UI 변경 예정이라 현재는 메뉴 구조만 준비해둔 상태입니다.</p>
-            </div>
-
-            <div class="simulator-slot-grid" aria-label="시뮬레이터 준비 메뉴">
-              <article class="simulator-slot is-active" data-simulator-card="encrypt">
-                <strong>인크립트 시뮬</strong>
-                <span>비용, 성공률, 로그 영역 예정</span>
-              </article>
-              <article class="simulator-slot" data-simulator-card="core">
-                <strong>코어 강화 시뮬</strong>
-                <span>강화 기대값 UI 예정</span>
-              </article>
-              <article class="simulator-slot" data-simulator-card="relic">
-                <strong>신조 렐릭 시뮬</strong>
-                <span>렐릭 기대값 UI 예정</span>
-              </article>
-            </div>
-          </section>
+          <div class="coming-soon">준비중</div>
         </div>
       </section>
 
       <section id="extraView" class="main-panel placeholder-view" data-main-panel="extra" hidden>
-        <div class="placeholder-card">
-          <p class="eyebrow">Coming Soon</p>
-          <h1>추가 메뉴</h1>
-          <span>다음 기능을 붙일 수 있도록 비워둔 영역입니다.</span>
-        </div>
+        <div class="coming-soon">준비중</div>
       </section>
     </main>
 
@@ -264,6 +189,6 @@
       </div>
     </template>
 
-    <script src="./assets/app.js?v=20260710-fixed-outer-frame" type="module"></script>
+    <script src="./assets/app.js?v=20260716-coefficient-calc-16" type="module"></script>
   </body>
 </html>
