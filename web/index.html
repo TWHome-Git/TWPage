@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>TW DB</title>
-    <link rel="stylesheet" href="./assets/styles.css?v=20260716-coefficient-calc-16" />
+    <link rel="stylesheet" href="./assets/styles.css?v=20260716-relic-msg" />
   </head>
   <body>
     <main class="app-shell">
@@ -165,15 +165,80 @@
           <div class="addon-tab-field">
             <span>시뮬레이터 메뉴</span>
             <nav class="addon-subtabs" aria-label="시뮬레이터 메뉴">
-              <button class="addon-tab is-active" type="button" data-simulator-tab="encrypt">인크립트 시뮬</button>
-              <button class="addon-tab" type="button" data-simulator-tab="core">코어 강화 시뮬</button>
-              <button class="addon-tab" type="button" data-simulator-tab="relic">신조 렐릭 시뮬</button>
+              <button class="addon-tab is-active" type="button" data-simulator-tab="encrypt">인크립트</button>
+              <button class="addon-tab" type="button" data-simulator-tab="core">코어 강화</button>
+              <button class="addon-tab" type="button" data-simulator-tab="relic">신조 렐릭</button>
             </nav>
           </div>
         </div>
 
         <div class="addon-window">
-          <div class="coming-soon">준비중</div>
+          <section class="addon-content is-active sim-panel" data-simulator-panel="encrypt">
+            <div class="sim-grid">
+              <div class="sim-controls">
+                <div class="sim-row">
+                  <label class="sim-radio"><input type="radio" name="encInkType" value="vianu" checked /><span>비아누</span></label>
+                  <label class="sim-radio"><input type="radio" name="encInkType" value="eta" /><span>에타</span></label>
+                  <label class="sim-check"><input id="encElso" type="checkbox" /><span>엘소</span></label>
+                  <label class="sim-check"><input id="encDiscount" type="checkbox" /><span>20% 할인</span></label>
+                </div>
+                <div id="encPresets" class="sim-presets"></div>
+                <div class="sim-fields">
+                  <label class="field"><span id="encCostLabel">1회 비용 (만원)</span><input id="encBaseCost" type="text" value="666" /></label>
+                  <label class="field"><span>현재 인크립트</span><input id="encStartInk" type="number" value="0" /></label>
+                  <label class="field"><span>목표 인크립트</span><input id="encTargetInk" type="number" value="10" /></label>
+                  <label class="field"><span>수동 횟수</span><input id="encManualCount" type="number" value="100" /></label>
+                </div>
+                <div class="sim-buttons">
+                  <button id="encRunBatch" class="sim-btn" type="button">수동 인크립트</button>
+                  <button id="encRunTarget" class="sim-btn primary" type="button">자동 인크립트</button>
+                  <button id="encReset" class="sim-btn danger" type="button">리셋</button>
+                </div>
+                <div id="encStatus" class="sim-status"></div>
+              </div>
+              <div id="encLog" class="sim-log" aria-label="인크립트 로그"></div>
+            </div>
+          </section>
+
+          <section class="addon-content sim-panel" data-simulator-panel="core" hidden>
+            <div class="sim-controls">
+              <div class="sim-row">
+                <label class="sim-radio"><input type="radio" name="coreType" value="abyss" checked /><span>머큐리얼/어비스</span></label>
+                <label class="sim-radio"><input type="radio" name="coreType" value="normal" /><span>이클립스/루비코나</span></label>
+                <label class="sim-check"><input id="coreMainStat" type="checkbox" checked /><span>주스탯</span></label>
+                <label class="sim-check"><input id="coreHasDust" type="checkbox" /><span>가루 보유</span></label>
+              </div>
+              <div class="sim-fields">
+                <label class="field"><span>시작 단계</span><select id="coreStartStage"></select></label>
+                <label class="field"><span>목표 단계</span><select id="coreTargetStage"></select></label>
+                <label class="field" id="coreBoxPriceField"><span>상자 가격 (만원)</span><input id="coreBoxPrice" type="text" value="0" /></label>
+              </div>
+              <div class="sim-buttons">
+                <button id="coreCalc" class="sim-btn primary" type="button">기대값 계산</button>
+              </div>
+            </div>
+            <div id="coreSummary" class="sim-summary"></div>
+            <div class="sim-table-wrap"><table id="coreTable" class="sim-table"></table></div>
+          </section>
+
+          <section class="addon-content sim-panel" data-simulator-panel="relic" hidden>
+            <div class="sim-controls">
+              <div class="sim-row">
+                <label class="sim-radio"><input type="radio" name="relicType" value="pendant" checked /><span>펜던트</span></label>
+                <label class="sim-radio"><input type="radio" name="relicType" value="bracelet" /><span>브레이슬릿</span></label>
+              </div>
+              <div class="sim-fields">
+                <label class="field"><span>현재 레벨 (0~19)</span><input id="relicCurrent" type="number" value="0" /></label>
+                <label class="field"><span>목표 레벨 (1~20)</span><input id="relicTarget" type="number" value="20" /></label>
+                <label class="field"><span>강화 가능 단수 (1~20)</span><input id="relicDifficulty" type="number" value="20" /></label>
+              </div>
+              <div class="sim-buttons">
+                <button id="relicCalc" class="sim-btn primary" type="button">기대값 계산</button>
+              </div>
+            </div>
+            <div id="relicSummary" class="sim-summary"></div>
+            <div class="sim-table-wrap"><table id="relicTable" class="sim-table"></table></div>
+          </section>
         </div>
       </section>
 
@@ -189,6 +254,6 @@
       </div>
     </template>
 
-    <script src="./assets/app.js?v=20260716-coefficient-calc-16" type="module"></script>
+    <script src="./assets/app.js?v=20260716-relic-msg" type="module"></script>
   </body>
 </html>

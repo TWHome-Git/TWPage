@@ -748,21 +748,17 @@ select {
 }
 
 /* 계수 계산기: 어빌리티 인라인 행 (해당 장비 바로 아래) */
+/* 배경 틴트 제거 → 왼쪽 액센트 선으로 하위 행 표시, 입력창은 흰 배경+테두리로 구분 */
 .coefficient-table tr.ability-inline > th {
   color: var(--muted);
   font-weight: 600;
-  background: rgba(15, 111, 99, 0.05);
+  box-shadow: inset 3px 0 0 rgba(15, 111, 99, 0.4);
 }
 
 .coefficient-table td.ability-inline-cell {
   text-align: left;
   white-space: nowrap;
   padding-left: 12px;
-  background: rgba(15, 111, 99, 0.05);
-}
-
-.coefficient-table tr.ability-inline > .coeff-cell {
-  background: rgba(15, 111, 99, 0.05);
 }
 
 .ability-field {
@@ -773,15 +769,28 @@ select {
 }
 
 .ability-field > span {
-  color: var(--muted);
+  color: var(--ink);
   font-size: 12px;
   font-weight: 700;
   white-space: nowrap;
 }
 
+/* 어빌리티/시에나 입력창: 흰 배경 + 테두리로 명확히 구분 */
 .coefficient-table td.ability-inline-cell input {
-  width: 78px;
-  min-width: 78px;
+  width: 82px;
+  min-width: 82px;
+  background: #fff;
+  border: 1px solid var(--line);
+}
+
+.coefficient-table td.ability-inline-cell input:hover {
+  background: #fff;
+  border-color: var(--accent);
+}
+
+.coefficient-table td.ability-inline-cell input:focus {
+  background: #fff;
+  border-color: var(--accent);
 }
 
 .damage-layout {
@@ -1196,6 +1205,318 @@ select {
   place-content: center;
   place-items: center;
   min-height: var(--main-panel-min-height);
+}
+
+/* ── 시뮬레이터 3종 공통 스타일 (밝은 테마) ── */
+.sim-panel {
+  padding: 14px;
+}
+
+.sim-grid {
+  display: grid;
+  /* 왼쪽 폭은 행운 지표(정규분포 그래프)를 담을 수 있게 미리 확보 */
+  grid-template-columns: 520px minmax(0, 1fr);
+  gap: 14px;
+}
+
+.sim-controls {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.sim-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: center;
+}
+
+.sim-radio,
+.sim-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.sim-radio input,
+.sim-check input {
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.sim-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sim-preset {
+  flex: 1 1 auto;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sim-preset:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.sim-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+/* hidden 속성이 .field { display:grid }에 덮이지 않도록 (예: 가루 보유 시 상자 가격 숨김) */
+.sim-fields .field[hidden] {
+  display: none;
+}
+
+.sim-fields .field span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.sim-fields .field input,
+.sim-fields .field select {
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 10px;
+  color: var(--ink);
+  background: #fff;
+  outline: none;
+}
+
+.sim-fields .field input:focus,
+.sim-fields .field select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(15, 111, 99, 0.14);
+}
+
+.sim-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sim-btn {
+  flex: 1 1 auto;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sim-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.sim-btn.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+.sim-btn.primary:hover {
+  background: var(--accent-strong);
+  color: #fff;
+}
+
+.sim-btn.danger:hover {
+  border-color: var(--danger);
+  background: var(--danger);
+  color: #fff;
+}
+
+.sim-status {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.sim-status .sim-status-strong {
+  color: var(--accent-strong);
+  font-weight: 800;
+}
+
+.sim-status .sim-graph {
+  font-family: "Consolas", "D2Coding", monospace;
+  color: var(--accent);
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.sim-log {
+  min-height: 300px;
+  max-height: 560px;
+  overflow-y: auto;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.sim-log .log-entry {
+  padding: 2px 0;
+  border-bottom: 1px solid #eef3f0;
+  overflow-wrap: anywhere;
+}
+
+.sim-log .log-cumulative {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  white-space: pre-line;
+}
+
+.sim-pos {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.sim-neg {
+  color: var(--danger);
+  font-weight: 700;
+}
+
+.sim-summary {
+  margin: 12px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-strong);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.6;
+}
+
+/* 시뮬레이터 재료 아이콘 */
+.sim-icon {
+  vertical-align: middle;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.sim-table th .sim-th {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+.sim-table th:first-child .sim-th {
+  justify-content: flex-start;
+}
+
+.sim-summary-title {
+  font-weight: 800;
+  margin-bottom: 8px;
+}
+
+.sim-summary-mats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 22px;
+  align-items: center;
+}
+
+.sim-summary-mats span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+}
+
+.sim-summary-note {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.sim-summary:empty {
+  display: none;
+}
+
+.sim-table-wrap {
+  overflow-x: auto;
+}
+
+.sim-table {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.sim-table th,
+.sim-table td {
+  border-bottom: 1px solid #e3ebe6;
+  padding: 7px 10px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.sim-table th:first-child,
+.sim-table td:first-child {
+  text-align: left;
+}
+
+.sim-table thead th {
+  color: var(--muted);
+  background: var(--panel-strong);
+  font-size: 12px;
+  position: sticky;
+  top: 0;
+}
+
+.sim-table tbody td.sim-cost {
+  color: var(--blue);
+  font-weight: 700;
+}
+
+@media (max-width: 1024px) {
+  .sim-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* 준비중 플레이스홀더 (대미지 계산기 / 추가 메뉴) */

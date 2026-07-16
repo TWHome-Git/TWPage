@@ -130,7 +130,7 @@ const MAIN_SLOTS = [
   "무기", "무기 어빌리티", "갑옷", "갑옷 어빌리티", "손목", "손목 어빌리티",
   "투구", "머리", "몸", "손", "손 어빌리티", "다리", "효과", "아티팩트",
 ];
-const ACCESSORY_SLOTS = ["스탯", "아바타", "커프", "칭호", "코어", "렐릭"];
+const ACCESSORY_SLOTS = ["스탯", "아바타", "커프", "칭호", "코어", "렐릭", "링크"];
 
 // 콘텐츠 가능여부 임계값 (UpdateContentAvailability)
 const CONTENT_THRESHOLDS = [
@@ -177,6 +177,7 @@ const els = {
   calculatorTabButtons: document.querySelectorAll("[data-calculator-tab]"),
   calculatorPanels: document.querySelectorAll("[data-calculator-panel]"),
   simulatorTabButtons: document.querySelectorAll("[data-simulator-tab]"),
+  simulatorPanels: document.querySelectorAll("[data-simulator-panel]"),
   characterGrid: document.querySelector("#characterGrid"),
   coefficientSelectView: document.querySelector("#coefficientSelectView"),
   coefficientDetailView: document.querySelector("#coefficientDetailView"),
@@ -216,6 +217,7 @@ async function boot() {
   activateCalculatorTab("coefficient");
   activateSimulatorTab("encrypt");
   wireEvents();
+  initSimulators();
 
   try {
     const rows = await loadSheetRows();
@@ -487,6 +489,11 @@ function activateCalculatorTab(key) {
 function activateSimulatorTab(key) {
   els.simulatorTabButtons.forEach((button) => {
     button.classList.toggle("is-active", button.dataset.simulatorTab === key);
+  });
+  els.simulatorPanels.forEach((panel) => {
+    const isActive = panel.dataset.simulatorPanel === key;
+    panel.hidden = !isActive;
+    panel.classList.toggle("is-active", isActive);
   });
 }
 
@@ -873,6 +880,7 @@ function calcTotalMetrics() {
   const relic = accRow("렐릭");
   const title = accRow("칭호");
   const core = accRow("코어");
+  const link = accRow("링크");
 
   const avatarMainBonus = els.avatarMainEnhance && els.avatarMainEnhance.checked ? 50 : 0;
   const avatarSubBonus = els.avatarSubEnhance && els.avatarSubEnhance.checked ? 50 : 0;
@@ -884,7 +892,8 @@ function calcTotalMetrics() {
     (avatar ? avatar.attackValue : 0) +
     (cuff ? cuff.attackValue : 0) +
     (relic ? relic.attackValue : 0) +
-    (title ? title.defenseValue : 0);
+    (title ? title.defenseValue : 0) +
+    (link ? link.attackValue : 0);
 
   const primaryEnchantSum =
     sum(calc.mainRows, (r) => r.attackEnchant) + (core ? core.attackEnchant : 0) + avatarMainBonus;
@@ -1392,6 +1401,7 @@ function renderSideTable() {
   const relic = accRow("렐릭");
   const title = accRow("칭호");
   const core = accRow("코어");
+  const link = accRow("링크");
 
   // 스탯: 명중(빈칸), 주스탯, 부스탯, 계수
   const statCoeff = cellWith(f0(stat.coefficient), "coeff-cell");
@@ -1450,6 +1460,16 @@ function renderSideTable() {
     cellWith(makeNumberInput(core, "attackEnchant")),
     cellWith(""),
     coreCoeff,
+  ]);
+
+  // 링크: 일반 주스탯 계수 (값=attackValue, 계수는 recalcRow 기본식이 primaryBase×값 계산)
+  const linkCoeff = cellWith(f0(link.coefficient), "coeff-cell");
+  addAccCoeff("링크", linkCoeff);
+  buildRow("링크", [
+    cellWith(""),
+    cellWith(makeNumberInput(link, "attackValue")),
+    cellWith(""),
+    linkCoeff,
   ]);
 }
 
@@ -1777,6 +1797,630 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+// ══════════════════════════════════════════════════════════════
+//  시뮬레이터 3종 (TWChatOverlay 로직 이식)
+// ══════════════════════════════════════════════════════════════
+const simEls = {};
+let simInited = false;
+
+// 시뮬레이터 재료 아이콘 (images 폴더)
+const SIM_IMG_BASE = "./images/";
+function simIcon(file, size = 18) {
+  return `<img class="sim-icon" src="${SIM_IMG_BASE}${encodeURIComponent(file)}" alt="" width="${size}" height="${size}" loading="lazy" />`;
+}
+
+function initSimulators() {
+  if (simInited) return;
+  simInited = true;
+  const q = (id) => document.getElementById(id);
+  [
+    "encElso", "encDiscount", "encBaseCost", "encCostLabel", "encStartInk", "encTargetInk",
+    "encManualCount", "encPresets", "encRunBatch", "encRunTarget", "encReset", "encStatus", "encLog",
+    "coreMainStat", "coreHasDust", "coreStartStage", "coreTargetStage",
+    "coreBoxPrice", "coreBoxPriceField", "coreCalc", "coreSummary", "coreTable",
+    "relicCurrent", "relicTarget", "relicDifficulty", "relicCalc", "relicSummary", "relicTable",
+  ].forEach((id) => (simEls[id] = q(id)));
+
+  wireEncryptSim();
+  wireCoreSim();
+  wireRelicSim();
+}
+
+// ── 인크립트 시뮬 (EncryptSimulatorView) ──────────────────────
+const ENC_PRESETS = {
+  vianu: {
+    man: [["효과", "666"], ["이클립스", "2046"], ["세크리드", "2946"]],
+    elso: [["효과", "999"], ["이클립스", "3096"], ["세크리드", "4419"]],
+  },
+  eta: {
+    man: [["세크리드", "29668"]],
+    elso: [["세크리드", "44502"]],
+  },
+};
+
+const encSim = {
+  currentInk: 0,
+  totalAttempts: 0,
+  successCount: 0,
+  totalCost: 0,
+  attemptsSinceLastSuccess: 0,
+  totalExpectedCost: 0,
+  totalExpectedSuccesses: 0,
+  totalSuccessVariance: 0,
+};
+
+function encIsEta() {
+  return document.querySelector('input[name="encInkType"]:checked')?.value === "eta";
+}
+function encIsElso() {
+  return simEls.encElso.checked;
+}
+function encGetChance(ink, isEta) {
+  if (isEta) return 0.01;
+  return Math.max(0.0001, 0.0007 - ink * 0.00005);
+}
+function encUnitCost() {
+  const raw = String(simEls.encBaseCost.value || "").replace(/만원|만|엘소/g, "").replace(/,/g, "").trim();
+  if (!raw) return null;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 0) return null;
+  let cost = encIsElso() ? n : n * 10000;
+  if (simEls.encDiscount.checked) cost = Math.round(cost * 0.8);
+  return cost;
+}
+function encFmtCost(v) {
+  const amount = Math.floor(Math.abs(v));
+  const eok = Math.floor(amount / 1e8);
+  const man = Math.floor((amount % 1e8) / 1e4);
+  return `${eok.toLocaleString("ko-KR")}억 ${man.toLocaleString("ko-KR")}만`;
+}
+function encFmtSigned(v) {
+  const sign = v > 0 ? "+" : v < 0 ? "-" : "";
+  return `${sign}${encFmtCost(v)}`;
+}
+function encStdNormCdf(z) {
+  const absZ = Math.abs(z);
+  const t = 1 / (1 + 0.2316419 * absZ);
+  const d = 0.3989422804014327 * Math.exp(-0.5 * absZ * absZ);
+  const poly = ((((1.330274429 * t - 1.821255978) * t + 1.781477937) * t - 0.356563782) * t + 0.31938153) * t;
+  const cdf = 1 - d * poly;
+  return z >= 0 ? cdf : 1 - cdf;
+}
+function encAccumulate(chance) {
+  if (chance <= 0 || !Number.isFinite(chance)) return;
+  encSim.totalExpectedSuccesses += chance;
+  encSim.totalSuccessVariance += chance * (1 - chance);
+}
+function encLuckStats() {
+  if (encSim.totalAttempts <= 0 || encSim.totalSuccessVariance <= 0) return null;
+  const z = (encSim.successCount - encSim.totalExpectedSuccesses) / Math.sqrt(encSim.totalSuccessVariance);
+  const percentile = Math.min(100, Math.max(0, encStdNormCdf(z) * 100));
+  const rank = Math.min(10000, Math.max(1, Math.round((percentile / 100) * 10000)));
+  return { z, percentile, rank };
+}
+function encLuckGraph(z) {
+  const levels = "▁▂▃▄▅▆▇█";
+  const n = 33;
+  const chars = [];
+  for (let i = 0; i < n; i++) {
+    const x = -3 + (6 * i) / (n - 1);
+    const y = Math.exp(-0.5 * x * x);
+    let lv = Math.round((levels.length - 1) * y);
+    lv = Math.max(0, Math.min(levels.length - 1, lv));
+    chars.push(levels[lv]);
+  }
+  const cz = Math.max(-3, Math.min(3, z));
+  let mark = Math.round(((cz + 3) / 6) * (n - 1));
+  mark = Math.max(0, Math.min(n - 1, mark));
+  chars[mark] = "◆";
+  return chars.join("");
+}
+function encRefreshStatus() {
+  const isEta = encIsEta();
+  const chance = encGetChance(encSim.currentInk, isEta);
+  const unit = encUnitCost();
+  // "현재 인크립트" 입력창을 실제 현재 인크립트로 동기화 (입력 중이 아닐 때)
+  if (simEls.encStartInk && document.activeElement !== simEls.encStartInk) {
+    simEls.encStartInk.value = String(encSim.currentInk);
+  }
+  const rows = [];
+  rows.push(`<div>현재 인크: <span class="sim-status-strong">+${encSim.currentInk}</span> (${(chance * 100).toFixed(3)}%) · ${encSim.currentInk}→${encSim.currentInk + 1}</div>`);
+  rows.push(`<div>적용 비용: ${unit == null ? "입력 필요" : encIsElso() ? `${Math.round(unit).toLocaleString("ko-KR")} 엘소` : `${Math.round(unit / 10000).toLocaleString("ko-KR")}만원`}</div>`);
+  rows.push(`<div>성공 / 시도: <span class="sim-status-strong">${encSim.successCount.toLocaleString("ko-KR")}</span> / ${encSim.totalAttempts.toLocaleString("ko-KR")}</div>`);
+  rows.push(`<div>누적 비용: ${encFmtCost(encSim.totalCost)}</div>`);
+  const luck = encLuckStats();
+  if (luck) {
+    rows.push(`<div>행운 지표: 상위 ${luck.percentile.toFixed(2)}% · 10000명 중 ${luck.rank.toLocaleString("ko-KR")}번째로 운이 좋음</div>`);
+    rows.push(`<div class="sim-graph">${encLuckGraph(luck.z)}</div>`);
+  }
+  simEls.encStatus.innerHTML = rows.join("");
+}
+function encRemoveCumulative() {
+  const el = document.getElementById("encCumulative");
+  if (el) el.remove();
+}
+function encAppendLog(e) {
+  const expectedCost = e.rate > 0 ? e.unit * (100 / e.rate) : null;
+  let html = `• [ ${e.attempts.toLocaleString("ko-KR")}번째 | ${e.inkBefore}→${e.inkAfter} 인크 | 비용 ${encFmtCost(e.cost)}`;
+  if (expectedCost != null) {
+    const diff = expectedCost - e.cost;
+    encSim.totalExpectedCost += expectedCost;
+    html += ` | 기대값 <span class="${diff >= 0 ? "sim-pos" : "sim-neg"}">${encFmtSigned(diff)}</span>`;
+  } else {
+    html += " | 기대값 N/A";
+  }
+  html += " ]";
+  const div = document.createElement("div");
+  div.className = "log-entry";
+  div.innerHTML = html;
+  simEls.encLog.appendChild(div);
+  simEls.encLog.scrollTop = simEls.encLog.scrollHeight;
+}
+function encUpdateCumulative() {
+  encRemoveCumulative();
+  let displayExpected = encSim.totalExpectedCost;
+  const unit = encUnitCost();
+  if (encSim.attemptsSinceLastSuccess > 0 && unit != null) {
+    const chance = encGetChance(encSim.currentInk, encIsEta());
+    if (chance > 0) displayExpected += unit / chance;
+  }
+  const diff = displayExpected - encSim.totalCost;
+  const div = document.createElement("div");
+  div.className = "log-cumulative";
+  div.id = "encCumulative";
+  div.innerHTML =
+    `▼ 누적 합산 (${encSim.totalAttempts.toLocaleString("ko-KR")}회 시도)\n` +
+    `누적 비용: ${encFmtCost(encSim.totalCost)}  |  누적 기대 비용: ${encFmtCost(displayExpected)}\n` +
+    `기대값 차이: <span class="${diff >= 0 ? "sim-pos" : "sim-neg"}">${encFmtSigned(diff)}</span>`;
+  simEls.encLog.appendChild(div);
+  simEls.encLog.scrollTop = simEls.encLog.scrollHeight;
+}
+function encRunLoop(mode) {
+  const unit = encUnitCost();
+  if (unit == null) {
+    alert("비용을 올바르게 입력해주세요.");
+    return;
+  }
+
+  const isEta = encIsEta();
+  let remaining = 0;
+  let target = 0;
+  if (mode === "batch") {
+    // 수동 인크립트: 현재 인크립트를 초기화하지 않고 이어서 진행 (리셋 전까지 유지)
+    remaining = parseInt(simEls.encManualCount.value, 10);
+    if (!Number.isInteger(remaining) || remaining <= 0) {
+      alert("수동 횟수를 1 이상의 숫자로 입력해주세요.");
+      return;
+    }
+  } else {
+    // 자동 인크립트: 현재 인크립트 값을 시작점으로 설정
+    const start = parseInt(simEls.encStartInk.value, 10);
+    if (Number.isInteger(start) && start >= 0) encSim.currentInk = start;
+    target = parseInt(simEls.encTargetInk.value, 10);
+    if (!Number.isInteger(target) || target < 1) {
+      alert("목표 인크립트를 1 이상의 숫자로 입력해주세요.");
+      return;
+    }
+    if (encSim.currentInk >= target) {
+      alert("이미 목표 인크립트 이상입니다.");
+      return;
+    }
+  }
+
+  // 자동 인크립트: 매번 로그/통계를 초기화하고 이번 실행 결과만 표시 (누적하지 않음)
+  if (mode === "target") {
+    encSim.totalAttempts = 0;
+    encSim.successCount = 0;
+    encSim.totalCost = 0;
+    encSim.attemptsSinceLastSuccess = 0;
+    encSim.totalExpectedCost = 0;
+    encSim.totalExpectedSuccesses = 0;
+    encSim.totalSuccessVariance = 0;
+    simEls.encLog.replaceChildren();
+  }
+
+  encRemoveCumulative();
+  const logs = [];
+  const MAX = 5_000_000;
+  let guard = 0;
+  const cond = () => (mode === "batch" ? guard < remaining : encSim.currentInk < target && guard < MAX);
+  while (cond()) {
+    guard++;
+    encSim.totalAttempts++;
+    encSim.totalCost += unit;
+    encSim.attemptsSinceLastSuccess++;
+    const chance = encGetChance(encSim.currentInk, isEta);
+    encAccumulate(chance);
+    if (Math.random() < chance) {
+      const inkBefore = encSim.currentInk;
+      encSim.successCount++;
+      encSim.currentInk++;
+      logs.push({
+        attempts: encSim.attemptsSinceLastSuccess,
+        inkBefore,
+        inkAfter: encSim.currentInk,
+        cost: unit * encSim.attemptsSinceLastSuccess,
+        unit,
+        rate: chance * 100,
+      });
+      encSim.attemptsSinceLastSuccess = 0;
+    }
+  }
+  logs.forEach(encAppendLog);
+  encUpdateCumulative();
+  encRefreshStatus();
+}
+function encReset() {
+  encSim.currentInk = 0;
+  encSim.totalAttempts = 0;
+  encSim.successCount = 0;
+  encSim.totalCost = 0;
+  encSim.attemptsSinceLastSuccess = 0;
+  encSim.totalExpectedCost = 0;
+  encSim.totalExpectedSuccesses = 0;
+  encSim.totalSuccessVariance = 0;
+  simEls.encLog.replaceChildren();
+  simEls.encStartInk.value = "0";
+  encRefreshStatus();
+}
+function encRenderPresets() {
+  const list = ENC_PRESETS[encIsEta() ? "eta" : "vianu"][encIsElso() ? "elso" : "man"];
+  simEls.encPresets.innerHTML = list
+    .map(([name, val]) => `<button class="sim-preset" type="button" data-cost="${val}">${escapeHtml(name)}</button>`)
+    .join("");
+  simEls.encCostLabel.textContent = encIsElso() ? "1회 비용 (엘소)" : "1회 비용 (만원)";
+  simEls.encBaseCost.value = list[0][1];
+}
+function wireEncryptSim() {
+  encRenderPresets();
+  encRefreshStatus();
+  document.querySelectorAll('input[name="encInkType"]').forEach((r) =>
+    r.addEventListener("change", () => {
+      encRenderPresets();
+      encRefreshStatus();
+    })
+  );
+  simEls.encElso.addEventListener("change", () => {
+    encRenderPresets();
+    encRefreshStatus();
+  });
+  simEls.encDiscount.addEventListener("change", encRefreshStatus);
+  simEls.encBaseCost.addEventListener("input", encRefreshStatus);
+  simEls.encStartInk.addEventListener("change", () => {
+    const s = parseInt(simEls.encStartInk.value, 10);
+    if (Number.isInteger(s) && s >= 0) encSim.currentInk = s;
+    encRefreshStatus();
+  });
+  simEls.encPresets.addEventListener("click", (ev) => {
+    const btn = ev.target.closest("[data-cost]");
+    if (!btn) return;
+    simEls.encBaseCost.value = btn.dataset.cost;
+    encRefreshStatus();
+  });
+  simEls.encRunBatch.addEventListener("click", () => encRunLoop("batch"));
+  simEls.encRunTarget.addEventListener("click", () => encRunLoop("target"));
+  simEls.encReset.addEventListener("click", encReset);
+}
+
+// ── 코어 강화 시뮬 (CoreEnhanceSimulatorView) ─────────────────
+let coreStages = [];
+
+function coreBuildStages(isAbyss) {
+  const rows = [
+    [0, 0, 1, 0, 0, 0, 0],
+    [0, 1, 2, 10, 0, 4000000, 100],
+    [0, 2, 3, 20, 0, 4400000, isAbyss ? 80 : 70],
+    [0, 3, 4, 30, 0, 4800000, isAbyss ? 60 : 50],
+    [0, 4, 5, 40, 0, 5200000, isAbyss ? 35 : 20],
+    [1, 0, 6, 50, 0, 5600000, isAbyss ? 25 : 10],
+    [1, 1, 7, 60, 0, 6000000, isAbyss ? 20 : 7],
+    [1, 2, 8, 70, 0, 6400000, isAbyss ? 20 : 7],
+    [1, 3, 9, 80, 0, 6800000, isAbyss ? 20 : 7],
+    [1, 4, 10, 90, 0, 7200000, isAbyss ? 20 : 7],
+    [2, 0, 12, 100, 0, 7600000, isAbyss ? 15 : 5],
+    [2, 1, 14, 110, 0, 8000000, isAbyss ? 15 : 5],
+    [2, 2, 16, 120, 0, 8400000, isAbyss ? 15 : 5],
+    [2, 3, 18, 130, 0, 8800000, isAbyss ? 15 : 5],
+    [2, 4, 20, 140, 0, 9200000, isAbyss ? 15 : 5],
+    [3, 0, 23, 200, 5, 12000000, isAbyss ? 8 : 2],
+    [3, 1, 26, 210, 5, 12400000, isAbyss ? 8 : 2],
+    [3, 2, 29, 220, 5, 12800000, isAbyss ? 8 : 2],
+    [3, 3, 32, 230, 5, 13200000, isAbyss ? 8 : 2],
+    [3, 4, 35, 240, 5, 13600000, isAbyss ? 8 : 2],
+    [4, 0, 40, 250, 5, 14000000, isAbyss ? 5 : 1],
+    [4, 1, 50, 260, 5, 14400000, isAbyss ? 5 : 1],
+    [4, 2, 60, 270, 5, 14800000, isAbyss ? 5 : 1],
+    [4, 3, 70, 280, 5, 15200000, isAbyss ? 5 : 1],
+    [4, 4, 80, 290, 5, 15600000, isAbyss ? 5 : 1],
+  ];
+  return rows.map((x, i) => ({
+    index: i,
+    tier: x[0],
+    enhance: x[1],
+    dust: x[3],
+    crystal: x[4],
+    seed: x[5],
+    ratePct: x[6],
+    rate: x[6] / 100,
+    display: `${x[0]}진 ${x[1]}강`,
+  }));
+}
+function coreIsAbyss() {
+  return document.querySelector('input[name="coreType"]:checked')?.value === "abyss";
+}
+function coreParseLong(input) {
+  let s = String(input || "").replace(/[,_\s]/g, "").replace(/seed/gi, "");
+  s = s.replace(/억/g, "00000000").replace(/만/g, "0000");
+  const n = Number(s);
+  if (!Number.isInteger(n) || n < 0) return null;
+  return n;
+}
+function coreFmtEok(amount) {
+  return (amount / 1e8).toFixed(2);
+}
+function coreFmtCount(value) {
+  const r = Math.round(value * 100) / 100;
+  if (Math.abs(r - Math.round(r)) < 0.0001) return Math.round(r).toLocaleString("ko-KR");
+  return r.toLocaleString("ko-KR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function corePopulateStages() {
+  simEls.coreStartStage.innerHTML = coreStages.map((s) => optionHtml(String(s.index), s.display)).join("");
+  simEls.coreStartStage.value = "0";
+  simEls.coreTargetStage.innerHTML = coreStages.map((s) => optionHtml(String(s.index), s.display)).join("");
+  simEls.coreTargetStage.value = String(coreStages.length - 1);
+}
+function coreApplyModeUi() {
+  // 가루 보유 시 상자 가격 입력 숨김 (단계 콤보는 건드리지 않음)
+  simEls.coreBoxPriceField.hidden = simEls.coreHasDust.checked;
+}
+function coreCalc() {
+  const startIdx = parseInt(simEls.coreStartStage.value, 10);
+  const targetIdx = parseInt(simEls.coreTargetStage.value, 10);
+  if (startIdx >= targetIdx) {
+    alert("목표 단계는 시작 단계보다 높아야 합니다.");
+    return;
+  }
+  const isMainStat = simEls.coreMainStat.checked;
+  const isSubStat = !isMainStat;
+  const hasDust = simEls.coreHasDust.checked;
+
+  let dustUnitPrice = 0;
+  if (!hasDust) {
+    const box = coreParseLong(simEls.coreBoxPrice.value);
+    if (box == null) {
+      alert("상자 가격을 숫자로 입력해주세요.");
+      return;
+    }
+    // 상자 가격은 만원 단위 입력 → 원으로 환산 후 가루 1개당 고정비 2만원 추가
+    dustUnitPrice = box * 10000 + 20000;
+  }
+
+  const rows = [];
+  let totalDust = 0, totalCrystal = 0, totalSeed = 0, totalCost = 0;
+
+  for (let i = startIdx + 1; i <= targetIdx; i++) {
+    const step = coreStages[i];
+    if (step.rate <= 0) {
+      alert(`${step.display} 단계 확률이 0%라 계산할 수 없습니다.`);
+      return;
+    }
+    const expected = 1 / step.rate;
+
+    let dustPer = step.dust, crystalPer = step.crystal, seedPer = step.seed;
+    if (isSubStat) {
+      dustPer = Math.floor(dustPer / 2);
+      crystalPer = Math.floor(crystalPer / 2);
+      seedPer = Math.floor(seedPer / 2);
+    }
+
+    const dustExp = Math.round(dustPer * expected);
+    const crystalExp = Math.round(crystalPer * expected);
+    const seedExp = Math.round(seedPer * expected);
+    const dustCost = !hasDust ? dustExp * dustUnitPrice : 0;
+    const stepCost = dustCost + seedExp;
+
+    totalDust += dustExp;
+    totalCrystal += crystalExp;
+    totalSeed += seedExp;
+    totalCost += stepCost;
+
+    rows.push({ step, expected, dustExp, crystalExp, seedExp, stepCost });
+  }
+
+  coreRenderTable(rows);
+  coreRenderSummary({ isMainStat, startIdx, targetIdx, totalDust, totalCrystal, totalSeed, totalCost });
+}
+function coreRenderTable(rows) {
+  const head = [
+    "단계",
+    "확률",
+    "시도",
+    `${simIcon("코어가루.png")}가루`,
+    `${simIcon("코어결정.png")}결정`,
+    `${simIcon("시드.png")}강화 비용`,
+    `${simIcon("시드.png")}총 기대비용`,
+  ];
+  const body = rows
+    .map((r) => {
+      const cells = [r.step.display, `${r.step.ratePct}%`, coreFmtCount(r.expected), r.dustExp.toLocaleString("ko-KR"), r.crystalExp.toLocaleString("ko-KR"), `${coreFmtEok(r.seedExp)}억`, `${coreFmtEok(r.stepCost)}억`];
+      return "<tr>" + cells.map((c, i) => `<td${i === cells.length - 1 ? ' class="sim-cost"' : ""}>${escapeHtml(c)}</td>`).join("") + "</tr>";
+    })
+    .join("");
+  simEls.coreTable.innerHTML = `<thead><tr>${head.map((h) => `<th><span class="sim-th">${h}</span></th>`).join("")}</tr></thead><tbody>${body}</tbody>`;
+}
+function coreRenderSummary(s) {
+  const statLabel = s.isMainStat ? "주스탯" : "부스탯";
+  const range = `${coreStages[s.startIdx].display} → ${coreStages[s.targetIdx].display}`;
+  simEls.coreSummary.innerHTML =
+    `<div class="sim-summary-title">${escapeHtml(statLabel)} | ${escapeHtml(range)} 기대값</div>` +
+    `<div class="sim-summary-mats">` +
+    `<span>${simIcon("코어가루.png", 24)}${s.totalDust.toLocaleString("ko-KR")}개</span>` +
+    `<span>${simIcon("코어결정.png", 24)}${s.totalCrystal.toLocaleString("ko-KR")}개</span>` +
+    `<span>${simIcon("시드.png", 24)}${coreFmtEok(s.totalCost)}억</span>` +
+    `</div>`;
+}
+function wireCoreSim() {
+  coreStages = coreBuildStages(coreIsAbyss());
+  corePopulateStages();
+  coreApplyModeUi();
+  document.querySelectorAll('input[name="coreType"]').forEach((r) =>
+    r.addEventListener("change", () => {
+      coreStages = coreBuildStages(coreIsAbyss());
+      corePopulateStages();
+    })
+  );
+  simEls.coreHasDust.addEventListener("change", coreApplyModeUi);
+  simEls.coreCalc.addEventListener("click", coreCalc);
+}
+
+// ── 신조 렐릭 시뮬 (RelicExpectationSimulatorView) ─────────────
+const RELIC_RATES = [
+  [20, 20, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48, 50, 52, 54],
+  [10, 20, 20, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48, 50, 52],
+  [10, 10, 20, 20, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48, 50],
+  [0, 0, 10, 20, 20, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48],
+  [0, 0, 0, 10, 20, 20, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44, 46],
+  [0, 0, 0, 0, 10, 20, 20, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44],
+  [0, 0, 0, 0, 0, 10, 20, 20, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42],
+  [0, 0, 0, 0, 0, 0, 10, 20, 20, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40],
+  [0, 0, 0, 0, 0, 0, 0, 10, 20, 20, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38],
+  [0, 0, 0, 0, 0, 0, 0, 0, 10, 20, 20, 20, 22, 24, 26, 28, 30, 32, 34, 36],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 20, 20, 20, 22, 24, 26, 28, 30, 32, 34],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 20, 20, 20, 22, 24, 26, 28, 30, 32],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 20, 20, 20, 22, 24, 26, 28, 30],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 20, 20, 20, 22, 24, 26, 28],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 20, 20, 20, 22, 24, 26],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 20, 20, 20, 22, 24],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 20, 20, 20, 22],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 20, 20, 20],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 20, 20],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 20],
+].map((r) => r.map((v) => v / 100));
+
+function relicCosts(isPendant) {
+  const shinjo = isPendant ? [140, 100, 25, 35, 25, 25, 25, 25, 50, 50] : [110, 80, 20, 30, 20, 20, 20, 20, 40, 40];
+  const luna = isPendant ? 50 : 40;
+  const powder = [5, 5, 7, 10, 12, 14, 16, 17, 18, 19];
+  const essence = [0, 3, 6, 10, 15, 21, 28, 36, 45, 54];
+  const moonPieces = [9, 11, 12, 14, 15, 18, 21, 24, 27, 30];
+  const moonStones = [1, 3, 6, 10, 15, 21, 28, 36, 45, 0];
+  const costs = [];
+  for (let i = 0; i < 10; i++) costs.push({ powder: powder[i], essence: essence[i], moonStone: 0, moonPiece: 0, required: shinjo[i] });
+  for (let i = 0; i < 10; i++) costs.push({ powder: 0, essence: 0, moonStone: moonStones[i], moonPiece: moonPieces[i], required: luna });
+  return costs;
+}
+// 진화 재료 시퀀스: 레벨 L 도달 시 소비하는 정수/월광석 = seq[L-2] (이전 단계 → 현재 단계 진화에 사용)
+// 신조 정수 10칸(레벨 1~10) 다음 루나 월광석 9칸이 이어짐 → 신조 마지막 정수 54가 루나 1단계 월광석 칸으로 넘어옴
+const RELIC_EVOL_SEQ = [0, 3, 6, 10, 15, 21, 28, 36, 45, 54, 1, 3, 6, 10, 15, 21, 28, 36, 45];
+
+function relicFmtLevel(level) {
+  if (level <= 0) return "0단계";
+  return level <= 10 ? `신조 ${level}단계` : `루나 ${level - 10}단계`;
+}
+function relicFmtNum(v) {
+  return Math.ceil(Math.max(0, v)).toLocaleString("ko-KR");
+}
+function relicReadInt(el, label, min, max) {
+  const raw = String(el.value || "").replace(/,/g, "").trim();
+  const n = parseInt(raw, 10);
+  if (!Number.isInteger(n) || n < min || n > max) {
+    alert(`${label}은(는) ${min}~${max} 숫자로 입력해주세요.`);
+    return null;
+  }
+  return n;
+}
+function relicCalc() {
+  const currentLevel = relicReadInt(simEls.relicCurrent, "현재 레벨", 0, 19);
+  if (currentLevel == null) return;
+  const targetLevel = relicReadInt(simEls.relicTarget, "목표 레벨", 1, 20);
+  if (targetLevel == null) return;
+  const difficulty = relicReadInt(simEls.relicDifficulty, "강화 가능 단수", 1, 20);
+  if (difficulty == null) return;
+  if (targetLevel <= currentLevel) {
+    alert("목표 레벨은 현재 레벨보다 높아야 합니다.");
+    return;
+  }
+  const isPendant = document.querySelector('input[name="relicType"]:checked')?.value === "pendant";
+  const costs = relicCosts(isPendant);
+
+  const rows = [];
+  let totalPowder = 0, totalEssence = 0, totalMoonStone = 0, totalMoonPiece = 0;
+  let reached = currentLevel;
+  let stopReason = null;
+
+  for (let level = currentLevel + 1; level <= targetLevel; level++) {
+    const chance = RELIC_RATES[level - 1][difficulty - 1];
+    if (chance <= 0) {
+      stopReason = `${relicFmtLevel(level)} 강화 확률이 0%라 ${relicFmtLevel(level - 1)}에서 정지`;
+      break;
+    }
+    const cost = costs[level - 1];
+    const expected = cost.required / chance;
+    const powder = expected * cost.powder;
+    const moonPiece = expected * cost.moonPiece;
+    // 정수/월광석: 이전 단계 → 이 단계 진화에 쓴 재료 (첫 레벨은 없음)
+    // 재료 종류는 "출발 단계" 기준: 신조(≤10)에서 진화하면 정수, 루나(≥11)에서 진화하면 월광석
+    // → 신조 10단계 → 루나 1단계 전환은 신조의 정수 54 사용 (루나 1단계 행에 정수로 표기)
+    const reachMat = level >= 2 ? RELIC_EVOL_SEQ[level - 2] : null;
+    const isShinjo = level <= 10;
+    const matIsEssence = level <= 11;
+    const essence = reachMat != null && matIsEssence ? reachMat : null;
+    const moonStone = reachMat != null && !matIsEssence ? reachMat : null;
+    rows.push({ level, chance, expected, powder, essence, moonStone, moonPiece, isShinjo });
+    totalPowder += powder;
+    totalEssence += essence != null ? essence : 0;
+    totalMoonStone += moonStone != null ? moonStone : 0;
+    totalMoonPiece += moonPiece;
+    reached = level;
+  }
+
+  relicRenderTable(rows);
+  const name = isPendant ? "펜던트" : "브레이슬릿";
+  const mats = [];
+  if (totalPowder > 0 || totalEssence > 0) {
+    mats.push(`<span>${simIcon("응축된신조의가루.png", 24)}${relicFmtNum(totalPowder)}개</span>`);
+    mats.push(`<span>${simIcon("신조의정수.png", 24)}${relicFmtNum(totalEssence)}개</span>`);
+  }
+  if (totalMoonPiece > 0 || totalMoonStone > 0) {
+    mats.push(`<span>${simIcon("달의파편.png", 24)}${relicFmtNum(totalMoonPiece)}개</span>`);
+    mats.push(`<span>${simIcon("월광석.png", 24)}${relicFmtNum(totalMoonStone)}개</span>`);
+  }
+  let html = `<div class="sim-summary-title">| ${escapeHtml(name)} | ${escapeHtml(relicFmtLevel(currentLevel))} → ${escapeHtml(relicFmtLevel(targetLevel))} | ${escapeHtml(relicFmtLevel(reached))} MAX |</div>`;
+  html += `<div class="sim-summary-mats">${mats.join("")}</div>`;
+  if (stopReason) html += `<div class="sim-summary-note">※ ${escapeHtml(stopReason)}</div>`;
+  simEls.relicSummary.innerHTML = html;
+}
+function relicRenderTable(rows) {
+  const head = [
+    "단계",
+    "확률",
+    "시도",
+    `${simIcon("응축된신조의가루.png")}신조의 가루`,
+    `${simIcon("신조의정수.png")}신조의 정수`,
+    `${simIcon("달의파편.png")}달의 파편`,
+    `${simIcon("월광석.png")}월광석`,
+  ];
+  const body = rows
+    .map((r) => {
+      const isShinjo = r.isShinjo;
+      const cells = [
+        relicFmtLevel(r.level),
+        `${(r.chance * 100).toFixed(2)}%`,
+        relicFmtNum(r.expected),
+        isShinjo ? relicFmtNum(r.powder) : "",
+        r.essence != null ? relicFmtNum(r.essence) : "",
+        isShinjo ? "" : relicFmtNum(r.moonPiece),
+        r.moonStone != null ? relicFmtNum(r.moonStone) : "",
+      ];
+      return "<tr>" + cells.map((c) => `<td>${escapeHtml(c)}</td>`).join("") + "</tr>";
+    })
+    .join("");
+  simEls.relicTable.innerHTML = `<thead><tr>${head.map((h) => `<th><span class="sim-th">${h}</span></th>`).join("")}</tr></thead><tbody>${body}</tbody>`;
+}
+function wireRelicSim() {
+  simEls.relicCalc.addEventListener("click", relicCalc);
 }
 
 boot().catch((error) => {
