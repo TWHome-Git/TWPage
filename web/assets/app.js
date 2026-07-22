@@ -1999,6 +1999,53 @@ function dmgSkillsFor(char, type) {
   return list && list.length ? list : DMG_SKILL_FALLBACK;
 }
 
+// 캐릭터·타입별 버프 목록 (assets/buffs.json에서 로드)
+// JSON 구조: {캐릭터: {버프: {버프명: {아이콘, 효과{공격피해량,적받는피해증가,적능력치감소,추가피해량,중딜레이감소}}}, 타입: {한글타입명: [버프명,...]}}}
+// 버프 정의는 캐릭터당 1곳(버프)에서만 관리하고, 타입별 목록은 이름으로 참조
+// 키: "캐릭터명::CALC타입" → [ {name, icon(파일명|null), effects{...}}, ... ]
+let DMG_BUFFS = {};
+
+async function loadDmgBuffs() {
+  try {
+    const res = await fetch("./assets/buffs.json", { cache: "no-store" });
+    if (!res.ok) return;
+    const data = await res.json();
+    const map = {};
+    for (const [charName, entry] of Object.entries(data)) {
+      if (!entry || typeof entry !== "object") continue;
+      const defs = entry["버프"] || {};
+      const types = entry["타입"] || {};
+      for (const [koType, list] of Object.entries(types)) {
+        const type = DMG_TYPE_FROM_KO[String(koType).replace(/\s+/g, "")];
+        if (!type || !Array.isArray(list)) continue;
+        map[`${charName}::${type}`] = list
+          .map((name) => {
+            const d = defs[name] || {};
+            const eff = d["효과"] || {};
+            return {
+              name: String(name).trim(),
+              icon: d["아이콘"] || null,
+              effects: {
+                attackDamage: Number(eff["공격피해량"]) || 0,
+                enemyTaken: Number(eff["적받는피해증가"]) || 0,
+                statReduction: Number(eff["적능력치감소"]) || 0,
+                additional: Number(eff["추가피해량"]) || 0,
+                skillDelay: Number(eff["중딜레이감소"]) || 0,
+              },
+            };
+          })
+          .filter((b) => b.name);
+      }
+    }
+    DMG_BUFFS = map;
+    // 이미 열려 있으면 버프 영역을 다시 그리도록 캐시 무효화 후 갱신
+    dmg.skillKey = null;
+    if (dmgInited) dmgRefresh();
+  } catch (error) {
+    console.info("버프 목록(buffs.json)을 불러오지 못했습니다.", error);
+  }
+}
+
 async function loadDmgSkills() {
   try {
     const res = await fetch("./assets/skills.json", { cache: "no-store" });
@@ -2272,12 +2319,22 @@ function dmgPopulateSelects() {
   dmgFillSelect("dmgJudgement", Array.from({ length: 41 }, (_, i) => `LV${i} - ${(i * 0.75).toFixed(2)}%`));
   dmgFillSelect("dmgEtaCrit", Array.from({ length: 21 }, (_, i) => `LV${i} - ${(i * 1.5).toFixed(1)}%`));
 
-  // 캐릭터 특성 스킬/패시브 자리표시 토글 8개 (추후 캐릭터별 데이터로 교체)
-  if (dmgEls.dmgTraitChecks) {
-    dmgEls.dmgTraitChecks.innerHTML = Array.from({ length: 8 }, (_, i) =>
-      `<label class="dmg-row is-placeholder"><span class="dmg-row-label"><span class="dmg-chk-icon"></span>버프 ${i + 1}</span><input type="checkbox" class="dmg-switch" disabled /></label>`
-    ).join("");
-  }
+}
+
+// 캐릭터·타입별 버프 토글 렌더 (buffs.json 기반, 효과 수치는 추후 연동)
+function dmgRenderBuffs(skillKey) {
+  if (!dmgEls.dmgTraitChecks) return;
+  const buffs = DMG_BUFFS[skillKey] || [];
+  dmgEls.dmgTraitChecks.innerHTML = buffs.length
+    ? buffs
+        .map((b) => {
+          const icon = b.icon
+            ? `<img class="dmg-chk-icon" src="./images/buff/${encodeURIComponent(b.icon)}" alt="" />`
+            : '<span class="dmg-chk-icon"></span>';
+          return `<label class="dmg-row"><span class="dmg-row-label">${icon}${escapeHtml(b.name)}</span><input type="checkbox" class="dmg-switch" disabled /></label>`;
+        })
+        .join("")
+    : '<p class="dmg-note">등록된 버프가 없습니다.</p>';
 }
 // 스킬 프리셋 선택값을 스킬 배율/크리 배율/타수 텍스트박스에 채움
 function dmgApplySkillPreset() {
@@ -2306,6 +2363,7 @@ function dmgRefresh() {
   const skillKey = `${s.characterName}::${s.calcType}`;
   if (dmg.skillKey !== skillKey) {
     dmg.skillKey = skillKey;
+    dmgRenderBuffs(skillKey);
     const skills = dmgSkillsFor(s.characterName, s.calcType);
     dmg.skillList = skills;
     if (dmgEls.dmgSkillSelect) {
@@ -3023,5 +3081,6 @@ boot().catch((error) => {
   els.equipmentCard.replaceChildren(els.emptyTemplate.content.cloneNode(true));
 });
 
-// 대미지 계산기 스킬 프리셋 로드 (실패해도 기본값으로 동작)
+// 대미지 계산기 스킬 프리셋·버프 목록 로드 (실패해도 기본값으로 동작)
 loadDmgSkills();
+loadDmgBuffs();
