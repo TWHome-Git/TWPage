@@ -2391,6 +2391,7 @@ function dmgRefresh() {
   dmgEls.dmgAddDmgSum.textContent = `${dmgAdditionalDamagePercent()}%`;
   dmgEls.dmgFinalSum.textContent = `${dmgFinalPercent()}%`;
   dmgEls.dmgCritSum.textContent = `${dmgCritFactorPercent()}%`;
+  if (dmgEls.dmgSienaSum) dmgEls.dmgSienaSum.textContent = `${dmgV("dmgSiena")}%`;
 
   dmgEls.dmgTraitName.textContent = dmg.modifierName;
   dmgEls.dmgTraitList.innerHTML = [
@@ -2408,9 +2409,9 @@ function dmgRefresh() {
   const passive = dmgCalcRange(entry, 0.85);
 
   dmgEls.dmgResult.innerHTML =
-    `<div><span>일반 대미지</span><strong>${dmgNum(dmgAvg(normal))}</strong><em>일반 DPS ${dmgNum(dmgCalcDps(normal, entry))}</em></div>` +
-    `<div><span>강타 대미지</span><strong>${dmgNum(dmgAvg(strong))}</strong><em>강타 DPS 미정</em></div>` +
-    `<div><span>방무 대미지</span><strong>${dmgNum(dmgAvg(passive))}</strong><em>방무 DPS 미정</em></div>`;
+    `<div><span>일반 대미지</span><strong>${dmgNum(dmgAvg(normal))}</strong></div>` +
+    `<div><span>강타 대미지</span><strong>${dmgNum(dmgAvg(strong))}</strong></div>` +
+    `<div><span>방무 대미지</span><strong>${dmgNum(dmgAvg(passive))}</strong></div>`;
 }
 
 function initDamageCalculator() {

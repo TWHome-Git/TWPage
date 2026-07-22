@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>TW DB</title>
-    <link rel="stylesheet" href="./assets/styles.css?v=20260716-buff-2" />
+    <link rel="stylesheet" href="./assets/styles.css?v=20260716-buff-6" />
   </head>
   <body>
     <main class="app-shell">
@@ -228,6 +228,7 @@
                   </div>
                 </section>
 
+                <div class="dmg-stack">
                 <section class="dmg-card">
                   <h3>추가 정보</h3>
                   <div class="dmg-rows">
@@ -235,25 +236,50 @@
                     <label class="dmg-row"><span class="dmg-row-label">부가 - 물리/마법 피해 증폭</span><input id="dmgWeaponAmp" type="checkbox" class="dmg-switch" /></label>
                     <label class="dmg-row"><span class="dmg-row-label">콤보 보너스</span><input id="dmgCombo" type="checkbox" class="dmg-switch" /></label>
                   </div>
-                  <div class="dmg-sub-title">계열 공격력 <span id="dmgSeriesSum">0%</span></div>
+                </section>
+
+                <section class="dmg-card">
+                  <h3>시에나 <span id="dmgSienaSum" class="dmg-badge">0%</span></h3>
+                  <div class="dmg-rows">
+                    <label class="dmg-row"><span class="dmg-row-label">시에나 (%)</span><input id="dmgSiena" type="number" value="0" /></label>
+                  </div>
+                </section>
+                </div>
+
+                <div class="dmg-stack">
+                <section class="dmg-card">
+                  <h3>계열 공격력 <span id="dmgSeriesSum" class="dmg-badge">0%</span></h3>
                   <div class="dmg-rows">
                     <label class="dmg-row"><span class="dmg-row-label"><img id="dmgArtifactIcon" class="dmg-chk-icon" src="./equipment-images/이클립스의_참력.png" alt="" data-dynamic />아티팩트</span><select id="dmgSeriesArtifact"></select></label>
                     <label class="dmg-row"><span class="dmg-row-label"><img class="dmg-chk-icon" src="./images/손목부가.png" alt="" />손목 부가옵션</span><select id="dmgSeriesWrist"></select></label>
                     <label class="dmg-row"><span class="dmg-row-label"><img class="dmg-chk-icon" src="./images/렐릭어빌.png" alt="" />루나리아 부가옵션</span><select id="dmgSeriesLunaria"></select></label>
                   </div>
-                  <div class="dmg-sub-title">추가 피해량 <span id="dmgAddDmgSum">0%</span></div>
+                </section>
+
+                <section class="dmg-card">
+                  <h3>추가 피해량 <span id="dmgAddDmgSum" class="dmg-badge">0%</span></h3>
                   <div class="dmg-rows">
                     <label class="dmg-row"><span class="dmg-row-label"><img class="dmg-chk-icon" src="./images/저격연마.png" alt="" />저격 연마</span><select id="dmgAddSniper"></select></label>
                     <label class="dmg-row"><span class="dmg-row-label"><img class="dmg-chk-icon" src="./images/장비강화석.png" alt="" />장비 강화석 부가옵션</span><select id="dmgAddGem"></select></label>
                     <label class="dmg-row"><span class="dmg-row-label">기타</span><input id="dmgAddWeapon" type="number" value="0" /></label>
                   </div>
                 </section>
+                </div>
 
                 <section class="dmg-card">
                   <h3>캐릭터 특성 <span id="dmgTraitName" class="dmg-badge">-</span></h3>
                   <div id="dmgTraitChecks" class="dmg-rows dmg-trait-checks"></div>
-                  <p class="dmg-note">※ 버프 효과 수치는 추후 연동 예정입니다.</p>
                   <div id="dmgTraitList" class="dmg-trait-list"></div>
+                </section>
+
+                <div class="dmg-stack">
+                <section class="dmg-card">
+                  <h3>치명타 배율 <span id="dmgCritSum" class="dmg-badge">0%</span></h3>
+                  <div class="dmg-rows">
+                    <label class="dmg-row"><span class="dmg-row-label"><img class="dmg-chk-icon" src="./images/약점간파.png" alt="" />약점 간파 (40%)</span><input id="dmgWeakPoint" type="checkbox" class="dmg-switch" /></label>
+                    <label class="dmg-row"><span class="dmg-row-label"><img class="dmg-chk-icon" src="./images/정의의심판.png" alt="" />정의의 심판</span><select id="dmgJudgement"></select></label>
+                    <label class="dmg-row"><span class="dmg-row-label"><img class="dmg-chk-icon" src="./images/치배.png" alt="" />에타 - 치명타 배율</span><select id="dmgEtaCrit"></select></label>
+                  </div>
                 </section>
 
                 <section class="dmg-card">
@@ -263,20 +289,8 @@
                     <label class="dmg-row"><span class="dmg-row-label"><img class="dmg-chk-icon" src="./images/코어.png" alt="" />코어 세트 (0~20)</span><input id="dmgCoreSet" type="number" value="0" /></label>
                     <label class="dmg-row"><span class="dmg-row-label"><img class="dmg-chk-icon" src="./images/최종.png" alt="" />에타 - 최종 대미지</span><select id="dmgEtaFinal"></select></label>
                   </div>
-                  <div class="dmg-sub-title">시에나</div>
-                  <div class="dmg-rows">
-                    <label class="dmg-row"><span class="dmg-row-label">시에나 (%)</span><input id="dmgSiena" type="number" value="0" /></label>
-                  </div>
                 </section>
-
-                <section class="dmg-card">
-                  <h3>치명타 배율 <span id="dmgCritSum" class="dmg-badge">0%</span></h3>
-                  <div class="dmg-rows">
-                    <label class="dmg-row"><span class="dmg-row-label"><img class="dmg-chk-icon" src="./images/약점간파.png" alt="" />약점 간파 (40%)</span><input id="dmgWeakPoint" type="checkbox" class="dmg-switch" /></label>
-                    <label class="dmg-row"><span class="dmg-row-label"><img class="dmg-chk-icon" src="./images/정의의심판.png" alt="" />정의의 심판</span><select id="dmgJudgement"></select></label>
-                    <label class="dmg-row"><span class="dmg-row-label"><img class="dmg-chk-icon" src="./images/치배.png" alt="" />에타 - 치명타 배율</span><select id="dmgEtaCrit"></select></label>
-                  </div>
-                </section>
+                </div>
               </div>
             </div>
           </section>
@@ -381,6 +395,6 @@
       </div>
     </template>
 
-    <script src="./assets/app.js?v=20260716-buff-2" type="module"></script>
+    <script src="./assets/app.js?v=20260716-buff-6" type="module"></script>
   </body>
 </html>
