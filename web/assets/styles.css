@@ -376,7 +376,7 @@ select {
 
 .coefficient-detail-header {
   display: grid;
-  grid-template-columns: 90px 1fr auto 140px;
+  grid-template-columns: 90px 1fr auto auto 140px;
   gap: 12px;
   align-items: center;
   min-height: 46px;
@@ -1081,6 +1081,44 @@ select {
   background: var(--accent);
 }
 
+/* 계수 계산기 프리셋 (캐릭터·타입별 3개) */
+.preset-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.preset-label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.preset-button {
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.preset-button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.preset-button.is-active {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
 .coefficient-selected {
   color: var(--accent);
 }
@@ -1371,6 +1409,15 @@ select {
   font-weight: 800;
 }
 
+.sim-status .sim-graph-legend {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
 .sim-status .sim-graph {
   font-family: "Consolas", "D2Coding", monospace;
   color: var(--accent);
@@ -1519,7 +1566,359 @@ select {
   }
 }
 
-/* 준비중 플레이스홀더 (대미지 계산기 / 추가 메뉴) */
+/* ── 대미지 계산기 ── */
+/* hidden 속성이 display:grid에 덮이지 않도록 (캐릭터 미선택 시 결과 숨김) */
+.dmg-nodata[hidden],
+.dmg-body[hidden] {
+  display: none;
+}
+
+.dmg-nodata {
+  display: grid;
+  place-items: center;
+  gap: 8px;
+  min-height: 360px;
+  padding: 40px 16px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.dmg-nodata strong {
+  color: var(--ink);
+  font-size: 18px;
+}
+
+.dmg-body {
+  display: grid;
+  gap: 12px;
+}
+
+.dmg-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 12px;
+  align-items: end;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.dmg-head-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  align-items: center;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.dmg-head-info strong {
+  color: var(--accent-strong);
+  font-size: 15px;
+  margin-left: 4px;
+}
+
+.dmg-inline-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.dmg-inline-field input,
+.dmg-inline-field select {
+  min-height: 32px;
+  min-width: 86px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0 8px;
+  color: var(--ink);
+  background: #fff;
+  font-size: 13px;
+  outline: none;
+}
+
+.dmg-inline-field input:focus,
+.dmg-inline-field select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(15, 111, 99, 0.14);
+}
+
+.dmg-result {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.dmg-result div {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-strong);
+}
+
+.dmg-result span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.dmg-result strong {
+  color: var(--accent);
+  font-size: 20px;
+}
+
+.dmg-result em {
+  color: var(--blue);
+  font-size: 13px;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.dmg-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.dmg-breakdown strong {
+  color: var(--ink);
+  margin-left: 4px;
+}
+
+.dmg-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(238px, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+.dmg-card {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+/* 세로 정렬 행: 라벨 왼쪽 · 컨트롤 오른쪽 */
+.dmg-rows {
+  display: grid;
+  gap: 6px;
+}
+
+.dmg-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  min-height: 32px;
+  margin: 0;
+}
+
+.dmg-row-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.dmg-row > input[type="number"],
+.dmg-row > input[type="text"],
+.dmg-row > select {
+  flex: none;
+  width: 110px;
+  min-height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0 8px;
+  color: var(--ink);
+  background: #fff;
+  font-size: 13px;
+  outline: none;
+}
+
+.dmg-row > input:focus,
+.dmg-row > select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(15, 111, 99, 0.16);
+}
+
+/* 토글 스위치 */
+.dmg-switch {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: none;
+  width: 42px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--line);
+  position: relative;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.dmg-switch::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  transition: transform 0.15s ease;
+}
+
+.dmg-switch:checked {
+  background: var(--accent);
+}
+
+.dmg-switch:checked::before {
+  transform: translateX(20px);
+}
+
+.dmg-sub-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.dmg-sub-title span {
+  color: var(--accent-strong);
+  font-size: 12px;
+}
+
+.dmg-card h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--ink);
+  font-size: 15px;
+}
+
+.dmg-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--panel-strong);
+  color: var(--accent-strong);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.dmg-sub {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.dmg-sub-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.dmg-sub-head span {
+  color: var(--accent-strong);
+  font-size: 12px;
+}
+
+.dmg-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: center;
+}
+
+/* 체크박스/콤보 앞 아이콘 자리표시자 (추후 이미지 교체) */
+.dmg-chk-icon {
+  display: inline-block;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+}
+
+span.dmg-chk-icon {
+  background: var(--panel-strong);
+  border: 1px dashed var(--line);
+}
+
+img.dmg-chk-icon {
+  object-fit: contain;
+  vertical-align: middle;
+}
+
+.dmg-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.dmg-trait-checks .is-placeholder {
+  opacity: 0.55;
+}
+
+.dmg-trait-list {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.dmg-trait-list strong {
+  color: var(--ink);
+}
+
+@media (max-width: 1024px) {
+  .dmg-grid,
+  .dmg-result {
+    grid-template-columns: 1fr;
+  }
+
+  .dmg-head {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 준비중 플레이스홀더 (추가 메뉴) */
 .coming-soon {
   display: grid;
   place-items: center;
@@ -1855,7 +2254,7 @@ select {
   }
 
   .coefficient-detail-header {
-    grid-template-columns: 90px 1fr auto;
+    grid-template-columns: 90px 1fr auto auto;
   }
 
   .coefficient-detail-header .dark-field {

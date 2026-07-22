@@ -164,6 +164,7 @@ const calc = {
   characterName: "",
   types: [],
   type: null,
+  preset: 1, // 캐릭터·타입별 프리셋 (1~3)
   mainRows: [],
   accRows: [],
   dex: 0,
@@ -217,6 +218,7 @@ async function boot() {
   activateCalculatorTab("coefficient");
   activateSimulatorTab("encrypt");
   wireEvents();
+  initDamageCalculator();
   initSimulators();
 
   try {
@@ -484,6 +486,7 @@ function activateCalculatorTab(key) {
     panel.hidden = !isActive;
     panel.classList.toggle("is-active", isActive);
   });
+  if (key === "damage") dmgRefresh();
 }
 
 function activateSimulatorTab(key) {
@@ -959,6 +962,10 @@ function showCoefficientDetail(characterName) {
   }
   els.coefficientTypeSelect.value = calc.type;
 
+  // 해당 캐릭터·타입에서 마지막으로 쓰던 프리셋 복원
+  calc.preset = savedPresetFor(characterName, calc.type);
+  updatePresetButtons();
+
   calc.mainRows = MAIN_SLOTS.map(makeSlotRow);
   calc.accRows = ACCESSORY_SLOTS.map(makeSlotRow);
 
@@ -975,12 +982,44 @@ function showCoefficientSelect() {
   els.coefficientSelectView.hidden = false;
 }
 
+// 프리셋 버튼 활성 표시 갱신
+function updatePresetButtons() {
+  document.querySelectorAll("#coefficientPresetGroup [data-preset]").forEach((btn) => {
+    btn.classList.toggle("is-active", Number(btn.dataset.preset) === calc.preset);
+  });
+}
+
+// 프리셋 전환: 현재 프리셋을 저장한 뒤 대상 프리셋 데이터 로드 (없으면 기본값)
+function switchPreset(n) {
+  if (!calc.active || n === calc.preset) return;
+
+  // 대기 중인 자동 저장 취소 후 현재 프리셋에 즉시 저장
+  if (saveTimer) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+  }
+  saveCalcState();
+
+  calc.preset = n;
+
+  // 선택 프리셋 기억
+  const charEntry = calc.save.characters[calc.characterName];
+  if (charEntry) {
+    charEntry.presetSel = charEntry.presetSel || {};
+    charEntry.presetSel[slotBaseKey()] = n;
+    saveCalcSave();
+  }
+
+  updatePresetButtons();
+  refreshAllRows();
+}
+
 // 선택된 캐릭터 + 계산 타입의 데이터만 초기화
 function resetCurrentTypeData() {
   if (!calc.active || !calc.characterName || !calc.type) return;
 
   const typeName = CALC_TYPE_DISPLAY[calc.type] || calc.type;
-  const ok = window.confirm(`${calc.characterName} · ${typeName} 데이터를 초기화할까요?`);
+  const ok = window.confirm(`${calc.characterName} · ${typeName} · 프리셋 ${calc.preset} 데이터를 초기화할까요?`);
   if (!ok) return;
 
   // 대기 중인 자동 저장 취소 (초기화 직후 되살아나지 않도록)
@@ -1091,8 +1130,19 @@ function saveCalcSave() {
   }
 }
 
-function slotSaveKey() {
+function slotBaseKey() {
   return `${calc.characterName}::${calc.type}`;
+}
+
+// 프리셋 1은 기존 키 그대로(하위 호환), 2·3은 ::p2 / ::p3 접미사
+function slotSaveKey() {
+  return calc.preset > 1 ? `${slotBaseKey()}::p${calc.preset}` : slotBaseKey();
+}
+
+function savedPresetFor(characterName, type) {
+  const charEntry = calc.save.characters[characterName];
+  const n = charEntry && charEntry.presetSel ? charEntry.presetSel[`${characterName}::${type}`] : 1;
+  return n === 2 || n === 3 ? n : 1;
 }
 
 // 입력 변경 시 디바운스 자동 저장
@@ -1143,6 +1193,10 @@ function saveCalcState() {
     avatarMain: !!(els.avatarMainEnhance && els.avatarMainEnhance.checked),
     avatarSub: !!(els.avatarSubEnhance && els.avatarSubEnhance.checked),
   };
+
+  // 캐릭터·타입별 마지막 선택 프리셋 기억
+  charEntry.presetSel = charEntry.presetSel || {};
+  charEntry.presetSel[slotBaseKey()] = calc.preset;
 
   calc.save.characters[calc.characterName] = charEntry;
   calc.save.lastCharacter = calc.characterName;
@@ -1510,6 +1564,10 @@ function updateDerived() {
     );
   }
   els.coefficientContentSummary.innerHTML = cards.join("");
+
+  // 대미지 계산기 탭이 열려 있으면 계수 변경을 즉시 반영
+  const damagePanel = document.querySelector('[data-calculator-panel="damage"]');
+  if (damagePanel && !damagePanel.hidden) dmgRefresh();
 }
 
 function wireEvents() {
@@ -1544,7 +1602,16 @@ function wireEvents() {
   els.coefficientTypeSelect?.addEventListener("change", () => {
     saveCalcState();
     calc.type = els.coefficientTypeSelect.value;
+    // 바뀐 타입에서 마지막으로 쓰던 프리셋 복원
+    calc.preset = savedPresetFor(calc.characterName, calc.type);
+    updatePresetButtons();
     refreshAllRows();
+  });
+
+  document.querySelector("#coefficientPresetGroup")?.addEventListener("click", (event) => {
+    const btn = event.target.closest("[data-preset]");
+    if (!btn) return;
+    switchPreset(Number(btn.dataset.preset));
   });
 
   els.avatarMainEnhance?.addEventListener("change", updateDerived);
@@ -1800,6 +1867,524 @@ function escapeHtml(value) {
 }
 
 // ══════════════════════════════════════════════════════════════
+//  대미지 계산기 (DamageCalculatorView 로직 이식)
+// ══════════════════════════════════════════════════════════════
+// 에타 레벨별 각성 피해 증가 (index = 레벨 0~100)
+// ※ 93레벨 2.256은 원본 데이터 그대로 (앞뒤가 2.55/2.56이라 원본 오타로 보임)
+const DMG_ETA_AWAKENING = [
+  2.0, 2.01, 2.01, 2.02, 2.02, 2.03, 2.03, 2.04, 2.04, 2.05, 2.05,
+  2.06, 2.06, 2.07, 2.07, 2.08, 2.08, 2.09, 2.09, 2.1, 2.1,
+  2.15, 2.15, 2.16, 2.16, 2.17, 2.17, 2.18, 2.18, 2.19, 2.19,
+  2.2, 2.2, 2.21, 2.21, 2.22, 2.22, 2.23, 2.23, 2.24, 2.24,
+  2.29, 2.29, 2.3, 2.3, 2.31, 2.31, 2.32, 2.32, 2.33, 2.33,
+  2.34, 2.34, 2.35, 2.35, 2.36, 2.36, 2.37, 2.37, 2.38, 2.38,
+  2.4, 2.4, 2.41, 2.41, 2.42, 2.42, 2.43, 2.43, 2.44, 2.44,
+  2.45, 2.45, 2.46, 2.46, 2.47, 2.47, 2.48, 2.48, 2.49, 2.49,
+  2.5, 2.5, 2.51, 2.51, 2.52, 2.52, 2.53, 2.53, 2.54, 2.54,
+  2.55, 2.55, 2.256, 2.56, 2.57, 2.57, 2.58, 2.58, 2.59, 2.59,
+];
+
+// 몬스터: [이름, 스탯방어, 고정방어, 고정피감, 피감률, 속성값, HP]
+const DMG_MONSTERS = [
+  ["허수아비", 990, 0, 0, 0.0, 90, 380000000],
+  ["지하 요새", 1350, 3000, 0, 82.0, 120, 300000000],
+  ["머큐리얼 보스", 1500, 7200, 0, 48.0, 120, 700000000],
+  ["어비스 지옥", 1500, 8100, 0, 75.0, 120, 2170000000],
+  ["어비스 코어 마스터", 1500, 8700, 0, 75.0, 120, 2300000000],
+  ["갈망하는 즐거움", 1500, 15000, 0, 82.0, 125, 1520000000],
+  ["형제의 대장간", 1050, 6000, 5850, 59.5, 120, 24500000],
+  ["시오칸하임 보스", 1500, 33720, 4550, 51.0, 125, 2000000000],
+  ["시오칸하임 오딘", 1500, 51720, 4550, 51.0, 125, 8000000000],
+  ["오딘 랭킹전", 1500, 57720, 4550, 51.0, 125, 12000000000],
+  ["멜카르트 키메라", 900, 57000, 0, 57.75, 120, 300000000],
+  ["상실의 숲", 1350, 36000, 4550, 51.0, 120, 255000000],
+  ["이클립스 보스1(로카고스, 에트로스, 체리아)", 1500, 39720, 4550, 51.0, 125, 2550000000],
+  ["이클립스 보스2(라이코스, 마티나, 티로로스)", 1500, 41220, 4550, 51.0, 125, 2550000000],
+  ["아페티리아(N)", 1500, 41700, 4550, 51.0, 125, 5100000000],
+  ["셀리니아코스(H)", 1500, 59700, 4550, 65.0, 125, 15300000000],
+  ["고이티아(H)", 1500, 61200, 4550, 68.5, 125, 20400000000],
+  ["키시니크(H)", 1500, 64200, 4550, 72.0, 125, 25500000000],
+  ["이클립스 토벌전", 1500, 61200, 4550, 68.5, 125, 17850000000],
+  ["골고라 협곡 보병", 1500, 72000, 0, 58.0, 125, 300000000],
+  ["골고나 협곡 부대장", 1500, 81000, 4550, 68.5, 125, 7200000000],
+  ["최후의 결전 1(로카고스, 체리아)", 1500, 81000, 4550, 68.5, 125, 5200000000],
+  ["최후의 결전 2(티로로스, 고이티아)", 1500, 81000, 4550, 68.5, 125, 7800000000],
+  ["최후의 결전 석상", 1500, 105000, 4550, 68.5, 125, 6000000000],
+  ["셀리니아코스(EX)", 1500, 116700, 5850, 65.0, 125, 4080000000],
+  ["고이티아(EX)", 1500, 116700, 5850, 68.5, 125, 4080000000],
+  ["키시니크(EX)", 1500, 118050, 5850, 72.0, 125, 4080000000],
+  ["릴리의 성소10", 1500, 37140, 0, 51.0, 120, 3600000000],
+  ["릴리의 성소11", 1500, 58200, 0, 72.0, 125, 10000000000],
+  ["릴리의 성소12", 1500, 60780, 0, 72.0, 125, 11000000000],
+  ["릴리의 성소13", 1500, 62610, 0, 72.0, 125, 13310000000],
+  ["릴리의 성소14", 1500, 76290, 0, 72.0, 125, 13310000000],
+  ["릴리의 성소15", 1500, 76950, 0, 72.0, 125, 14641000000],
+  ["릴리의 성소16", 1500, 77610, 0, 72.0, 125, 16105100000],
+  ["릴리의 성소17", 1500, 100200, 0, 72.0, 125, 11273570000],
+  ["릴리의 성소18", 1500, 102120, 0, 72.0, 125, 10146213000],
+  ["릴리의 성소19", 1500, 104040, 0, 72.0, 125, 9131591700],
+  ["릴리의 성소20", 1500, 106860, 0, 72.0, 125, 8218432520],
+  ["레이티아 N", 1950, 105000, 3250, 67.5, 125, 15000000000],
+  ["설계자 N", 1950, 105000, 3250, 67.5, 125, 15000000000],
+  ["레이티아 H", 1950, 130200, 2925, 70.75, 125, 15000000000],
+  ["설계사 H", 1950, 130800, 2925, 70.75, 125, 15000000000],
+].map((x) => ({ name: x[0], statDef: x[1], fixedDef: x[2], fixedReduction: x[3], reductionRate: x[4], attribute: x[5], hp: x[6] }));
+
+// 캐릭터 특성: [이름, 적받피증가, 공격피해량, 추가피해량, 능력치감소, 딜레이감소]
+const DMG_MODIFIERS = [
+  ["아나이스 마법", 0, 3, 0, 0, 0],
+  ["아나이스 비호", 20, 23, 0, 0, 5],
+  ["아나이스 파괴", 10, 3, 0, 0, 0],
+  ["예프넨", 10, 0, 0, 0, 0],
+  ["이자크", 5, 5, 0, 0, 0],
+  ["이스핀", 15, 8, 0, 10, 0],
+  ["이솔렛", 0, 20, 0, 20, 5],
+  ["클로에", 10, 7, 30, 10, 0],
+  ["시벨린", 10, 15, 0, 10, 0],
+  ["조슈아", 10, 3, 20, 20, 0],
+  ["티치엘", 0, 20, 0, 0, 0],
+  ["티치엘 타격", 0, 20, 0, 20, 0],
+  ["나야트레이", 5, 0, 0, 10, 0],
+  ["녹턴", 5, 5, 10, 0, 0],
+  ["벤야", 10, 10, 0, 10, 0],
+  ["보리스", 0, 3, 10, 0, 10],
+  ["막시민", 10, 5, 0, 10, 0],
+  ["밀라", 10, 2, 0, 20, 5],
+  ["란지에", 20, 13, 0, 0, 0],
+  ["리체", 15, 0, 0, 0, 0],
+  ["루시안", 5, 5, 0, 0, 0],
+  ["로아미니", 20, 23, 0, 25, 0],
+].map((x) => ({ name: x[0], dmgAmp: x[1], atkPower: x[2], addDmg: x[3], statReduction: x[4], skillDelay: x[5] }));
+
+const DMG_SNIPER = [0, 5, 10, 15, 20, 25, 28, 31, 34, 37, 40];
+const DMG_GEM = [0, 45, 46, 47, 48]; // 무기 장비 강화석 부가옵션
+const DMG_DEEP_RUNE = [0, 3, 6, 9]; // 심화 룬 LV0~LV3
+// 무기/손목 어빌: 야성 11 / 상실 10 / 심연 9 / 없음 0
+const DMG_ABIL_WEAPON_VALS = [11, 10, 9, 0];
+const DMG_ABIL_WEAPON_LABELS = ["야성 (11%)", "상실 (10%)", "심연 (9%)", "없음 (0%)"];
+// 손 어빌: 야성 9 / 상실 8 / 심연 7 / 없음 0
+const DMG_ABIL_HAND_VALS = [9, 8, 7, 0];
+const DMG_ABIL_HAND_LABELS = ["야성 (9%)", "상실 (8%)", "심연 (7%)", "없음 (0%)"];
+const DMG_SERIES_ARTIFACT = [15, 20, 30, 35];
+const DMG_SERIES_ART_LABELS = ["프시키 (15%)", "아크론 (20%)", "이클립스 (30%)", "에테르 (35%)"];
+const DMG_SERIES_WRIST = [25, 26, 27, 28];
+
+// 계산 타입(계열)별 이클립스 아티팩트 아이콘 (equipment-images 폴더)
+const DMG_ECLIPSE_ARTIFACT = {
+  [CALC.STAB]: "이클립스의_자력.png",
+  [CALC.HACK]: "이클립스의_참력.png",
+  [CALC.MAGIC_ATTACK]: "이클립스의_마력.png",
+  [CALC.MAGIC_DEFENSE]: "이클립스의_신성.png",
+  [CALC.PHYSICAL_HYBRID]: "이클립스의_물리력.png",
+  [CALC.MAGIC_HACK]: "이클립스의_마참력.png",
+};
+
+// 캐릭터·타입별 스킬 프리셋 (assets/skills.json에서 로드)
+// 키: "캐릭터명::CALC타입" → [ [스킬명, 스킬배율%, 크리배율%, 타수], ... ]
+let DMG_SKILLS = {};
+const DMG_SKILL_FALLBACK = [["기본 (임시 · 배율 1000 / 크리 200 / 1타)", 1000, 200, 1]];
+
+// skills.json의 한글 타입명 → CALC 키 (공백 제거 후 비교: "물리 복합"/"물리복합" 모두 허용)
+const DMG_TYPE_FROM_KO = {
+  찌르기: CALC.STAB,
+  베기: CALC.HACK,
+  마법공격: CALC.MAGIC_ATTACK,
+  마법방어: CALC.MAGIC_DEFENSE,
+  물리복합: CALC.PHYSICAL_HYBRID,
+  마법베기: CALC.MAGIC_HACK,
+};
+
+function dmgSkillsFor(char, type) {
+  const list = DMG_SKILLS[`${char}::${type}`];
+  return list && list.length ? list : DMG_SKILL_FALLBACK;
+}
+
+async function loadDmgSkills() {
+  try {
+    const res = await fetch("./assets/skills.json", { cache: "no-store" });
+    if (!res.ok) return;
+    const data = await res.json();
+    const map = {};
+    for (const [charName, types] of Object.entries(data)) {
+      if (!types || typeof types !== "object") continue;
+      for (const [koType, list] of Object.entries(types)) {
+        const type = DMG_TYPE_FROM_KO[String(koType).replace(/\s+/g, "")];
+        if (!type || !Array.isArray(list)) continue;
+        map[`${charName}::${type}`] = list
+          .map((sk) => [
+            String(sk["스킬명"] ?? "").trim(),
+            Number(sk["스킬배율"]) || 0,
+            Number(sk["크리배율"]) || 0,
+            Number(sk["타수"]) || 1,
+          ])
+          .filter((sk) => sk[0]);
+      }
+    }
+    DMG_SKILLS = map;
+    // 이미 열려 있으면 콤보를 다시 채우도록 캐시 무효화 후 갱신
+    dmg.skillKey = null;
+    if (dmgInited) dmgRefresh();
+  } catch (error) {
+    console.info("스킬 프리셋(skills.json)을 불러오지 못했습니다.", error);
+  }
+}
+
+const dmgEls = {};
+let dmgInited = false;
+const dmg = {
+  statCoefficient: 0,
+  equipmentCoefficient: 0,
+  dexCorrection: 0,
+  finalCoefficient: 0,
+  etaAwakening: 0,
+  traitAttackDamage: 0,
+  traitEnemyTaken: 0,
+  traitAdditional: 0,
+  traitStatReduction: 0,
+  traitSkillDelay: 0,
+  modifierName: "-",
+  skillKey: "", // "캐릭터::타입" — 스킬 프리셋 콤보 캐시 키
+  skillList: DMG_SKILL_FALLBACK,
+  skillMul: 0,
+  critMul: 0,
+  hitCount: 1,
+};
+
+function dmgV(id) {
+  const el = dmgEls[id];
+  const n = Number(String(el?.value ?? "").replace(/,/g, "").trim());
+  return Number.isFinite(n) ? n : 0;
+}
+function dmgChecked(id) {
+  return !!dmgEls[id]?.checked;
+}
+function dmgSel(id) {
+  return dmgEls[id] ? Math.max(0, dmgEls[id].selectedIndex) : 0;
+}
+
+// 계수 계산기 → 대미지 계산기 스냅샷
+function dmgSnapshot() {
+  if (!calc.active || !calc.characterName || !calc.type) return null;
+  const totals = calcTotalMetrics();
+  const statRow = accRow("스탯");
+  return {
+    characterName: calc.characterName,
+    calcType: calc.type,
+    calcTypeName: CALC_TYPE_DISPLAY[calc.type] || "",
+    statCoefficient: statRow ? statRow.coefficient : 0,
+    totalCoefficient: totals.totalCoefficient,
+    dexValue: calc.dex,
+    totalPrimarySum: totals.totalPrimarySum,
+    primaryEnchantSum: totals.primaryEnchantSum,
+    secondarySum: totals.secondarySum,
+    secondaryEnchantSum: totals.secondaryEnchantSum,
+  };
+}
+
+// 계수 가공 (UpdateCoefficientBreakdown)
+function dmgApplySnapshot(s) {
+  const statCoefficient = s.statCoefficient;
+  const equipmentCoefficient = Math.max(0, s.totalCoefficient - statCoefficient);
+  const correction = Math.floor(statCoefficient + s.dexValue * 3.0) / 18.0;
+  const bonus = Math.floor((equipmentCoefficient / 25.0) * (0.05 + 0.03 * 5)) * 25.0;
+  const finalCoefficient = Math.floor(statCoefficient + equipmentCoefficient) + bonus;
+  dmg.statCoefficient = statCoefficient;
+  dmg.equipmentCoefficient = equipmentCoefficient;
+  dmg.dexCorrection = correction;
+  dmg.finalCoefficient = finalCoefficient;
+}
+
+// 캐릭터 특성 (ApplyCharacterModifier)
+function dmgApplyModifier(characterName, calcTypeName) {
+  const isAnais = characterName === "아나이스";
+  const isMagicDefense = calcTypeName.includes("마법방어") || calcTypeName.includes("신성");
+
+  let resolved = characterName;
+  if (isAnais) {
+    resolved = isMagicDefense ? "아나이스 비호" : "아나이스 마법";
+  }
+
+  const m = DMG_MODIFIERS.find((x) => x.name === resolved) || null;
+  if (!m) {
+    dmg.modifierName = "특성 값 없음";
+    dmg.traitAttackDamage = 0;
+    dmg.traitEnemyTaken = 0;
+    dmg.traitAdditional = 0;
+    dmg.traitStatReduction = 0;
+    dmg.traitSkillDelay = 0;
+    return;
+  }
+  dmg.modifierName = m.name;
+  dmg.traitEnemyTaken = m.dmgAmp;
+  dmg.traitAttackDamage = m.atkPower;
+  dmg.traitAdditional = m.addDmg;
+  dmg.traitStatReduction = m.statReduction;
+  dmg.traitSkillDelay = m.skillDelay;
+}
+
+function dmgApplyEta() {
+  let lv = Math.round(dmgV("dmgEtaLevel"));
+  lv = Math.min(100, Math.max(1, lv));
+  dmg.etaAwakening = DMG_ETA_AWAKENING[lv] ?? 0;
+}
+
+// ── 배율 ──
+function dmgCritFactorPercent() {
+  const weak = dmgChecked("dmgWeakPoint") ? 40 : 0;
+  const judge = Math.min(40, dmgSel("dmgJudgement")) * 0.75;
+  const etaCrit = Math.min(20, dmgSel("dmgEtaCrit")) * 1.5;
+  return weak + judge + etaCrit;
+}
+function dmgFinalPercent() {
+  const club = dmgChecked("dmgClubFinal") ? 5 : 0;
+  const core = dmgV("dmgCoreSet");
+  const etaFinal = Math.min(5, dmgSel("dmgEtaFinal")) * 4;
+  return club + core + etaFinal;
+}
+function dmgSpecialFactor() {
+  const r = Math.min(50, Math.max(0, dmgV("dmgSpecialReduction")));
+  return 1 - r / 100;
+}
+function dmgSeriesPercent() {
+  const art = DMG_SERIES_ARTIFACT[dmgSel("dmgSeriesArtifact")] ?? 15;
+  const wrist = DMG_SERIES_WRIST[dmgSel("dmgSeriesWrist")] ?? 25;
+  const lunaria = dmgSel("dmgSeriesLunaria"); // 0~10 콤보 (index=값)
+  return art + wrist + lunaria;
+}
+function dmgAtk1Percent() {
+  let v = 0;
+  if (dmgChecked("dmgA1Snowman")) v += 20;
+  if (dmgChecked("dmgA1Illumi")) v += 10;
+  if (dmgChecked("dmgA1IsabelDmg")) v += 10;
+  if (dmgChecked("dmgA1IsabelSpecial")) v += 10;
+  if (dmgChecked("dmgA1IsabelBattle")) v += 10;
+  return Math.min(v + dmgV("dmgA1Etc"), 50);
+}
+function dmgAtk2Percent() {
+  let v = 0;
+  if (dmgChecked("dmgA2Awakening")) v += 5;
+  if (dmgChecked("dmgA2ClubP")) v += 5;
+  if (dmgChecked("dmgA2Explore")) v += 5;
+  if (dmgChecked("dmgA2TwPower")) v += 5;
+  if (dmgChecked("dmgA2Ham")) v += 10;
+  if (dmgChecked("dmgA2Event")) v += 10;
+  return Math.min(v + dmgV("dmgA2Etc"), 30);
+}
+function dmgAtk3Percent() {
+  return Math.min(dmg.traitAttackDamage, 65);
+}
+function dmgAtk4Percent() {
+  let v = 0;
+  if (dmgChecked("dmgAfTitle")) v += 20;
+  v += DMG_ABIL_WEAPON_VALS[dmgSel("dmgAfWeapon")] ?? 0;
+  if (dmgChecked("dmgAfFever")) v += 10;
+  v += DMG_ABIL_WEAPON_VALS[dmgSel("dmgAfWrist")] ?? 0;
+  v += DMG_ABIL_HAND_VALS[dmgSel("dmgAfHand")] ?? 0;
+  v += dmgSel("dmgAfLunaria");
+  v += DMG_DEEP_RUNE[dmgSel("dmgAfDeepRune")] ?? 0;
+  return Math.min(v + dmgV("dmgAfEtc"), 80);
+}
+function dmgAttackDamagePercent() {
+  return dmgAtk1Percent() + dmgAtk2Percent() + dmgAtk3Percent() + dmgAtk4Percent();
+}
+function dmgAdditionalDamagePercent() {
+  const sniper = DMG_SNIPER[dmgSel("dmgAddSniper")] ?? 0;
+  const gem = DMG_GEM[dmgSel("dmgAddGem")] ?? 0;
+  const weapon = Math.min(100, Math.max(0, dmgV("dmgAddWeapon")));
+  return sniper + gem + weapon + dmg.traitAdditional;
+}
+function dmgMonsterAttrFactor(cur, mon) {
+  return Math.min(1.5, Math.max(1.0, 1.0 + (cur - mon) * 0.00625));
+}
+function dmgMonsterReductionFactor(rate) {
+  return Math.min(1, Math.max(0, 1.0 - rate / 100.0));
+}
+
+// ── 핵심 대미지 (CalculateDamageRange) ──
+function dmgCalcRange(entry, defenseMultiplier) {
+  const monsterDefense = (entry.statDef + entry.fixedDef) * defenseMultiplier;
+  const attrFactor = dmgMonsterAttrFactor(dmgV("dmgElement"), entry.attribute);
+  const redFactor = dmgMonsterReductionFactor(entry.reductionRate);
+
+  const baseMin = dmg.finalCoefficient + 1 - monsterDefense;
+  const baseMax = dmg.finalCoefficient + 1 + Math.floor(dmg.dexCorrection) - monsterDefense;
+
+  const skillFactor = dmgV("dmgSkill") / 100.0;
+  const helmetFactor = dmgChecked("dmgHelmet") ? 0.1 : 0.0;
+  const critMultiplier = dmgV("dmgCrit") / 100.0;
+  const critFactor = 1 + dmgCritFactorPercent() / 100.0;
+  const comboFactor = dmgChecked("dmgCombo") ? 1.15 : 1.0;
+  const finalFactor = 1 + dmgFinalPercent() / 100.0;
+  const specialFactor = dmgSpecialFactor();
+  const sienaFactor = 1 + dmgV("dmgSiena") / 100.0;
+  const etaFactor = Math.max(0, dmg.etaAwakening);
+  const seriesFactor = 1 + dmgSeriesPercent() / 100.0;
+  const ampFactor = 1 + dmg.traitEnemyTaken / 100.0;
+  const weaponAmpFactor = dmgChecked("dmgWeaponAmp") ? 1.1 : 1.0;
+  const attackDamageFactor = 1 + dmgAttackDamagePercent() / 100.0;
+
+  const innerMin = Math.floor(baseMin * (skillFactor + helmetFactor) * critMultiplier * critFactor * comboFactor * attrFactor);
+  const innerMax = Math.floor(baseMax * (skillFactor + helmetFactor) * critMultiplier * critFactor * comboFactor * attrFactor);
+
+  const midMin = Math.floor((innerMin * finalFactor * redFactor - entry.fixedReduction) * specialFactor * sienaFactor * etaFactor * seriesFactor * ampFactor * weaponAmpFactor);
+  const midMax = Math.floor((innerMax * finalFactor * redFactor - entry.fixedReduction) * specialFactor * sienaFactor * etaFactor * seriesFactor * ampFactor * weaponAmpFactor);
+
+  return {
+    min: Math.max(1, Math.floor(midMin * attackDamageFactor)),
+    max: Math.max(1, Math.floor(midMax * attackDamageFactor)),
+  };
+}
+function dmgAvg(range) {
+  return Math.floor((range.min + range.max) / 2.0);
+}
+function dmgCalcDps(range, entry) {
+  const avg = (range.min + range.max) / 2.0;
+  const hitDamage = Math.floor(avg * Math.max(1, dmgV("dmgHitCount")));
+  const addFactor = 1 + dmgAdditionalDamagePercent() / 100.0;
+  let total = hitDamage * addFactor;
+  if (!entry.name.includes("키메라")) {
+    total += Math.max(0, dmgV("dmgWeaponAdd")) * addFactor;
+  }
+  return Math.floor(total);
+}
+
+// ── 렌더링 ──
+function dmgFillSelect(id, labels, defaultIndex = 0) {
+  const el = dmgEls[id];
+  if (!el) return;
+  el.innerHTML = labels.map((label, i) => optionHtml(String(i), label)).join("");
+  el.selectedIndex = Math.min(Math.max(0, defaultIndex), labels.length - 1);
+}
+function dmgPopulateSelects() {
+  dmgFillSelect("dmgMonster", DMG_MONSTERS.map((m) => m.name));
+  // 어빌: 기본값은 "없음"(마지막 항목 0%)
+  dmgFillSelect("dmgAfWeapon", DMG_ABIL_WEAPON_LABELS, DMG_ABIL_WEAPON_LABELS.length - 1);
+  dmgFillSelect("dmgAfWrist", DMG_ABIL_WEAPON_LABELS, DMG_ABIL_WEAPON_LABELS.length - 1);
+  dmgFillSelect("dmgAfHand", DMG_ABIL_HAND_LABELS, DMG_ABIL_HAND_LABELS.length - 1);
+  dmgFillSelect("dmgAfLunaria", Array.from({ length: 11 }, (_, i) => `${i}%`));
+  dmgFillSelect("dmgAfDeepRune", DMG_DEEP_RUNE.map((v, i) => `LV${i} - ${v}%`));
+  dmgFillSelect("dmgSeriesArtifact", DMG_SERIES_ART_LABELS);
+  dmgFillSelect("dmgSeriesWrist", DMG_SERIES_WRIST.map((v) => `${v}%`));
+  dmgFillSelect("dmgSeriesLunaria", Array.from({ length: 11 }, (_, i) => `${i}%`));
+  dmgFillSelect("dmgAddSniper", DMG_SNIPER.map((v, i) => `LV${i} - ${v}%`));
+  dmgFillSelect("dmgAddGem", DMG_GEM.map((v) => `${v}%`));
+  dmgFillSelect("dmgEtaFinal", Array.from({ length: 6 }, (_, i) => `LV${i} - ${i * 4}%`));
+  dmgFillSelect("dmgJudgement", Array.from({ length: 41 }, (_, i) => `LV${i} - ${(i * 0.75).toFixed(2)}%`));
+  dmgFillSelect("dmgEtaCrit", Array.from({ length: 21 }, (_, i) => `LV${i} - ${(i * 1.5).toFixed(1)}%`));
+
+  // 캐릭터 특성 스킬/패시브 자리표시 토글 8개 (추후 캐릭터별 데이터로 교체)
+  if (dmgEls.dmgTraitChecks) {
+    dmgEls.dmgTraitChecks.innerHTML = Array.from({ length: 8 }, (_, i) =>
+      `<label class="dmg-row is-placeholder"><span class="dmg-row-label"><span class="dmg-chk-icon"></span>버프 ${i + 1}</span><input type="checkbox" class="dmg-switch" disabled /></label>`
+    ).join("");
+  }
+}
+// 스킬 프리셋 선택값을 스킬 배율/크리 배율/타수 텍스트박스에 채움
+function dmgApplySkillPreset() {
+  const skill = dmg.skillList[dmgSel("dmgSkillSelect")];
+  if (!skill) return;
+  if (dmgEls.dmgSkill) dmgEls.dmgSkill.value = String(skill[1]);
+  if (dmgEls.dmgCrit) dmgEls.dmgCrit.value = String(skill[2]);
+  if (dmgEls.dmgHitCount) dmgEls.dmgHitCount.value = String(skill[3]);
+}
+function dmgNum(v) {
+  return Math.round(v).toLocaleString("ko-KR");
+}
+function dmgRefresh() {
+  if (!dmgInited) return;
+  const s = dmgSnapshot();
+  const hasData = !!s;
+  if (dmgEls.dmgNoData) dmgEls.dmgNoData.hidden = hasData;
+  if (dmgEls.dmgBody) dmgEls.dmgBody.hidden = !hasData;
+  if (!hasData) return;
+
+  dmgApplySnapshot(s);
+  dmgApplyModifier(s.characterName, s.calcTypeName);
+  dmgApplyEta();
+
+  // 캐릭터·타입별 스킬 프리셋 콤보 (캐릭터나 타입이 바뀔 때만 다시 채우고 텍스트박스에 반영)
+  const skillKey = `${s.characterName}::${s.calcType}`;
+  if (dmg.skillKey !== skillKey) {
+    dmg.skillKey = skillKey;
+    const skills = dmgSkillsFor(s.characterName, s.calcType);
+    dmg.skillList = skills;
+    if (dmgEls.dmgSkillSelect) {
+      dmgEls.dmgSkillSelect.innerHTML = skills.map((sk, i) => optionHtml(String(i), sk[0])).join("");
+      dmgEls.dmgSkillSelect.selectedIndex = 0;
+    }
+    dmgApplySkillPreset();
+  }
+
+  dmgEls.dmgCharName.textContent = s.characterName;
+  dmgEls.dmgCalcType.textContent = s.calcTypeName;
+
+  // 아티팩트 아이콘: 계열에 맞는 이클립스 아티팩트로 교체
+  const artFile = DMG_ECLIPSE_ARTIFACT[s.calcType];
+  if (artFile && dmgEls.dmgArtifactIcon) {
+    const artSrc = `${IMAGE_BASE}${encodeURIComponent(artFile)}`;
+    if (dmgEls.dmgArtifactIcon.getAttribute("src") !== artSrc) dmgEls.dmgArtifactIcon.src = artSrc;
+  }
+  dmgEls.dmgFinalCoeff.textContent = dmgNum(dmg.finalCoefficient);
+
+  dmgEls.dmgAtk1Sum.textContent = `${dmgAtk1Percent()}% / 50%`;
+  dmgEls.dmgAtk2Sum.textContent = `${dmgAtk2Percent()}% / 30%`;
+  dmgEls.dmgAtk4Sum.textContent = `${dmgAtk4Percent()}% / 80%`;
+  dmgEls.dmgSeriesSum.textContent = `${dmgSeriesPercent()}%`;
+  dmgEls.dmgAddDmgSum.textContent = `${dmgAdditionalDamagePercent()}%`;
+  dmgEls.dmgFinalSum.textContent = `${dmgFinalPercent()}%`;
+  dmgEls.dmgCritSum.textContent = `${dmgCritFactorPercent()}%`;
+
+  dmgEls.dmgTraitName.textContent = dmg.modifierName;
+  dmgEls.dmgTraitList.innerHTML = [
+    ["공격 피해량(스킬)", `${dmg.traitAttackDamage}%`],
+    ["적이 받는 피해 증가", `${dmg.traitEnemyTaken}%`],
+    ["적 능력치 감소", `${dmg.traitStatReduction}%`],
+    ["추가 피해량", `${dmg.traitAdditional}%`],
+    ["중 딜레이 감소", `${dmg.traitSkillDelay}%`],
+  ].map(([k, v]) => `<div>${escapeHtml(k)} <strong>${escapeHtml(v)}</strong></div>`).join("");
+
+  const entry = DMG_MONSTERS[dmgSel("dmgMonster")];
+  if (!entry) return;
+  const normal = dmgCalcRange(entry, 1.0);
+  const strong = dmgCalcRange(entry, 0.5);
+  const passive = dmgCalcRange(entry, 0.85);
+
+  dmgEls.dmgResult.innerHTML =
+    `<div><span>일반 대미지</span><strong>${dmgNum(dmgAvg(normal))}</strong><em>일반 DPS ${dmgNum(dmgCalcDps(normal, entry))}</em></div>` +
+    `<div><span>강타 대미지</span><strong>${dmgNum(dmgAvg(strong))}</strong><em>강타 DPS 미정</em></div>` +
+    `<div><span>방무 대미지</span><strong>${dmgNum(dmgAvg(passive))}</strong><em>방무 DPS 미정</em></div>`;
+}
+
+function initDamageCalculator() {
+  if (dmgInited) return;
+  const panel = document.querySelector('[data-calculator-panel="damage"]');
+  if (!panel) return;
+  panel.querySelectorAll("[id]").forEach((el) => (dmgEls[el.id] = el));
+  dmgEls.dmgNoData = document.getElementById("dmgNoData");
+  dmgEls.dmgBody = document.getElementById("dmgBody");
+  dmgInited = true;
+
+  // 체크박스 아이콘 이미지가 없으면 자리표시 박스로 대체 (동적 아이콘 제외)
+  panel.querySelectorAll("img.dmg-chk-icon:not([data-dynamic])").forEach((img) => {
+    img.addEventListener("error", () => {
+      const box = document.createElement("span");
+      box.className = "dmg-chk-icon";
+      img.replaceWith(box);
+    });
+  });
+
+  dmgPopulateSelects();
+
+  // 스킬 프리셋 선택 시 스킬 배율/크리/타수 자동 입력 (패널 change보다 먼저 실행되어 값이 반영됨)
+  dmgEls.dmgSkillSelect?.addEventListener("change", dmgApplySkillPreset);
+
+  panel.addEventListener("input", dmgRefresh);
+  panel.addEventListener("change", dmgRefresh);
+
+  dmgRefresh();
+}
+
+// ══════════════════════════════════════════════════════════════
 //  시뮬레이터 3종 (TWChatOverlay 로직 이식)
 // ══════════════════════════════════════════════════════════════
 const simEls = {};
@@ -1912,7 +2497,8 @@ function encLuckGraph(z) {
     chars.push(levels[lv]);
   }
   const cz = Math.max(-3, Math.min(3, z));
-  let mark = Math.round(((cz + 3) / 6) * (n - 1));
+  // 운이 좋을수록(z 큼) 왼쪽에 표시 → "상위 %" 텍스트 방향과 일치 (왼쪽=운 좋음)
+  let mark = Math.round(((-cz + 3) / 6) * (n - 1));
   mark = Math.max(0, Math.min(n - 1, mark));
   chars[mark] = "◆";
   return chars.join("");
@@ -1932,7 +2518,15 @@ function encRefreshStatus() {
   rows.push(`<div>누적 비용: ${encFmtCost(encSim.totalCost)}</div>`);
   const luck = encLuckStats();
   if (luck) {
-    rows.push(`<div>행운 지표: 상위 ${luck.percentile.toFixed(2)}% · 10000명 중 ${luck.rank.toLocaleString("ko-KR")}번째로 운이 좋음</div>`);
+    // 표시용: 상위 % = 100 - percentile(나보다 운 나쁜 사람 비율), 100명 중 나보다 운 좋은 사람 수
+    const topPercent = Math.max(0, Math.min(100, 100 - luck.percentile));
+    const luckier = Math.round(topPercent);
+    const luckText =
+      luckier <= 0
+        ? `같은 횟수를 돌린 100명 중 나보다 운 좋은 사람이 거의 없어요 (상위 ${topPercent.toFixed(1)}%)`
+        : `같은 횟수를 돌린 100명 중 약 ${luckier}명만 나보다 운이 좋았어요 (상위 ${topPercent.toFixed(1)}%)`;
+    rows.push(`<div>${luckText}</div>`);
+    rows.push(`<div class="sim-graph-legend"><span>운 좋음</span><span>평균</span><span>운 나쁨</span></div>`);
     rows.push(`<div class="sim-graph">${encLuckGraph(luck.z)}</div>`);
   }
   simEls.encStatus.innerHTML = rows.join("");
@@ -2428,3 +3022,6 @@ boot().catch((error) => {
   els.dataStatus.textContent = "데이터 로드 실패";
   els.equipmentCard.replaceChildren(els.emptyTemplate.content.cloneNode(true));
 });
+
+// 대미지 계산기 스킬 프리셋 로드 (실패해도 기본값으로 동작)
+loadDmgSkills();
