@@ -247,7 +247,42 @@ function restoreLastCharacter() {
   }
 }
 
+// 시트의 AZ1 셀을 버전 값으로 사용:
+//  1) AZ1만 먼저 요청(수 바이트) → 저장된 캐시 버전과 같으면 전체 CSV 다운로드 생략
+//  2) 다르면(또는 버전 셀이 비어 있으면) 전체 CSV를 받고 캐시 갱신
+// AZ1이 비어 있으면 Google이 range를 무시하고 전체 CSV를 반환하므로,
+// "짧은 단일 토큰"일 때만 유효한 버전으로 인정한다.
+const SHEET_VERSION_URL = `${SHEET_CSV_URL}&range=AZ1`;
+const CSV_CACHE_KEY = "tw-equipment-csv-cache-v1";
+
+async function fetchSheetVersion() {
+  try {
+    const response = await fetch(SHEET_VERSION_URL, { cache: "no-store" });
+    if (!response.ok) return "";
+    const text = (await response.text()).trim().replace(/^"|"$/g, "");
+    // 줄바꿈/쉼표가 없는 40자 이하 값만 버전으로 인정 (전체 CSV가 반환된 경우 배제)
+    if (text && text.length <= 40 && !/[\n\r,<]/.test(text)) return text;
+  } catch (error) {
+    console.info("시트 버전 확인 실패 — 전체 CSV를 받습니다.", error);
+  }
+  return "";
+}
+
 async function loadSheetRows() {
+  const version = await fetchSheetVersion();
+
+  // 버전이 같으면 localStorage에 저장해둔 CSV 재사용
+  if (version) {
+    try {
+      const cached = JSON.parse(localStorage.getItem(CSV_CACHE_KEY) || "null");
+      if (cached && cached.version === version && typeof cached.text === "string" && cached.text) {
+        return parseDelimited(cached.text, ",");
+      }
+    } catch (error) {
+      console.info("CSV 캐시를 읽지 못했습니다.", error);
+    }
+  }
+
   const response = await fetch(SHEET_CSV_URL, { cache: "no-store" });
   if (!response.ok) {
     throw new Error(`Google Sheet CSV ${response.status}`);
@@ -255,6 +290,14 @@ async function loadSheetRows() {
   const text = await response.text();
   if (text.trim().startsWith("<")) {
     throw new Error("Google Sheet returned an HTML page instead of CSV.");
+  }
+
+  if (version) {
+    try {
+      localStorage.setItem(CSV_CACHE_KEY, JSON.stringify({ version, text }));
+    } catch (error) {
+      console.info("CSV 캐시 저장 실패(용량 초과 등) — 캐시 없이 동작합니다.", error);
+    }
   }
   return parseDelimited(text, ",");
 }
@@ -3085,3 +3128,16 @@ boot().catch((error) => {
 // 대미지 계산기 스킬 프리셋·버프 목록 로드 (실패해도 기본값으로 동작)
 loadDmgSkills();
 loadDmgBuffs();
+
+// 방문 수 배지 (hits.sh — 가입 불필요, 호스트+경로 기준 페이지뷰 집계)
+// 로컬(127.0.0.1)과 배포 주소는 서로 다른 키로 집계되므로 테스트 방문이 실제 수치에 섞이지 않음
+(function initVisitBadge() {
+  const badge = document.getElementById("visitBadge");
+  if (!badge) return;
+  const path = location.pathname.replace(/index\.html$/, "");
+  badge.src = `https://hits.sh/${location.host}${path}.svg?style=flat&label=View&color=0f6f63`;
+  // 서비스 장애 시 깨진 이미지가 보이지 않도록 로드 성공 시에만 표시
+  badge.addEventListener("load", () => {
+    badge.hidden = false;
+  });
+})();

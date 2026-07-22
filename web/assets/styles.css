@@ -1707,6 +1707,17 @@ select {
   align-items: start;
 }
 
+/* 페이지 하단 방문 수 배지 */
+.site-footer {
+  display: flex;
+  justify-content: center;
+  padding: 12px 0 4px;
+}
+
+.site-footer img {
+  height: 20px;
+}
+
 /* 한 그리드 칸 안에 카드를 세로로 쌓는 묶음 (계열+추가 피해량, 치명타+최종+시에나) */
 .dmg-stack {
   display: grid;
