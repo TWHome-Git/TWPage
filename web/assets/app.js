@@ -2620,13 +2620,10 @@ function encRefreshStatus() {
   rows.push(`<div>누적 비용: ${encFmtCost(encSim.totalCost)}</div>`);
   const luck = encLuckStats();
   if (luck) {
-    // 표시용: 상위 % = 100 - percentile(나보다 운 나쁜 사람 비율), 100명 중 나보다 운 좋은 사람 수
+    // 표시용: 상위 % = 100 - percentile(나보다 운 나쁜 사람 비율) → 100명 중 등수(순위)로 표현
     const topPercent = Math.max(0, Math.min(100, 100 - luck.percentile));
-    const luckier = Math.round(topPercent);
-    const luckText =
-      luckier <= 0
-        ? `같은 횟수를 돌린 100명 중 나보다 운 좋은 사람이 거의 없어요 (상위 ${topPercent.toFixed(1)}%)`
-        : `같은 횟수를 돌린 100명 중 약 ${luckier}명만 나보다 운이 좋았어요 (상위 ${topPercent.toFixed(1)}%)`;
+    const rank = Math.max(1, Math.min(100, Math.round(topPercent)));
+    const luckText = `운 순위: 100명 중 <span class="sim-status-strong">${rank}등</span> (상위 ${topPercent.toFixed(1)}%)`;
     rows.push(`<div>${luckText}</div>`);
     rows.push(`<div class="sim-graph-legend"><span>운 좋음</span><span>평균</span><span>운 나쁨</span></div>`);
     rows.push(`<div class="sim-graph">${encLuckGraph(luck.z)}</div>`);
@@ -3134,8 +3131,12 @@ loadDmgBuffs();
 (function initVisitBadge() {
   const badge = document.getElementById("visitBadge");
   if (!badge) return;
-  const path = location.pathname.replace(/index\.html$/, "");
-  badge.src = `https://hits.sh/${location.host}${path}.svg?style=flat&label=View&color=0f6f63`;
+  // 로컬 개발 주소는 hits.sh가 "Not a valid URI"로 거부하므로 배지 생략
+  if (/^(localhost|127\.0\.0\.1|\[?::1\]?)/.test(location.host)) return;
+  // 끝 슬래시를 제거해야 함: `.../TWPage/.svg` 는 hits.sh가 리다이렉트하며 쿼리(label)를 버려
+  // 라벨이 "hits"로 되돌아간다. `.../TWPage.svg` 로 직접 요청해야 label이 적용됨 (카운터는 동일).
+  const path = location.pathname.replace(/index\.html$/, "").replace(/\/$/, "");
+  badge.src = `https://hits.sh/${location.host}${path}.svg?style=flat&label=%EB%B0%A9%EB%AC%B8%EC%9E%90&color=0f6f63`;
   // 서비스 장애 시 깨진 이미지가 보이지 않도록 로드 성공 시에만 표시
   badge.addEventListener("load", () => {
     badge.hidden = false;

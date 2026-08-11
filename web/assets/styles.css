@@ -1702,7 +1702,7 @@ select {
 
 .dmg-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(238px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: 12px;
   align-items: start;
 }
@@ -1925,13 +1925,25 @@ img.dmg-chk-icon {
   color: var(--ink);
 }
 
+/* 화면이 좁아지면 4열 → 2열 → 1열로 단계적 축소 */
+@media (max-width: 1080px) {
+  .dmg-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
 @media (max-width: 1024px) {
-  .dmg-grid,
   .dmg-result {
     grid-template-columns: 1fr;
   }
 
   .dmg-head {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 620px) {
+  .dmg-grid {
     grid-template-columns: 1fr;
   }
 }
