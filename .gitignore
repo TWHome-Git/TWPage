@@ -1,8 +1,1 @@
-.agents/
-.codex/
-.codex-work/
-outputs/
-
-node_modules/
-.DS_Store
-Thumbs.db
+.claude/
