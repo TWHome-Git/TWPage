@@ -55,7 +55,7 @@ select {
 
 .top-tabs {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 4px;
   padding: 5px;
   border-radius: 8px 8px 0 0;
@@ -2218,6 +2218,39 @@ img.dmg-chk-icon {
 
 .eta-control-grid {
   grid-template-columns: 1fr;
+}
+
+.eta-server-tabs {
+  display: inline-flex;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 3px;
+  margin-right: 6px;
+}
+
+.eta-server-tab {
+  min-height: 28px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 0 14px;
+  color: var(--muted);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.eta-server-tab:hover {
+  background: var(--panel-strong);
+}
+
+.eta-server-tab.is-active {
+  border-color: var(--accent);
+  color: #fff;
+  background: var(--accent);
 }
 
 .eta-workspace {

@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>TW DB</title>
-    <link rel="stylesheet" href="./assets/styles.css?v=20260812-eta-2" />
+    <link rel="stylesheet" href="./assets/styles.css?v=20260812-eta-4" />
   </head>
   <body>
     <main class="app-shell">
@@ -28,11 +28,18 @@
               <span>검색</span>
               <input id="etaSearchInput" type="search" placeholder="아이디, 캐릭터" autocomplete="off" />
             </label>
+            <label class="field">
+              <span>날짜</span>
+              <select id="etaDateSelect" disabled>
+                <option value="">최신</option>
+              </select>
+            </label>
           </div>
         </section>
 
         <section class="result-band" aria-live="polite">
           <div class="result-meta">
+            <div id="etaServerTabs" class="eta-server-tabs" role="radiogroup" aria-label="서버 선택"></div>
             <strong id="etaCount">0명</strong>
             <span id="etaUpdatedDate">갱신일: -</span>
           </div>
@@ -472,6 +479,6 @@
       </div>
     </template>
 
-    <script src="./assets/app.js?v=20260812-eta-2" type="module"></script>
+    <script src="./assets/app.js?v=20260812-eta-4" type="module"></script>
   </body>
 </html>

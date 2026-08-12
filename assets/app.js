@@ -149,6 +149,9 @@ const ABILITY_TYPES = ["심연", "상실", "야성"];
 const ABILITY_OPTIONS = [ABILITY_DEFAULT, ...ABILITY_TYPES];
 // ── 에타 순위 (TWChatOverlay EtaRankingService 이식) ──
 const ETA_RANKING_URL = "https://raw.githubusercontent.com/TWHome-Git/TWHomeDB/main/eta_ranking.json";
+// 날짜 → 커밋 SHA 인덱스. 과거 랭킹은 해당 커밋의 raw 파일로 조회한다.
+const ETA_INDEX_URL = "https://raw.githubusercontent.com/TWHome-Git/TWHomeDB/main/ranking_index.json";
+const etaSnapshotUrl = (sha) => `https://raw.githubusercontent.com/TWHome-Git/TWHomeDB/${sha}/eta_ranking.json`;
 const ETA_CHAR_IMAGE_BASE = "./images/etachar/";
 const ETA_CHARACTER_BY_CODE = {
   0: "루시안", 1: "보리스", 2: "막시민", 3: "시벨린", 4: "조슈아",
@@ -158,13 +161,20 @@ const ETA_CHARACTER_BY_CODE = {
 };
 
 const eta = {
-  all: [],
+  servers: {}, // 서버명 → 랭킹 배열
+  server: "",
   collectDate: null, // "yyyy-MM-dd"
   category: "전체",
   query: "",
   loaded: false,
   loading: false,
+  index: null, // 날짜 → 커밋 SHA
+  date: "", // 선택한 날짜 ("" = 최신)
 };
+
+function etaCurrentRows() {
+  return eta.servers[eta.server] || [];
+}
 
 const state = {
   records: [],
@@ -232,8 +242,10 @@ const els = {
   equipListWrap: document.querySelector("#listWorkspace .equip-list-wrap"),
   equipmentCard: document.querySelector("#equipmentCard"),
   etaSearchInput: document.querySelector("#etaSearchInput"),
+  etaDateSelect: document.querySelector("#etaDateSelect"),
   etaCount: document.querySelector("#etaCount"),
   etaUpdatedDate: document.querySelector("#etaUpdatedDate"),
+  etaServerTabs: document.querySelector("#etaServerTabs"),
   etaSidebar: document.querySelector("#etaSidebar"),
   etaCharacterList: document.querySelector("#etaCharacterList"),
   etaRankingBody: document.querySelector("#etaRankingBody"),
@@ -559,18 +571,23 @@ function activateMainTab(key) {
 
 // ── 에타 순위 ──────────────────────────────────────────
 
-async function loadEtaRankings() {
+let etaLoadSeq = 0;
+
+async function loadEtaRankings(url = ETA_RANKING_URL) {
+  const seq = ++etaLoadSeq; // 연속 요청 시 마지막 요청만 화면에 반영
   eta.loading = true;
+  loadEtaIndex();
 
   try {
-    const response = await fetch(ETA_RANKING_URL, { cache: "no-store" });
+    const response = await fetch(url, { cache: "no-store" });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const payload = await response.json();
+    if (seq !== etaLoadSeq) return;
     applyEtaPayload(payload);
     eta.loaded = true;
   } catch (error) {
     console.warn("에타 순위 로딩 실패", error);
-    if (!eta.loaded) {
+    if (!eta.loaded && seq === etaLoadSeq) {
       els.etaRankingBody.innerHTML = `
         <tr><td colspan="5">
           <div class="empty-state"><strong>에타 순위를 불러오지 못했습니다</strong><span>잠시 후 페이지를 새로고침해주세요.</span></div>
@@ -578,33 +595,76 @@ async function loadEtaRankings() {
       `;
     }
   } finally {
-    eta.loading = false;
-    renderEtaSidebar();
-    renderEtaRanking();
-    els.etaUpdatedDate.textContent = `갱신일: ${eta.collectDate || "-"}`;
+    if (seq === etaLoadSeq) {
+      eta.loading = false;
+      renderEtaServerTabs();
+      renderEtaSidebar();
+      renderEtaRanking();
+      els.etaUpdatedDate.textContent = `갱신일: ${eta.collectDate || "-"}`;
+    }
   }
 }
 
+async function loadEtaIndex() {
+  if (eta.index || !els.etaDateSelect) return;
+  try {
+    const response = await fetch(ETA_INDEX_URL, { cache: "no-store" });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    eta.index = await response.json();
+    renderEtaDateSelect();
+  } catch (error) {
+    console.warn("에타 날짜 인덱스 로딩 실패", error);
+  }
+}
+
+function renderEtaDateSelect() {
+  const dates = eta.index ? Object.keys(eta.index).sort().reverse() : [];
+  els.etaDateSelect.innerHTML = [
+    `<option value=""${eta.date === "" ? " selected" : ""}>최신</option>`,
+    ...dates.map((d) => `<option value="${d}"${d === eta.date ? " selected" : ""}>${d}</option>`),
+  ].join("");
+  els.etaDateSelect.disabled = !dates.length;
+}
+
 function applyEtaPayload(payload) {
-  const rows = Array.isArray(payload?.Rankings) ? payload.Rankings : [];
-  eta.all = rows
-    .filter((row) => clean(row.UserId))
-    .map((row, index) => {
-      const code = Number(row.CharacterCode) || 0;
-      return {
-        code,
-        characterName: ETA_CHARACTER_BY_CODE[code] || `코드${code}`,
-        userId: clean(row.UserId),
-        level: Number(row.Level) || 0,
-        essence: Number(row.Essence) || 0,
-        order: index,
-      };
-    });
+  // 신규 구조: { Servers: { 서버명: [...] } } / 구 구조: { Rankings: [...] } 모두 지원
+  const serverMap = payload?.Servers && typeof payload.Servers === "object"
+    ? payload.Servers
+    : { "하이아칸": Array.isArray(payload?.Rankings) ? payload.Rankings : [] };
+
+  eta.servers = {};
+  Object.entries(serverMap).forEach(([serverName, rows]) => {
+    if (!Array.isArray(rows)) return;
+    eta.servers[serverName] = rows
+      .filter((row) => clean(row.UserId))
+      .map((row, index) => {
+        const code = Number(row.CharacterCode) || 0;
+        return {
+          code,
+          characterName: ETA_CHARACTER_BY_CODE[code] || `코드${code}`,
+          userId: clean(row.UserId),
+          level: Number(row.Level) || 0,
+          essence: Number(row.Essence) || 0,
+          order: index,
+        };
+      });
+  });
+
+  if (!eta.servers[eta.server]) {
+    eta.server = Object.keys(eta.servers)[0] || "";
+  }
   eta.collectDate = clean(payload?.CollectDate || payload?.Date || "").slice(0, 10) || null;
 }
 
+function renderEtaServerTabs() {
+  const names = Object.keys(eta.servers);
+  els.etaServerTabs.innerHTML = names.map((name) => `
+    <button class="eta-server-tab${name === eta.server ? " is-active" : ""}" type="button" role="radio" aria-checked="${name === eta.server}" data-eta-server="${escapeHtml(name)}">${escapeHtml(name)}</button>
+  `).join("");
+}
+
 function renderEtaSidebar() {
-  const names = [...new Set(eta.all.map((row) => row.characterName))]
+  const names = [...new Set(etaCurrentRows().map((row) => row.characterName))]
     .sort((a, b) => a.localeCompare(b, "ko"));
   els.etaCharacterList.innerHTML = names
     .map((name) => `<button class="eta-cat eta-subcat${eta.category === name ? " is-active" : ""}" type="button" data-eta-category="${escapeHtml(name)}">${escapeHtml(name)}</button>`)
@@ -614,9 +674,10 @@ function renderEtaSidebar() {
 }
 
 function renderEtaRanking() {
+  const source = etaCurrentRows();
   let rows = eta.category === "전체"
-    ? [...eta.all]
-    : eta.all.filter((row) => row.characterName === eta.category);
+    ? [...source]
+    : source.filter((row) => row.characterName === eta.category);
 
   rows.sort((a, b) => b.level - a.level || b.essence - a.essence || a.order - b.order);
 
@@ -1833,6 +1894,22 @@ function wireEvents() {
       eta.query = els.etaSearchInput.value.trim().toLowerCase();
       renderEtaRanking();
     }, 250);
+  });
+
+  els.etaDateSelect?.addEventListener("change", () => {
+    eta.date = els.etaDateSelect.value;
+    const sha = eta.date ? eta.index?.[eta.date] : null;
+    loadEtaRankings(sha ? etaSnapshotUrl(sha) : ETA_RANKING_URL);
+  });
+
+  els.etaServerTabs?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-eta-server]");
+    if (!button || button.dataset.etaServer === eta.server) return;
+    eta.server = button.dataset.etaServer;
+    eta.category = "전체";
+    renderEtaServerTabs();
+    renderEtaSidebar();
+    renderEtaRanking();
   });
 
   els.etaSidebar?.addEventListener("click", (event) => {
