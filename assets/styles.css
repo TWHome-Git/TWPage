@@ -2350,6 +2350,39 @@ img.dmg-chk-icon {
 
 .eta-rank {
   font-weight: 700;
+  white-space: nowrap;
+}
+
+.eta-delta {
+  display: inline-block;
+  margin-left: 5px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.eta-delta.up {
+  color: var(--blue);
+}
+
+.eta-delta.down {
+  color: var(--danger);
+}
+
+.eta-delta.same {
+  color: #a7b0ad;
+}
+
+.eta-new {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--gold);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  vertical-align: 1px;
 }
 
 .eta-userid {
@@ -2374,9 +2407,32 @@ img.dmg-chk-icon {
   object-fit: contain;
 }
 
-@media (max-width: 720px) {
-  .eta-workspace {
-    grid-template-columns: 1fr;
+/* 창이 좁아지면 사이드바를 세로로 쌓지 않고 폭만 줄인다
+   (#etaView 접두어: 뒤에 선언된 공용 .workspace 미디어 규칙보다 우선하기 위함) */
+@media (max-width: 900px) {
+  #etaView .eta-workspace {
+    grid-template-columns: 140px minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .eta-cat {
+    padding: 0 8px;
+    font-size: 12px;
+  }
+
+  .eta-subcat {
+    padding-left: 14px;
+  }
+}
+
+@media (max-width: 560px) {
+  #etaView .eta-workspace {
+    grid-template-columns: 110px minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .eta-sidebar {
+    padding: 8px 6px;
   }
 }
 

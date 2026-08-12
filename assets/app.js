@@ -164,6 +164,8 @@ const eta = {
   servers: {}, // 서버명 → 랭킹 배열
   server: "",
   collectDate: null, // "yyyy-MM-dd"
+  prevServers: null, // 비교 기준(일주일 전) 데이터. 없으면 변동 표시 생략
+  prevDate: null,
   category: "전체",
   query: "",
   loaded: false,
@@ -174,6 +176,10 @@ const eta = {
 
 function etaCurrentRows() {
   return eta.servers[eta.server] || [];
+}
+
+function etaResetScroll() {
+  if (els.etaListWrap) els.etaListWrap.scrollTop = 0;
 }
 
 const state = {
@@ -585,6 +591,7 @@ async function loadEtaRankings(url = ETA_RANKING_URL) {
     if (seq !== etaLoadSeq) return;
     applyEtaPayload(payload);
     eta.loaded = true;
+    loadEtaPreviousRankings(seq);
   } catch (error) {
     console.warn("에타 순위 로딩 실패", error);
     if (!eta.loaded && seq === etaLoadSeq) {
@@ -605,19 +612,28 @@ async function loadEtaRankings(url = ETA_RANKING_URL) {
   }
 }
 
-async function loadEtaIndex() {
-  if (eta.index || !els.etaDateSelect) return;
-  try {
-    const response = await fetch(ETA_INDEX_URL, { cache: "no-store" });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    eta.index = await response.json();
-    renderEtaDateSelect();
-  } catch (error) {
-    console.warn("에타 날짜 인덱스 로딩 실패", error);
+let etaIndexPromise = null;
+
+function loadEtaIndex() {
+  if (eta.index) return Promise.resolve();
+  if (!etaIndexPromise) {
+    etaIndexPromise = (async () => {
+      try {
+        const response = await fetch(ETA_INDEX_URL, { cache: "no-store" });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        eta.index = await response.json();
+        renderEtaDateSelect();
+      } catch (error) {
+        console.warn("에타 날짜 인덱스 로딩 실패", error);
+        etaIndexPromise = null; // 다음 시도에서 재요청 가능하게
+      }
+    })();
   }
+  return etaIndexPromise;
 }
 
 function renderEtaDateSelect() {
+  if (!els.etaDateSelect) return;
   const dates = eta.index ? Object.keys(eta.index).sort().reverse() : [];
   els.etaDateSelect.innerHTML = [
     `<option value=""${eta.date === "" ? " selected" : ""}>최신</option>`,
@@ -626,16 +642,16 @@ function renderEtaDateSelect() {
   els.etaDateSelect.disabled = !dates.length;
 }
 
-function applyEtaPayload(payload) {
-  // 신규 구조: { Servers: { 서버명: [...] } } / 구 구조: { Rankings: [...] } 모두 지원
+// 신규 구조: { Servers: { 서버명: [...] } } / 구 구조: { Rankings: [...] } 모두 지원
+function parseEtaServers(payload) {
   const serverMap = payload?.Servers && typeof payload.Servers === "object"
     ? payload.Servers
     : { "하이아칸": Array.isArray(payload?.Rankings) ? payload.Rankings : [] };
 
-  eta.servers = {};
+  const servers = {};
   Object.entries(serverMap).forEach(([serverName, rows]) => {
     if (!Array.isArray(rows)) return;
-    eta.servers[serverName] = rows
+    servers[serverName] = rows
       .filter((row) => clean(row.UserId))
       .map((row, index) => {
         const code = Number(row.CharacterCode) || 0;
@@ -649,11 +665,69 @@ function applyEtaPayload(payload) {
         };
       });
   });
+  return servers;
+}
+
+function applyEtaPayload(payload) {
+  eta.servers = parseEtaServers(payload);
 
   if (!eta.servers[eta.server]) {
     eta.server = Object.keys(eta.servers)[0] || "";
   }
   eta.collectDate = clean(payload?.CollectDate || payload?.Date || "").slice(0, 10) || null;
+}
+
+// ── 일주일 전 데이터 (변동 표시 기준) ──
+// 기준일(현재 보고 있는 수집일)에서 7일 전 이하의 가장 가까운 날짜를 인덱스에서 찾는다.
+function etaPrevIndexDate(baseDate) {
+  if (!eta.index || !baseDate) return null;
+  const base = new Date(`${baseDate}T00:00:00`);
+  if (Number.isNaN(base.getTime())) return null;
+  base.setDate(base.getDate() - 7);
+  const pad = (value) => String(value).padStart(2, "0");
+  const target = `${base.getFullYear()}-${pad(base.getMonth() + 1)}-${pad(base.getDate())}`;
+  const dates = Object.keys(eta.index).filter((d) => d <= target).sort();
+  return dates[dates.length - 1] || null;
+}
+
+async function loadEtaPreviousRankings(seq) {
+  eta.prevServers = null;
+  eta.prevDate = null;
+
+  try {
+    await loadEtaIndex();
+    const baseDate = eta.date || eta.collectDate;
+    const prevDate = etaPrevIndexDate(baseDate);
+    if (!prevDate) return;
+
+    const sha = eta.index[prevDate];
+    const response = await fetch(etaSnapshotUrl(sha), { cache: "force-cache" });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const payload = await response.json();
+    if (seq !== etaLoadSeq) return;
+
+    eta.prevServers = parseEtaServers(payload);
+    eta.prevDate = prevDate;
+  } catch (error) {
+    console.warn("에타 순위 비교 데이터 로딩 실패", error);
+  } finally {
+    if (seq === etaLoadSeq) renderEtaRanking();
+  }
+}
+
+// 현재 서버·카테고리 기준으로 일주일 전 순위를 계산 (검색어는 순위에 영향 없음)
+function etaPrevRankMap() {
+  const prevRows = eta.prevServers?.[eta.server];
+  if (!prevRows || !prevRows.length) return null;
+
+  const rows = eta.category === "전체"
+    ? [...prevRows]
+    : prevRows.filter((row) => row.characterName === eta.category);
+  rows.sort((a, b) => b.level - a.level || b.essence - a.essence || a.order - b.order);
+
+  const map = new Map();
+  rows.forEach((row, index) => map.set(`${row.code}|${row.userId}`, index + 1));
+  return map;
 }
 
 function renderEtaServerTabs() {
@@ -674,22 +748,27 @@ function renderEtaSidebar() {
 }
 
 function renderEtaRanking() {
+  // 변동 데이터 도착 후 재렌더링 시 스크롤 위치 유지 (초기화는 각 이벤트 핸들러에서)
+  const keepScroll = els.etaListWrap ? els.etaListWrap.scrollTop : 0;
   const source = etaCurrentRows();
-  let rows = eta.category === "전체"
+  const rows = eta.category === "전체"
     ? [...source]
     : source.filter((row) => row.characterName === eta.category);
 
   rows.sort((a, b) => b.level - a.level || b.essence - a.essence || a.order - b.order);
 
-  if (eta.query) {
-    rows = rows.filter((row) =>
-      row.userId.toLowerCase().includes(eta.query) ||
-      row.characterName.toLowerCase().includes(eta.query));
-  }
+  // 순위는 검색어 필터 이전(서버·카테고리 기준)에 확정한다
+  const ranked = rows.map((row, index) => ({ ...row, rank: index + 1 }));
 
-  els.etaCount.textContent = `${rows.length.toLocaleString("ko-KR")}명`;
+  const visible = eta.query
+    ? ranked.filter((row) =>
+        row.userId.toLowerCase().includes(eta.query) ||
+        row.characterName.toLowerCase().includes(eta.query))
+    : ranked;
 
-  if (!rows.length) {
+  els.etaCount.textContent = `${visible.length.toLocaleString("ko-KR")}명`;
+
+  if (!visible.length) {
     els.etaRankingBody.innerHTML = `
       <tr><td colspan="5">
         <div class="empty-state"><strong>표시할 순위가 없습니다</strong><span>${eta.loaded ? "조건을 조금 넓혀보세요." : "데이터를 불러오는 중입니다."}</span></div>
@@ -698,17 +777,37 @@ function renderEtaRanking() {
     return;
   }
 
-  els.etaRankingBody.innerHTML = rows.map((row, index) => `
-    <tr class="eta-row">
-      <td class="eta-rank">${index + 1}</td>
-      <td><span class="eta-char-thumb"><img src="${ETA_CHAR_IMAGE_BASE}${row.code}.png" alt="${escapeHtml(row.characterName)}" title="${escapeHtml(row.characterName)}" loading="lazy" decoding="async" /></span></td>
-      <td class="eta-userid">${escapeHtml(row.userId)}</td>
-      <td>${formatNumber(row.level)}</td>
-      <td>${formatNumber(row.essence)}</td>
-    </tr>
-  `).join("");
+  const prevMap = etaPrevRankMap();
+  const deltaTitle = eta.prevDate ? ` title="${escapeHtml(eta.prevDate)} 대비"` : "";
 
-  if (els.etaListWrap) els.etaListWrap.scrollTop = 0;
+  els.etaRankingBody.innerHTML = visible.map((row) => {
+    let deltaHtml = "";
+    let newHtml = "";
+    if (prevMap) {
+      const prevRank = prevMap.get(`${row.code}|${row.userId}`);
+      if (prevRank === undefined) {
+        newHtml = `<span class="eta-new"${deltaTitle}>NEW</span>`;
+      } else {
+        const diff = prevRank - row.rank;
+        deltaHtml = diff > 0
+          ? `<span class="eta-delta up"${deltaTitle}>▲${formatNumber(diff)}</span>`
+          : diff < 0
+            ? `<span class="eta-delta down"${deltaTitle}>▼${formatNumber(-diff)}</span>`
+            : `<span class="eta-delta same"${deltaTitle}>-</span>`;
+      }
+    }
+    return `
+      <tr class="eta-row">
+        <td class="eta-rank">${row.rank}${deltaHtml}</td>
+        <td><span class="eta-char-thumb"><img src="${ETA_CHAR_IMAGE_BASE}${row.code}.png" alt="${escapeHtml(row.characterName)}" title="${escapeHtml(row.characterName)}" loading="lazy" decoding="async" /></span></td>
+        <td class="eta-userid">${escapeHtml(row.userId)}${newHtml}</td>
+        <td>${formatNumber(row.level)}</td>
+        <td>${formatNumber(row.essence)}</td>
+      </tr>
+    `;
+  }).join("");
+
+  if (els.etaListWrap) els.etaListWrap.scrollTop = keepScroll;
 }
 
 function activateCalculatorTab(key) {
@@ -1892,6 +1991,7 @@ function wireEvents() {
     clearTimeout(etaSearchTimer);
     etaSearchTimer = setTimeout(() => {
       eta.query = els.etaSearchInput.value.trim().toLowerCase();
+      etaResetScroll();
       renderEtaRanking();
     }, 250);
   });
@@ -1899,6 +1999,7 @@ function wireEvents() {
   els.etaDateSelect?.addEventListener("change", () => {
     eta.date = els.etaDateSelect.value;
     const sha = eta.date ? eta.index?.[eta.date] : null;
+    etaResetScroll();
     loadEtaRankings(sha ? etaSnapshotUrl(sha) : ETA_RANKING_URL);
   });
 
@@ -1907,6 +2008,7 @@ function wireEvents() {
     if (!button || button.dataset.etaServer === eta.server) return;
     eta.server = button.dataset.etaServer;
     eta.category = "전체";
+    etaResetScroll();
     renderEtaServerTabs();
     renderEtaSidebar();
     renderEtaRanking();
@@ -1919,6 +2021,7 @@ function wireEvents() {
     els.etaSidebar.querySelectorAll("[data-eta-category]").forEach((item) => {
       item.classList.toggle("is-active", item === button);
     });
+    etaResetScroll();
     renderEtaRanking();
   });
 
