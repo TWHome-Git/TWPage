@@ -786,7 +786,7 @@ function etaPrevRankMap() {
 
   const map = new Map();
   rows.forEach((row, index) => {
-    map.set(`${row.code}|${row.userId}`, { rank: index + 1, essence: row.essence });
+    map.set(`${row.code}|${row.userId}`, { rank: index + 1, level: row.level, essence: row.essence });
   });
   return map;
 }
@@ -842,27 +842,24 @@ function renderEtaRanking() {
   const deltaTitle = eta.prevDate ? ` title="${escapeHtml(eta.prevDate)} 대비"` : "";
 
   els.etaRankingBody.innerHTML = visible.map((row) => {
+    const deltaBadge = (diff) => diff > 0
+      ? `<span class="eta-delta up"${deltaTitle}>▲${formatNumber(diff)}</span>`
+      : diff < 0
+        ? `<span class="eta-delta down"${deltaTitle}>▼${formatNumber(-diff)}</span>`
+        : `<span class="eta-delta same"${deltaTitle}>-</span>`;
+
     let deltaHtml = "";
     let newHtml = "";
+    let levelDeltaHtml = "";
     let essenceDeltaHtml = "";
     if (prevMap) {
       const prev = prevMap.get(`${row.code}|${row.userId}`);
       if (!prev) {
         newHtml = `<span class="eta-new"${deltaTitle}>NEW</span>`;
       } else {
-        const diff = prev.rank - row.rank;
-        deltaHtml = diff > 0
-          ? `<span class="eta-delta up"${deltaTitle}>▲${formatNumber(diff)}</span>`
-          : diff < 0
-            ? `<span class="eta-delta down"${deltaTitle}>▼${formatNumber(-diff)}</span>`
-            : `<span class="eta-delta same"${deltaTitle}>-</span>`;
-
-        const essenceDiff = row.essence - prev.essence;
-        essenceDeltaHtml = essenceDiff > 0
-          ? `<span class="eta-delta up"${deltaTitle}>▲${formatNumber(essenceDiff)}</span>`
-          : essenceDiff < 0
-            ? `<span class="eta-delta down"${deltaTitle}>▼${formatNumber(-essenceDiff)}</span>`
-            : `<span class="eta-delta same"${deltaTitle}>-</span>`;
+        deltaHtml = deltaBadge(prev.rank - row.rank);
+        levelDeltaHtml = deltaBadge(row.level - prev.level);
+        essenceDeltaHtml = deltaBadge(row.essence - prev.essence);
       }
     }
     return `
@@ -870,7 +867,7 @@ function renderEtaRanking() {
         <td class="eta-rank">${row.rank}${deltaHtml}</td>
         <td><span class="eta-char-thumb"><img src="${ETA_CHAR_IMAGE_BASE}${row.code}.png" alt="${escapeHtml(row.characterName)}" title="${escapeHtml(row.characterName)}" loading="lazy" decoding="async" /></span></td>
         <td class="eta-userid">${escapeHtml(row.userId)}${newHtml}</td>
-        <td>${formatNumber(row.level)}</td>
+        <td class="eta-level">${formatNumber(row.level)}${levelDeltaHtml}</td>
         <td class="eta-essence">${formatNumber(row.essence)}${essenceDeltaHtml}</td>
       </tr>
     `;
