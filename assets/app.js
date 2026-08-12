@@ -3623,19 +3623,3 @@ boot().catch((error) => {
 loadDmgSkills();
 loadDmgBuffs();
 
-// 방문 수 배지 (hits.sh — 가입 불필요, 호스트+경로 기준 페이지뷰 집계)
-// 로컬(127.0.0.1)과 배포 주소는 서로 다른 키로 집계되므로 테스트 방문이 실제 수치에 섞이지 않음
-(function initVisitBadge() {
-  const badge = document.getElementById("visitBadge");
-  if (!badge) return;
-  // 로컬 개발 주소는 hits.sh가 "Not a valid URI"로 거부하므로 배지 생략
-  if (/^(localhost|127\.0\.0\.1|\[?::1\]?)/.test(location.host)) return;
-  // 끝 슬래시를 제거해야 함: `.../TWPage/.svg` 는 hits.sh가 리다이렉트하며 쿼리(label)를 버려
-  // 라벨이 "hits"로 되돌아간다. `.../TWPage.svg` 로 직접 요청해야 label이 적용됨 (카운터는 동일).
-  const path = location.pathname.replace(/index\.html$/, "").replace(/\/$/, "");
-  badge.src = `https://hits.sh/${location.host}${path}.svg?style=flat&label=%EB%B0%A9%EB%AC%B8%EC%9E%90&color=0f6f63`;
-  // 서비스 장애 시 깨진 이미지가 보이지 않도록 로드 성공 시에만 표시
-  badge.addEventListener("load", () => {
-    badge.hidden = false;
-  });
-})();
