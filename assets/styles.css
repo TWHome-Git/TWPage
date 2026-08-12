@@ -2206,6 +2206,147 @@ img.dmg-chk-icon {
   color: var(--ink);
 }
 
+/* ── 에타 순위 ─────────────────────────────────────── */
+
+#etaView {
+  border: 1px solid rgba(23, 33, 31, 0.12);
+  border-top: 0;
+  border-radius: 0 0 8px 8px;
+  background: rgba(247, 250, 247, 0.9);
+  box-shadow: var(--shadow);
+}
+
+.eta-control-grid {
+  grid-template-columns: 1fr;
+}
+
+.eta-workspace {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  gap: 16px;
+}
+
+.eta-sidebar {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  align-self: start;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 12px 10px;
+}
+
+.eta-cat {
+  min-height: 34px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 0 12px;
+  color: var(--ink);
+  background: transparent;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.eta-cat:hover {
+  background: var(--panel-strong);
+}
+
+.eta-cat.is-active {
+  border-color: var(--accent);
+  color: #fff;
+  background: var(--accent);
+}
+
+.eta-divider {
+  height: 1px;
+  margin: 4px 2px;
+  background: var(--line);
+}
+
+.eta-cat-group summary {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  border-radius: 8px;
+  padding: 0 12px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  user-select: none;
+}
+
+.eta-cat-group summary:hover {
+  background: var(--panel-strong);
+}
+
+.eta-cat-group > div {
+  display: grid;
+  gap: 2px;
+  margin-top: 4px;
+}
+
+.eta-subcat {
+  font-weight: 500;
+  padding-left: 20px;
+}
+
+.eta-list-wrap {
+  max-height: 660px;
+}
+
+.eta-list {
+  min-width: 0;
+}
+
+.eta-list thead th {
+  text-align: center;
+}
+
+.eta-list thead th.eta-rank-head {
+  width: 70px;
+}
+
+.eta-row td {
+  padding: 6px 8px;
+  font-size: 13px;
+}
+
+.eta-rank {
+  font-weight: 700;
+}
+
+.eta-userid {
+  font-weight: 600;
+}
+
+.eta-char-thumb {
+  display: inline-grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid rgba(15, 111, 99, 0.24);
+  border-radius: 8px;
+  background: linear-gradient(145deg, #ffffff, #dfeae4);
+  vertical-align: middle;
+}
+
+.eta-char-thumb img {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+}
+
+@media (max-width: 720px) {
+  .eta-workspace {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ── 장비 목록(리스트 뷰) ───────────────────────────── */
 
 .workspace[hidden],

@@ -147,6 +147,25 @@ const CALC_SAVE_KEY = "tw-coefficient-save-v1";
 const ABILITY_DEFAULT = "수동 입력";
 const ABILITY_TYPES = ["심연", "상실", "야성"];
 const ABILITY_OPTIONS = [ABILITY_DEFAULT, ...ABILITY_TYPES];
+// ── 에타 순위 (TWChatOverlay EtaRankingService 이식) ──
+const ETA_RANKING_URL = "https://raw.githubusercontent.com/TWHome-Git/TWHomeDB/main/eta_ranking.json";
+const ETA_CHAR_IMAGE_BASE = "./images/etachar/";
+const ETA_CHARACTER_BY_CODE = {
+  0: "루시안", 1: "보리스", 2: "막시민", 3: "시벨린", 4: "조슈아",
+  5: "란지에", 6: "이자크", 7: "밀라", 8: "티치엘", 9: "이스핀",
+  10: "나야트레이", 11: "아나이스", 12: "클로에", 13: "벤야", 14: "이솔렛",
+  15: "로아미니", 16: "녹턴", 17: "리체", 18: "예프넨",
+};
+
+const eta = {
+  all: [],
+  collectDate: null, // "yyyy-MM-dd"
+  category: "전체",
+  query: "",
+  loaded: false,
+  loading: false,
+};
+
 const state = {
   records: [],
   filtered: [],
@@ -212,6 +231,13 @@ const els = {
   equipmentListBody: document.querySelector("#equipmentListBody"),
   equipListWrap: document.querySelector("#listWorkspace .equip-list-wrap"),
   equipmentCard: document.querySelector("#equipmentCard"),
+  etaSearchInput: document.querySelector("#etaSearchInput"),
+  etaCount: document.querySelector("#etaCount"),
+  etaUpdatedDate: document.querySelector("#etaUpdatedDate"),
+  etaSidebar: document.querySelector("#etaSidebar"),
+  etaCharacterList: document.querySelector("#etaCharacterList"),
+  etaRankingBody: document.querySelector("#etaRankingBody"),
+  etaListWrap: document.querySelector(".eta-list-wrap"),
   compareSelect: document.querySelector("#compareSelect"),
   limitCompareToggle: document.querySelector("#limitCompareToggle"),
   compareSummary: document.querySelector("#compareSummary"),
@@ -525,6 +551,103 @@ function activateMainTab(key) {
     button.classList.toggle("is-active", isActive);
     button.toggleAttribute("aria-current", isActive);
   });
+
+  if (key === "eta" && !eta.loaded && !eta.loading) {
+    loadEtaRankings();
+  }
+}
+
+// ── 에타 순위 ──────────────────────────────────────────
+
+async function loadEtaRankings() {
+  eta.loading = true;
+
+  try {
+    const response = await fetch(ETA_RANKING_URL, { cache: "no-store" });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const payload = await response.json();
+    applyEtaPayload(payload);
+    eta.loaded = true;
+  } catch (error) {
+    console.warn("에타 순위 로딩 실패", error);
+    if (!eta.loaded) {
+      els.etaRankingBody.innerHTML = `
+        <tr><td colspan="5">
+          <div class="empty-state"><strong>에타 순위를 불러오지 못했습니다</strong><span>잠시 후 페이지를 새로고침해주세요.</span></div>
+        </td></tr>
+      `;
+    }
+  } finally {
+    eta.loading = false;
+    renderEtaSidebar();
+    renderEtaRanking();
+    els.etaUpdatedDate.textContent = `갱신일: ${eta.collectDate || "-"}`;
+  }
+}
+
+function applyEtaPayload(payload) {
+  const rows = Array.isArray(payload?.Rankings) ? payload.Rankings : [];
+  eta.all = rows
+    .filter((row) => clean(row.UserId))
+    .map((row, index) => {
+      const code = Number(row.CharacterCode) || 0;
+      return {
+        code,
+        characterName: ETA_CHARACTER_BY_CODE[code] || `코드${code}`,
+        userId: clean(row.UserId),
+        level: Number(row.Level) || 0,
+        essence: Number(row.Essence) || 0,
+        order: index,
+      };
+    });
+  eta.collectDate = clean(payload?.CollectDate || payload?.Date || "").slice(0, 10) || null;
+}
+
+function renderEtaSidebar() {
+  const names = [...new Set(eta.all.map((row) => row.characterName))]
+    .sort((a, b) => a.localeCompare(b, "ko"));
+  els.etaCharacterList.innerHTML = names
+    .map((name) => `<button class="eta-cat eta-subcat${eta.category === name ? " is-active" : ""}" type="button" data-eta-category="${escapeHtml(name)}">${escapeHtml(name)}</button>`)
+    .join("");
+  els.etaSidebar.querySelector('[data-eta-category="전체"]')
+    ?.classList.toggle("is-active", eta.category === "전체");
+}
+
+function renderEtaRanking() {
+  let rows = eta.category === "전체"
+    ? [...eta.all]
+    : eta.all.filter((row) => row.characterName === eta.category);
+
+  rows.sort((a, b) => b.level - a.level || b.essence - a.essence || a.order - b.order);
+
+  if (eta.query) {
+    rows = rows.filter((row) =>
+      row.userId.toLowerCase().includes(eta.query) ||
+      row.characterName.toLowerCase().includes(eta.query));
+  }
+
+  els.etaCount.textContent = `${rows.length.toLocaleString("ko-KR")}명`;
+
+  if (!rows.length) {
+    els.etaRankingBody.innerHTML = `
+      <tr><td colspan="5">
+        <div class="empty-state"><strong>표시할 순위가 없습니다</strong><span>${eta.loaded ? "조건을 조금 넓혀보세요." : "데이터를 불러오는 중입니다."}</span></div>
+      </td></tr>
+    `;
+    return;
+  }
+
+  els.etaRankingBody.innerHTML = rows.map((row, index) => `
+    <tr class="eta-row">
+      <td class="eta-rank">${index + 1}</td>
+      <td><span class="eta-char-thumb"><img src="${ETA_CHAR_IMAGE_BASE}${row.code}.png" alt="${escapeHtml(row.characterName)}" title="${escapeHtml(row.characterName)}" loading="lazy" decoding="async" /></span></td>
+      <td class="eta-userid">${escapeHtml(row.userId)}</td>
+      <td>${formatNumber(row.level)}</td>
+      <td>${formatNumber(row.essence)}</td>
+    </tr>
+  `).join("");
+
+  if (els.etaListWrap) els.etaListWrap.scrollTop = 0;
 }
 
 function activateCalculatorTab(key) {
@@ -1702,6 +1825,29 @@ function wireEvents() {
     state.listScroll = 0;
     applyFilters();
   });
+
+  let etaSearchTimer = null;
+  els.etaSearchInput?.addEventListener("input", () => {
+    clearTimeout(etaSearchTimer);
+    etaSearchTimer = setTimeout(() => {
+      eta.query = els.etaSearchInput.value.trim().toLowerCase();
+      renderEtaRanking();
+    }, 250);
+  });
+
+  els.etaSidebar?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-eta-category]");
+    if (!button) return;
+    eta.category = button.dataset.etaCategory;
+    els.etaSidebar.querySelectorAll("[data-eta-category]").forEach((item) => {
+      item.classList.toggle("is-active", item === button);
+    });
+    renderEtaRanking();
+  });
+
+  els.etaRankingBody?.addEventListener("error", (event) => {
+    if (event.target instanceof HTMLImageElement) event.target.hidden = true;
+  }, true);
 
   els.equipmentListBody?.addEventListener("click", (event) => {
     const row = event.target.closest("tr[data-index]");
