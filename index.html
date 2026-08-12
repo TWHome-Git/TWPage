@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>TW DB</title>
-    <link rel="stylesheet" href="./assets/styles.css?v=20260812-eta-6" />
+    <link rel="stylesheet" href="./assets/styles.css?v=20260812-eta-13" />
   </head>
   <body>
     <main class="app-shell">
@@ -43,6 +43,14 @@
             <strong id="etaCount">0명</strong>
             <span id="etaUpdatedDate">갱신일: -</span>
           </div>
+          <label class="eta-compare-field">
+            <span>증감 기준</span>
+            <select id="etaCompareSelect">
+              <option value="1" selected>1일 전</option>
+              <option value="7">1주일 전</option>
+              <option value="30">1달 전</option>
+            </select>
+          </label>
         </section>
 
         <section class="workspace eta-workspace">
@@ -479,6 +487,6 @@
       </div>
     </template>
 
-    <script src="./assets/app.js?v=20260812-eta-6" type="module"></script>
+    <script src="./assets/app.js?v=20260812-eta-13" type="module"></script>
   </body>
 </html>

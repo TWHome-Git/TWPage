@@ -164,8 +164,9 @@ const eta = {
   servers: {}, // 서버명 → 랭킹 배열
   server: "",
   collectDate: null, // "yyyy-MM-dd"
-  prevServers: null, // 비교 기준(일주일 전) 데이터. 없으면 변동 표시 생략
+  prevServers: null, // 비교 기준 데이터. 없으면 변동 표시 생략
   prevDate: null,
+  compareDays: 1, // 증감 기준: 1(1일 전) | 7(1주일 전) | 30(1달 전)
   category: "전체",
   query: "",
   loaded: false,
@@ -176,6 +177,67 @@ const eta = {
 
 function etaCurrentRows() {
   return eta.servers[eta.server] || [];
+}
+
+// ── 에타 랭킹 로컬 캐시 ──
+// 데이터는 매일 오전 10시경 1회 갱신되므로, 같은 주기의 데이터를 이미 받아뒀다면
+// 페이지를 다시 열어도 네트워크 요청 없이 localStorage 캐시를 사용한다.
+const ETA_REFRESH_ANCHOR_HOUR = 10;
+const ETA_LATEST_CACHE_KEY = "tw-eta-latest-cache-v1";
+const ETA_PREV_CACHE_KEY = "tw-eta-prev-cache-v1";
+const ETA_SNAPSHOT_CACHE_KEY = "tw-eta-snapshot-cache-v1";
+
+// 오전 10시 이후면 오늘, 이전이면 어제가 현재 갱신 주기의 기준일
+function etaCycleDateString(now = new Date()) {
+  const date = new Date(now);
+  if (date.getHours() < ETA_REFRESH_ANCHOR_HOUR) date.setDate(date.getDate() - 1);
+  const pad = (value) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+function etaReadCache(key) {
+  try {
+    return JSON.parse(localStorage.getItem(key) || "null");
+  } catch {
+    return null;
+  }
+}
+
+function etaWriteCache(key, value) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // 저장 공간 부족 등은 무시 (캐시는 최적화일 뿐)
+  }
+}
+
+// cacheSlot: "latest"(주기 일치 시 재사용) | "prev"/"snapshot"(같은 URL이면 재사용, 커밋 고정이라 불변)
+async function fetchEtaPayload(url, cacheSlot) {
+  if (cacheSlot === "latest") {
+    const cached = etaReadCache(ETA_LATEST_CACHE_KEY);
+    if (cached?.payload && cached.cycleDate === etaCycleDateString()) return cached.payload;
+  } else if (cacheSlot) {
+    const key = cacheSlot === "prev" ? ETA_PREV_CACHE_KEY : ETA_SNAPSHOT_CACHE_KEY;
+    const cached = etaReadCache(key);
+    if (cached?.url === url && cached.payload) return cached.payload;
+  }
+
+  const response = await fetch(url, { cache: "no-store" });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const payload = await response.json();
+
+  if (cacheSlot === "latest") {
+    // 수집이 아직 안 된 날(CollectDate가 주기와 다름)에는 캐시하지 않아 다음 방문 때 재확인한다
+    const collectDate = clean(payload?.CollectDate || payload?.Date || "").slice(0, 10);
+    if (collectDate === etaCycleDateString()) {
+      etaWriteCache(ETA_LATEST_CACHE_KEY, { cycleDate: collectDate, payload });
+    }
+  } else if (cacheSlot) {
+    const key = cacheSlot === "prev" ? ETA_PREV_CACHE_KEY : ETA_SNAPSHOT_CACHE_KEY;
+    etaWriteCache(key, { url, payload });
+  }
+
+  return payload;
 }
 
 function etaResetScroll() {
@@ -251,6 +313,7 @@ const els = {
   etaDateSelect: document.querySelector("#etaDateSelect"),
   etaCount: document.querySelector("#etaCount"),
   etaUpdatedDate: document.querySelector("#etaUpdatedDate"),
+  etaCompareSelect: document.querySelector("#etaCompareSelect"),
   etaServerTabs: document.querySelector("#etaServerTabs"),
   etaSidebar: document.querySelector("#etaSidebar"),
   etaCharacterList: document.querySelector("#etaCharacterList"),
@@ -585,9 +648,7 @@ async function loadEtaRankings(url = ETA_RANKING_URL) {
   loadEtaIndex();
 
   try {
-    const response = await fetch(url, { cache: "no-store" });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const payload = await response.json();
+    const payload = await fetchEtaPayload(url, url === ETA_RANKING_URL ? "latest" : "snapshot");
     if (seq !== etaLoadSeq) return;
     applyEtaPayload(payload);
     eta.loaded = true;
@@ -677,13 +738,13 @@ function applyEtaPayload(payload) {
   eta.collectDate = clean(payload?.CollectDate || payload?.Date || "").slice(0, 10) || null;
 }
 
-// ── 일주일 전 데이터 (변동 표시 기준) ──
-// 기준일(현재 보고 있는 수집일)에서 7일 전 이하의 가장 가까운 날짜를 인덱스에서 찾는다.
+// ── 비교 기준 데이터 (변동 표시) ──
+// 기준일(현재 보고 있는 수집일)에서 compareDays일 전 이하의 가장 가까운 날짜를 인덱스에서 찾는다.
 function etaPrevIndexDate(baseDate) {
   if (!eta.index || !baseDate) return null;
   const base = new Date(`${baseDate}T00:00:00`);
   if (Number.isNaN(base.getTime())) return null;
-  base.setDate(base.getDate() - 7);
+  base.setDate(base.getDate() - eta.compareDays);
   const pad = (value) => String(value).padStart(2, "0");
   const target = `${base.getFullYear()}-${pad(base.getMonth() + 1)}-${pad(base.getDate())}`;
   const dates = Object.keys(eta.index).filter((d) => d <= target).sort();
@@ -701,9 +762,7 @@ async function loadEtaPreviousRankings(seq) {
     if (!prevDate) return;
 
     const sha = eta.index[prevDate];
-    const response = await fetch(etaSnapshotUrl(sha), { cache: "force-cache" });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const payload = await response.json();
+    const payload = await fetchEtaPayload(etaSnapshotUrl(sha), "prev");
     if (seq !== etaLoadSeq) return;
 
     eta.prevServers = parseEtaServers(payload);
@@ -715,7 +774,7 @@ async function loadEtaPreviousRankings(seq) {
   }
 }
 
-// 현재 서버·카테고리 기준으로 일주일 전 순위를 계산 (검색어는 순위에 영향 없음)
+// 현재 서버·카테고리 기준으로 일주일 전 순위·정수를 계산 (검색어는 순위에 영향 없음)
 function etaPrevRankMap() {
   const prevRows = eta.prevServers?.[eta.server];
   if (!prevRows || !prevRows.length) return null;
@@ -726,7 +785,9 @@ function etaPrevRankMap() {
   rows.sort((a, b) => b.level - a.level || b.essence - a.essence || a.order - b.order);
 
   const map = new Map();
-  rows.forEach((row, index) => map.set(`${row.code}|${row.userId}`, index + 1));
+  rows.forEach((row, index) => {
+    map.set(`${row.code}|${row.userId}`, { rank: index + 1, essence: row.essence });
+  });
   return map;
 }
 
@@ -783,16 +844,24 @@ function renderEtaRanking() {
   els.etaRankingBody.innerHTML = visible.map((row) => {
     let deltaHtml = "";
     let newHtml = "";
+    let essenceDeltaHtml = "";
     if (prevMap) {
-      const prevRank = prevMap.get(`${row.code}|${row.userId}`);
-      if (prevRank === undefined) {
+      const prev = prevMap.get(`${row.code}|${row.userId}`);
+      if (!prev) {
         newHtml = `<span class="eta-new"${deltaTitle}>NEW</span>`;
       } else {
-        const diff = prevRank - row.rank;
+        const diff = prev.rank - row.rank;
         deltaHtml = diff > 0
           ? `<span class="eta-delta up"${deltaTitle}>▲${formatNumber(diff)}</span>`
           : diff < 0
             ? `<span class="eta-delta down"${deltaTitle}>▼${formatNumber(-diff)}</span>`
+            : `<span class="eta-delta same"${deltaTitle}>-</span>`;
+
+        const essenceDiff = row.essence - prev.essence;
+        essenceDeltaHtml = essenceDiff > 0
+          ? `<span class="eta-delta up"${deltaTitle}>▲${formatNumber(essenceDiff)}</span>`
+          : essenceDiff < 0
+            ? `<span class="eta-delta down"${deltaTitle}>▼${formatNumber(-essenceDiff)}</span>`
             : `<span class="eta-delta same"${deltaTitle}>-</span>`;
       }
     }
@@ -802,7 +871,7 @@ function renderEtaRanking() {
         <td><span class="eta-char-thumb"><img src="${ETA_CHAR_IMAGE_BASE}${row.code}.png" alt="${escapeHtml(row.characterName)}" title="${escapeHtml(row.characterName)}" loading="lazy" decoding="async" /></span></td>
         <td class="eta-userid">${escapeHtml(row.userId)}${newHtml}</td>
         <td>${formatNumber(row.level)}</td>
-        <td>${formatNumber(row.essence)}</td>
+        <td class="eta-essence">${formatNumber(row.essence)}${essenceDeltaHtml}</td>
       </tr>
     `;
   }).join("");
@@ -2001,6 +2070,11 @@ function wireEvents() {
     const sha = eta.date ? eta.index?.[eta.date] : null;
     etaResetScroll();
     loadEtaRankings(sha ? etaSnapshotUrl(sha) : ETA_RANKING_URL);
+  });
+
+  els.etaCompareSelect?.addEventListener("change", () => {
+    eta.compareDays = Number(els.etaCompareSelect.value) || 1;
+    loadEtaPreviousRankings(etaLoadSeq);
   });
 
   els.etaServerTabs?.addEventListener("click", (event) => {

@@ -2217,7 +2217,12 @@ img.dmg-chk-icon {
 }
 
 .eta-control-grid {
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1.6fr) minmax(140px, 0.6fr);
+}
+
+/* 좁은 화면 공용 규칙(.search-field 전체 폭 확장)이 에타 검색/날짜 한 줄 배치를 깨지 않게 */
+#etaView .search-field {
+  grid-column: auto;
 }
 
 .eta-server-tabs {
@@ -2357,15 +2362,44 @@ img.dmg-chk-icon {
   display: inline-block;
   margin-left: 5px;
   font-size: 11px;
+  font-weight: 800;
+}
+
+.eta-compare-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.eta-compare-field span {
+  color: var(--muted);
+  font-size: 12px;
   font-weight: 700;
 }
 
+.eta-compare-field select {
+  min-height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 8px;
+  color: var(--ink);
+  background: #fff;
+  font-size: 13px;
+  outline: none;
+}
+
+.eta-compare-field select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(15, 111, 99, 0.14);
+}
+
 .eta-delta.up {
-  color: var(--blue);
+  color: var(--danger);
 }
 
 .eta-delta.down {
-  color: var(--danger);
+  color: var(--blue);
 }
 
 .eta-delta.same {
@@ -2387,6 +2421,10 @@ img.dmg-chk-icon {
 
 .eta-userid {
   font-weight: 600;
+}
+
+.eta-essence {
+  white-space: nowrap;
 }
 
 .eta-char-thumb {
