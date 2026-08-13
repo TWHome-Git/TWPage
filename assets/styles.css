@@ -1965,6 +1965,79 @@ img.dmg-chk-icon {
   height: auto;
 }
 
+/* 세로 해상도 1080 이하: 계산기 등 addon 화면이 한 화면에 들어가도록 여백 압축 */
+@media (max-height: 1010px) {
+  .addon-view,
+  .placeholder-view {
+    padding: 6px 10px;
+  }
+
+  .addon-titlebar {
+    min-height: 42px;
+  }
+
+  .addon-tab {
+    min-height: 36px;
+  }
+
+  .addon-window {
+    margin-top: 6px;
+    padding: 12px 20px;
+  }
+
+  .addon-content {
+    min-height: 0;
+    padding: 8px 10px;
+  }
+
+  .coefficient-detail {
+    gap: 8px;
+  }
+
+  .coefficient-detail-header {
+    min-height: 40px;
+    padding: 5px 10px;
+  }
+
+  .coefficient-maintotal {
+    margin-top: 6px;
+  }
+
+  .coefficient-maintotal div {
+    padding: 5px 6px;
+  }
+
+  .coefficient-summary {
+    padding: 6px 8px;
+  }
+
+  .coefficient-table th,
+  .coefficient-table td,
+  .side-score-table th,
+  .side-score-table td {
+    padding-top: 2px;
+    padding-bottom: 2px;
+  }
+
+  .coefficient-table input,
+  .side-score-table input {
+    padding-top: 1px;
+    padding-bottom: 1px;
+  }
+
+  .addon-titlebar .eyebrow {
+    display: none;
+  }
+
+  .addon-titlebar h1 {
+    font-size: 21px;
+  }
+
+  .main-panel {
+    min-height: 0;
+  }
+}
+
 .equipment-card,
 .compare-panel {
   border: 1px solid var(--line);
@@ -2225,6 +2298,219 @@ img.dmg-chk-icon {
   grid-column: auto;
 }
 
+/* ── DB 검색 서브탭 ─────────────────────────────────── */
+
+.db-subtabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 16px;
+}
+
+.db-subtab {
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 18px;
+  color: var(--muted);
+  background: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.db-subtab:hover {
+  background: var(--panel-strong);
+}
+
+.db-subtab.is-active {
+  border-color: var(--accent);
+  color: #fff;
+  background: var(--accent);
+}
+
+[data-db-panel][hidden] {
+  display: none !important;
+}
+
+.ability-control-grid {
+  grid-template-columns: minmax(150px, 0.7fr) minmax(220px, 1.5fr);
+}
+
+.ability-list {
+  min-width: 760px;
+}
+
+.ability-list thead th {
+  text-align: center;
+}
+
+.ability-list thead th.ability-effects-head {
+  text-align: left;
+  padding-left: 12px;
+}
+
+.ability-prob-head {
+  width: 80px;
+}
+
+.ability-row td {
+  padding: 8px;
+  border-bottom: 1px solid #e3ebe6;
+  vertical-align: middle;
+}
+
+.ability-row:nth-child(even) {
+  background: #f4f8f5;
+}
+
+.ability-prob {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.ability-effects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding-left: 12px;
+}
+
+.ability-thumb.is-missing::after {
+  content: "✕";
+  color: #a7b0ad;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+/* ── 아바타 DB ──────────────────────────────────────── */
+
+.avatar-control-grid {
+  grid-template-columns: 1fr;
+}
+
+.avatar-list {
+  min-width: 720px;
+}
+
+.avatar-list thead th {
+  text-align: center;
+}
+
+.avatar-source,
+.avatar-round {
+  text-align: center;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.avatar-detail-workspace {
+  display: block;
+}
+
+.avatar-detail-card {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.avatar-detail-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.avatar-meta-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid #dce7e1;
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: var(--panel);
+}
+
+.avatar-meta-row span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.avatar-meta-row strong {
+  font-size: 13px;
+  text-align: right;
+}
+
+.avatar-wear-section {
+  display: grid;
+  gap: 8px;
+  padding: 12px 16px 16px;
+}
+
+.avatar-wear-section > span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.avatar-wear-frame {
+  display: grid;
+  place-items: center;
+  min-height: 260px;
+  border: 1px solid rgba(15, 111, 99, 0.24);
+  border-radius: 8px;
+  background: linear-gradient(145deg, #ffffff, #dfeae4);
+}
+
+.avatar-wear-image {
+  max-width: 100%;
+  max-height: 420px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.avatar-wear-missing {
+  color: #a7b0ad;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.ability-chip {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #d8e3dd;
+  border-radius: 999px;
+  padding: 3px 9px;
+  background: var(--panel);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.db-placeholder {
+  display: grid;
+  min-height: 480px;
+  place-content: center;
+  gap: 8px;
+  padding: 16px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.db-placeholder strong {
+  color: var(--ink);
+  font-size: 24px;
+}
+
 .eta-help-button {
   display: inline-grid;
   width: 26px;
@@ -2315,6 +2601,15 @@ img.dmg-chk-icon {
   text-align: left;
   white-space: nowrap;
   min-width: 180px;
+}
+
+.eta-note-icon {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  vertical-align: -4px;
+  margin-right: 2px;
 }
 
 .eta-server-tabs {
@@ -2425,7 +2720,7 @@ img.dmg-chk-icon {
 }
 
 .eta-list-wrap {
-  max-height: 660px;
+  max-height: max(400px, calc(100vh - 235px));
 }
 
 .eta-list {
@@ -2597,7 +2892,8 @@ img.dmg-chk-icon {
 }
 
 .equip-list-wrap {
-  max-height: 660px;
+  /* 화면 세로 크기에 맞춰 목록 높이 자동 조절 (한 화면에 스크롤 없이 들어가도록) */
+  max-height: max(400px, calc(100vh - 296px));
   overflow: auto;
   border: 1px solid var(--line);
   border-radius: 8px;

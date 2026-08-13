@@ -274,6 +274,22 @@ const els = {
   mainTabButtons: document.querySelectorAll(".top-tabs [data-main-tab]"),
   mainTabTriggers: document.querySelectorAll("[data-main-tab]"),
   mainPanels: document.querySelectorAll("[data-main-panel]"),
+  dbTabButtons: document.querySelectorAll("[data-db-tab]"),
+  dbPanels: document.querySelectorAll("[data-db-panel]"),
+  abilityCategorySelect: document.querySelector("#abilityCategorySelect"),
+  abilitySearchInput: document.querySelector("#abilitySearchInput"),
+  abilityCount: document.querySelector("#abilityCount"),
+  abilityStatus: document.querySelector("#abilityStatus"),
+  abilityListBody: document.querySelector("#abilityListBody"),
+  avatarSearchInput: document.querySelector("#avatarSearchInput"),
+  avatarCount: document.querySelector("#avatarCount"),
+  avatarStatus: document.querySelector("#avatarStatus"),
+  avatarBackButton: document.querySelector("#avatarBackButton"),
+  avatarListWorkspace: document.querySelector("#avatarListWorkspace"),
+  avatarDetailWorkspace: document.querySelector("#avatarDetailWorkspace"),
+  avatarListBody: document.querySelector("#avatarListBody"),
+  avatarListWrap: document.querySelector(".avatar-list-wrap"),
+  avatarDetailCard: document.querySelector("#avatarDetailCard"),
   calculatorTabButtons: document.querySelectorAll("[data-calculator-tab]"),
   calculatorPanels: document.querySelectorAll("[data-calculator-panel]"),
   simulatorTabButtons: document.querySelectorAll("[data-simulator-tab]"),
@@ -835,7 +851,7 @@ function renderEtaInfo() {
         <tr>
           <th>${escapeHtml(row[0])}</th>
           ${row.slice(1, 10).map((cell) => `<td>${escapeHtml(cell || "-")}</td>`).join("")}
-          <td class="eta-info-note">${escapeHtml(row[10] || "")}</td>
+          <td class="eta-info-note">${row[10] ? `<img class="eta-note-icon" src="./images/${encodeURIComponent("경험의 정수.png")}" alt="경험의 정수" title="누적 경험의 정수" decoding="async" /> - ${escapeHtml(row[10])}` : ""}</td>
         </tr>
       `).join("")}
     </tbody>
@@ -950,6 +966,277 @@ function renderEtaRanking() {
   }).join("");
 
   if (els.etaListWrap) els.etaListWrap.scrollTop = keepScroll;
+}
+
+// DB 검색 서브탭 (장비 / 어빌리티 / 아바타)
+function activateDbTab(key) {
+  els.dbTabButtons.forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.dbTab === key);
+  });
+  els.dbPanels.forEach((panel) => {
+    panel.hidden = panel.dataset.dbPanel !== key;
+  });
+
+  if (key === "ability" && !ability.loaded && !ability.loading) {
+    loadAbilityDb();
+  }
+  if (key === "avatar" && !avatar.loaded && !avatar.loading) {
+    loadAvatarDb();
+  }
+}
+
+// ── 어빌리티 DB ──
+// 데이터: Google Sheets 웹 게시 CSV (이미지 파일, 종류, 어빌리티명, 획득확률, 효과1~6)
+const ABILITY_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS78PnupM0NaJzkrkFCr2Llja9TJKrLcRZqeCqlCUV4GPGlsJd3xSIn3SQAvHwzy_tGtxDbTFtl8oZQ/pub?gid=1875452616&single=true&output=csv";
+const ABILITY_IMAGE_BASE = "./ability-images/";
+const ability = {
+  records: [],
+  category: "all",
+  query: "",
+  loaded: false,
+  loading: false,
+};
+
+async function loadAbilityDb() {
+  ability.loading = true;
+  els.abilityStatus.textContent = "데이터 로딩 중";
+
+  try {
+    const response = await fetch(ABILITY_CSV_URL, { cache: "no-store" });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const text = (await response.text()).replace(/^﻿/, "");
+    const rows = parseDelimited(text, ",");
+    ability.records = rows
+      .slice(1)
+      .map((row) => {
+        const name = clean(row[2]);
+        if (!name) return null;
+        const effects = row.slice(4, 10).map(clean).filter(Boolean);
+        return {
+          imageFile: clean(row[0]),
+          category: clean(row[1]),
+          name,
+          prob: clean(row[3]),
+          effects,
+          searchText: [row[1], name, effects.join(" ")].join(" ").toLowerCase(),
+        };
+      })
+      .filter(Boolean);
+    ability.loaded = true;
+    els.abilityStatus.textContent = "DB 연결";
+    populateAbilityCategorySelect();
+  } catch (error) {
+    console.warn("어빌리티 DB 로딩 실패", error);
+    els.abilityStatus.textContent = "데이터 로드 실패";
+  } finally {
+    ability.loading = false;
+    renderAbilityList();
+  }
+}
+
+// ── 아바타 DB ──
+// 데이터: Google Sheets 웹 게시 CSV (아바타 이미지, 아바타 이름, 획득처, 확률, 회차, 月-아이템 교환 가능)
+// 이미지: 시트의 파일명에서 확장자를 뗀 기본명 + "1.png"(아이콘) / "2.png"(착용 이미지)
+const AVATAR_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS78PnupM0NaJzkrkFCr2Llja9TJKrLcRZqeCqlCUV4GPGlsJd3xSIn3SQAvHwzy_tGtxDbTFtl8oZQ/pub?gid=1331633328&single=true&output=csv";
+const AVATAR_IMAGE_BASE = "./avatar-images/";
+
+const avatar = {
+  records: [],
+  filtered: [],
+  view: "list", // "list" | "detail"
+  detailIndex: 0,
+  listScroll: 0,
+  query: "",
+  loaded: false,
+  loading: false,
+};
+
+async function loadAvatarDb() {
+  avatar.loading = true;
+  els.avatarStatus.textContent = "데이터 로딩 중";
+
+  try {
+    const response = await fetch(AVATAR_CSV_URL, { cache: "no-store" });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const text = (await response.text()).replace(/^﻿/, "");
+    const rows = parseDelimited(text, ",");
+    avatar.records = rows
+      .slice(1)
+      .map((row, index) => {
+        const name = clean(row[1]);
+        if (!name) return null;
+        const imageBase = clean(row[0]).replace(/\.png$/i, "");
+        const source = clean(row[2]);
+        const round = clean(row[4]);
+        return {
+          id: index,
+          imageBase,
+          name,
+          source,
+          prob: clean(row[3]),
+          round,
+          exchange: clean(row[5]),
+          searchText: [name, source, round].join(" ").toLowerCase(),
+        };
+      })
+      .filter(Boolean);
+    avatar.loaded = true;
+    els.avatarStatus.textContent = "DB 연결";
+  } catch (error) {
+    console.warn("아바타 DB 로딩 실패", error);
+    els.avatarStatus.textContent = "데이터 로드 실패";
+  } finally {
+    avatar.loading = false;
+    renderAvatar();
+  }
+}
+
+function renderAvatar() {
+  avatar.filtered = avatar.query
+    ? avatar.records.filter((record) => record.searchText.includes(avatar.query))
+    : avatar.records;
+
+  els.avatarCount.textContent = `${avatar.filtered.length.toLocaleString("ko-KR")}개`;
+
+  const isList = avatar.view === "list";
+  els.avatarListWorkspace.hidden = !isList;
+  els.avatarDetailWorkspace.hidden = isList;
+  els.avatarBackButton.hidden = isList;
+
+  if (isList) {
+    renderAvatarList();
+  } else {
+    renderAvatarDetail();
+  }
+}
+
+function renderAvatarList() {
+  if (!avatar.filtered.length) {
+    els.avatarListBody.innerHTML = `
+      <tr><td colspan="3">
+        <div class="empty-state"><strong>검색 결과가 없습니다</strong><span>${avatar.loaded ? "조건을 조금 넓혀보세요." : "데이터를 불러오는 중입니다."}</span></div>
+      </td></tr>
+    `;
+    return;
+  }
+
+  els.avatarListBody.innerHTML = avatar.filtered.map((record, index) => `
+    <tr class="equip-row avatar-row" data-index="${index}">
+      <td class="equip-info-cell">
+        <div class="equip-info">
+          <span class="equip-thumb ability-thumb">
+            ${record.imageBase ? `<img src="${AVATAR_IMAGE_BASE}${encodeURIComponent(`${record.imageBase}1.png`)}" alt="" loading="lazy" decoding="async" />` : ""}
+          </span>
+          <span class="equip-name-block">
+            <strong>${escapeHtml(record.name)}</strong>
+          </span>
+        </div>
+      </td>
+      <td class="avatar-source">${escapeHtml(record.source || "-")}</td>
+      <td class="avatar-round">${escapeHtml(record.round || "-")}</td>
+    </tr>
+  `).join("");
+
+  if (els.avatarListWrap) els.avatarListWrap.scrollTop = avatar.listScroll;
+}
+
+function renderAvatarDetail() {
+  const record = avatar.filtered[avatar.detailIndex];
+  if (!record) {
+    els.avatarDetailCard.innerHTML = "";
+    return;
+  }
+
+  const iconHtml = record.imageBase
+    ? `<img src="${AVATAR_IMAGE_BASE}${encodeURIComponent(`${record.imageBase}1.png`)}" alt="" decoding="async" />`
+    : "";
+  const wearHtml = record.imageBase
+    ? `<img class="avatar-wear-image" src="${AVATAR_IMAGE_BASE}${encodeURIComponent(`${record.imageBase}2.png`)}" alt="${escapeHtml(record.name)} 착용 이미지" decoding="async" />`
+    : "";
+
+  els.avatarDetailCard.innerHTML = `
+    <div class="item-hero">
+      <div class="item-image avatar-detail-thumb">${iconHtml}</div>
+      <div>
+        <p class="item-kind">아바타</p>
+        <h2>${escapeHtml(record.name)}</h2>
+        <p class="item-condition">${escapeHtml(record.source || "획득처 정보 없음")}</p>
+      </div>
+    </div>
+
+    <div class="avatar-detail-meta">
+      <div class="avatar-meta-row"><span>획득처</span><strong>${escapeHtml(record.source || "-")}</strong></div>
+      <div class="avatar-meta-row"><span>획득 회차</span><strong>${escapeHtml(record.round || "-")}</strong></div>
+      <div class="avatar-meta-row"><span>확률</span><strong>${escapeHtml(record.prob || "-")}</strong></div>
+      <div class="avatar-meta-row"><span>月-아이템 교환</span><strong>${escapeHtml(record.exchange || "-")}</strong></div>
+    </div>
+
+    <div class="avatar-wear-section">
+      <span>착용 이미지</span>
+      <div class="avatar-wear-frame">${wearHtml}<b class="avatar-wear-missing" hidden>✕ 이미지 준비 중</b></div>
+    </div>
+  `;
+
+  const wearImg = els.avatarDetailCard.querySelector(".avatar-wear-image");
+  const missing = els.avatarDetailCard.querySelector(".avatar-wear-missing");
+  if (!wearImg) {
+    missing.hidden = false;
+  } else {
+    wearImg.addEventListener("error", () => {
+      wearImg.hidden = true;
+      missing.hidden = false;
+    });
+  }
+  els.avatarDetailCard.querySelector(".avatar-detail-thumb img")?.addEventListener("error", (event) => {
+    event.currentTarget.hidden = true;
+  });
+}
+
+function populateAbilityCategorySelect() {
+  const categories = [...new Set(ability.records.map((record) => record.category))];
+  els.abilityCategorySelect.innerHTML = optionHtml("all", "전체 종류") + categories.map((category) => optionHtml(category, category)).join("");
+  els.abilityCategorySelect.value = ability.category;
+}
+
+function renderAbilityList() {
+  let rows = ability.category === "all"
+    ? ability.records
+    : ability.records.filter((record) => record.category === ability.category);
+
+  if (ability.query) {
+    rows = rows.filter((record) => record.searchText.includes(ability.query));
+  }
+
+  els.abilityCount.textContent = `${rows.length.toLocaleString("ko-KR")}개`;
+
+  if (!rows.length) {
+    els.abilityListBody.innerHTML = `
+      <tr><td colspan="3">
+        <div class="empty-state"><strong>검색 결과가 없습니다</strong><span>${ability.loaded ? "조건을 조금 넓혀보세요." : "데이터를 불러오는 중입니다."}</span></div>
+      </td></tr>
+    `;
+    return;
+  }
+
+  els.abilityListBody.innerHTML = rows.map((record) => `
+    <tr class="ability-row">
+      <td class="equip-info-cell">
+        <div class="equip-info">
+          <span class="equip-thumb ability-thumb">
+            ${record.imageFile ? `<img src="${ABILITY_IMAGE_BASE}${encodeURIComponent(record.imageFile)}" alt="" decoding="async" />` : ""}
+          </span>
+          <span class="equip-name-block">
+            <strong>${escapeHtml(record.name)}</strong>
+            <small>${escapeHtml(record.category)}</small>
+          </span>
+        </div>
+      </td>
+      <td class="ability-prob">각 ${escapeHtml(record.prob)}</td>
+      <td class="ability-effects">
+        ${record.effects.map((effect) => `<b class="ability-chip">${escapeHtml(effect)}</b>`).join("")}
+      </td>
+    </tr>
+  `).join("");
 }
 
 function activateCalculatorTab(key) {
@@ -2051,6 +2338,67 @@ function wireEvents() {
       activateMainTab(button.dataset.mainTab);
     });
   });
+
+  els.dbTabButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      activateDbTab(button.dataset.dbTab);
+    });
+  });
+
+  els.abilityCategorySelect?.addEventListener("change", () => {
+    ability.category = els.abilityCategorySelect.value;
+    renderAbilityList();
+  });
+
+  // 어빌리티 이미지 로드 실패 시 임시 X 표시 (error는 버블링되지 않으므로 캡처 단계에서 위임)
+  els.abilityListBody?.addEventListener("error", (event) => {
+    if (event.target instanceof HTMLImageElement) {
+      event.target.hidden = true;
+      event.target.closest(".ability-thumb")?.classList.add("is-missing");
+    }
+  }, true);
+
+  let abilitySearchTimer = null;
+  els.abilitySearchInput?.addEventListener("input", () => {
+    clearTimeout(abilitySearchTimer);
+    abilitySearchTimer = setTimeout(() => {
+      ability.query = els.abilitySearchInput.value.trim().toLowerCase();
+      renderAbilityList();
+    }, 200);
+  });
+
+  let avatarSearchTimer = null;
+  els.avatarSearchInput?.addEventListener("input", () => {
+    clearTimeout(avatarSearchTimer);
+    avatarSearchTimer = setTimeout(() => {
+      avatar.query = els.avatarSearchInput.value.trim().toLowerCase();
+      avatar.view = "list";
+      avatar.listScroll = 0;
+      renderAvatar();
+    }, 200);
+  });
+
+  els.avatarListBody?.addEventListener("click", (event) => {
+    const row = event.target.closest("tr[data-index]");
+    if (!row) return;
+    avatar.listScroll = els.avatarListWrap?.scrollTop || 0;
+    avatar.detailIndex = Number(row.dataset.index);
+    avatar.view = "detail";
+    renderAvatar();
+  });
+
+  els.avatarBackButton?.addEventListener("click", () => {
+    avatar.view = "list";
+    renderAvatar();
+  });
+
+  // 아바타 아이콘 로드 실패 시 임시 X 표시
+  els.avatarListBody?.addEventListener("error", (event) => {
+    if (event.target instanceof HTMLImageElement) {
+      event.target.hidden = true;
+      event.target.closest(".ability-thumb")?.classList.add("is-missing");
+    }
+  }, true);
 
   els.calculatorTabButtons.forEach((button) => {
     button.addEventListener("click", () => {
