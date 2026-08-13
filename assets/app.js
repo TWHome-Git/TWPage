@@ -292,6 +292,8 @@ const els = {
   avatarDetailCard: document.querySelector("#avatarDetailCard"),
   calculatorTabButtons: document.querySelectorAll("[data-calculator-tab]"),
   calculatorPanels: document.querySelectorAll("[data-calculator-panel]"),
+  extraTabButtons: document.querySelectorAll("[data-extra-tab]"),
+  extraPanels: document.querySelectorAll("[data-extra-panel]"),
   simulatorTabButtons: document.querySelectorAll("[data-simulator-tab]"),
   simulatorPanels: document.querySelectorAll("[data-simulator-panel]"),
   characterGrid: document.querySelector("#characterGrid"),
@@ -350,9 +352,10 @@ const els = {
 async function boot() {
   resetControls();
   renderCharacterGrid();
-  activateMainTab("equipment");
+  activateMainTab("extra");
   activateCalculatorTab("coefficient");
   activateSimulatorTab("encrypt");
+  activateExtraTab("content");
   wireEvents();
   initDamageCalculator();
   initSimulators();
@@ -1121,7 +1124,7 @@ async function loadAvatarDb() {
       if (!name) return;
       const listImage = avatarImageFile(row[0]);
       const detailImage = avatarImageFile(row[1]);
-      const entry = { source: clean(row[3]), prob: clean(row[4]), round: clean(row[5]) };
+      const entry = { source: clean(row[3]), prob: clean(row[4]), slot: clean(row[5]), round: clean(row[6]) };
       const existing = merged.get(name);
       if (existing) {
         if (!existing.sources.some((s) => s.source === entry.source && s.round === entry.round)) {
@@ -1131,14 +1134,16 @@ async function loadAvatarDb() {
         if (detailImage && !existing.detailImages.includes(detailImage)) {
           existing.detailImages.push(detailImage);
         }
-        if (!existing.exchange) existing.exchange = clean(row[6]);
+        if (!existing.exchange) existing.exchange = clean(row[7]);
+        if (!existing.slot) existing.slot = entry.slot;
       } else {
         merged.set(name, {
           listImage,
           detailImages: detailImage ? [detailImage] : [],
           name,
+          slot: entry.slot,
           sources: [entry],
-          exchange: clean(row[6]),
+          exchange: clean(row[7]),
           searchText: name.toLowerCase(),
         });
       }
@@ -1334,6 +1339,17 @@ function activateSimulatorTab(key) {
   });
   els.simulatorPanels.forEach((panel) => {
     const isActive = panel.dataset.simulatorPanel === key;
+    panel.hidden = !isActive;
+    panel.classList.toggle("is-active", isActive);
+  });
+}
+
+function activateExtraTab(key) {
+  els.extraTabButtons.forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.extraTab === key);
+  });
+  els.extraPanels.forEach((panel) => {
+    const isActive = panel.dataset.extraPanel === key;
     panel.hidden = !isActive;
     panel.classList.toggle("is-active", isActive);
   });
@@ -2486,6 +2502,12 @@ function wireEvents() {
   els.simulatorTabButtons.forEach((button) => {
     button.addEventListener("click", () => {
       activateSimulatorTab(button.dataset.simulatorTab);
+    });
+  });
+
+  els.extraTabButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      activateExtraTab(button.dataset.extraTab);
     });
   });
 
