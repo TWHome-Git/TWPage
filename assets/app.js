@@ -1076,7 +1076,7 @@ async function loadAvatarDb() {
           prob: clean(row[3]),
           round,
           exchange: clean(row[5]),
-          searchText: [name, source, round].join(" ").toLowerCase(),
+          searchText: name.toLowerCase(),
         };
       })
       .filter(Boolean);
