@@ -2510,8 +2510,9 @@ img.dmg-chk-icon {
 .avatar-wear-frame {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
-  align-items: flex-end;
+  /* 1개면 중앙, 2개 이상이면 좌우로 고르게 배치 */
+  justify-content: space-evenly;
+  align-items: center;
   gap: 12px;
   min-height: 260px;
   padding: 12px;
@@ -2521,12 +2522,18 @@ img.dmg-chk-icon {
 }
 
 .avatar-wear-image {
-  max-width: 100%;
+  /* 2개 이상이면 한 줄에 좌/우로 나란히 들어가도록 폭 제한 */
+  max-width: 48%;
   max-height: 420px;
   object-fit: contain;
   image-rendering: pixelated;
   /* 흰 배경 이미지도 프레임 배경에 녹아들게 (흰색 = 투명처럼 처리) */
   mix-blend-mode: multiply;
+}
+
+/* 이미지가 1개뿐이면 원래 크기 그대로 중앙 표시 */
+.avatar-wear-image:only-of-type {
+  max-width: 100%;
 }
 
 .avatar-list .equip-thumb img,
