@@ -2225,6 +2225,108 @@ img.dmg-chk-icon {
   grid-column: auto;
 }
 
+.eta-help-button {
+  display: inline-grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  vertical-align: 4px;
+  margin-left: 4px;
+  border: 1px solid var(--accent);
+  border-radius: 50%;
+  color: var(--accent-strong);
+  background: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.eta-help-button:hover {
+  color: #fff;
+  background: var(--accent);
+}
+
+#etaView > .toolbar[hidden],
+#etaView > .result-band[hidden] {
+  display: none !important;
+}
+
+.eta-info {
+  display: block;
+  border-radius: 0 0 8px 8px;
+}
+
+.eta-info-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 4px;
+}
+
+.eta-info-head h2 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.eta-info-source {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.eta-info-source:hover {
+  color: var(--accent-strong);
+}
+
+.eta-info h3 {
+  margin: 18px 0 8px;
+  font-size: 16px;
+}
+
+.eta-info-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.eta-info-table {
+  width: 100%;
+  min-width: 900px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.eta-info-table th,
+.eta-info-table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid #e3ebe6;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.eta-info-table thead th {
+  background: var(--panel-strong);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.eta-info-table tbody th {
+  font-weight: 700;
+}
+
+.eta-info-table tbody tr:nth-child(even) {
+  background: #f4f8f5;
+}
+
+.eta-info-table .eta-info-sub,
+.eta-info-table .eta-info-note {
+  text-align: left;
+  white-space: normal;
+  min-width: 180px;
+}
+
 .eta-server-tabs {
   display: inline-flex;
   gap: 4px;

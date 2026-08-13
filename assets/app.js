@@ -314,6 +314,12 @@ const els = {
   etaCount: document.querySelector("#etaCount"),
   etaUpdatedDate: document.querySelector("#etaUpdatedDate"),
   etaCompareSelect: document.querySelector("#etaCompareSelect"),
+  etaInfoButton: document.querySelector("#etaInfoButton"),
+  etaInfoPanel: document.querySelector("#etaInfoPanel"),
+  etaInfoBackButton: document.querySelector("#etaInfoBackButton"),
+  etaSummaryTable: document.querySelector("#etaSummaryTable"),
+  etaLevelTable: document.querySelector("#etaLevelTable"),
+  etaMainSections: document.querySelectorAll("#etaView > .toolbar, #etaView > .result-band, #etaView > .eta-workspace"),
   etaServerTabs: document.querySelector("#etaServerTabs"),
   etaSidebar: document.querySelector("#etaSidebar"),
   etaCharacterList: document.querySelector("#etaCharacterList"),
@@ -789,6 +795,76 @@ function etaPrevRankMap() {
     map.set(`${row.code}|${row.userId}`, { rank: index + 1, level: row.level, essence: row.essence });
   });
   return map;
+}
+
+// ── 에타 정보 페이지 ([?] 버튼 → 조견표·레벨별 상세) ──
+const ETA_INFO_URL = "./assets/eta_info.json";
+const etaInfo = { data: null, loading: false };
+
+function showEtaInfoPanel(show) {
+  els.etaInfoPanel.hidden = !show;
+  els.etaMainSections.forEach((section) => {
+    section.hidden = show;
+  });
+  if (show && !etaInfo.data && !etaInfo.loading) loadEtaInfo();
+}
+
+async function loadEtaInfo() {
+  etaInfo.loading = true;
+  try {
+    const response = await fetch(ETA_INFO_URL);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    etaInfo.data = await response.json();
+    renderEtaInfo();
+  } catch (error) {
+    console.warn("에타 정보 로딩 실패", error);
+    els.etaSummaryTable.innerHTML = `<tr><td>에타 정보를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.</td></tr>`;
+  } finally {
+    etaInfo.loading = false;
+  }
+}
+
+function renderEtaInfo() {
+  const { summary, levels } = etaInfo.data;
+
+  const [summaryHead, ...summaryRows] = summary;
+  els.etaSummaryTable.innerHTML = `
+    <thead><tr>${summaryHead.map((cell) => `<th>${escapeHtml(cell)}</th>`).join("")}</tr></thead>
+    <tbody>
+      ${summaryRows.map((row) => `
+        <tr>
+          <th>${escapeHtml(row[0])}</th>
+          ${row.slice(1, 10).map((cell) => `<td>${escapeHtml(cell || "-")}</td>`).join("")}
+          <td class="eta-info-note">${escapeHtml(row[10] || "")}</td>
+        </tr>
+      `).join("")}
+    </tbody>
+  `;
+
+  els.etaLevelTable.innerHTML = `
+    <thead>
+      <tr>
+        <th>LV</th><th>필요 경험치</th><th>필요 SEED</th><th>부재료</th><th>경험의 성수</th>
+        <th>최대 대미지</th><th>최대 HP</th><th>최대 방어력</th><th>최대 스탯</th><th>각성 대미지</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${levels.map((row) => `
+        <tr>
+          <th>${row.lv}</th>
+          <td>${escapeHtml(row.exp)}</td>
+          <td>${escapeHtml(row.seed)}</td>
+          <td class="eta-info-sub">${escapeHtml(row.sub || "")}</td>
+          <td>${escapeHtml(row.water)}</td>
+          <td>${escapeHtml(row.dmg)}</td>
+          <td>${escapeHtml(row.hp)}</td>
+          <td>${escapeHtml(row.def)}</td>
+          <td>${escapeHtml(row.stat)}</td>
+          <td>${escapeHtml(row.awaken)}</td>
+        </tr>
+      `).join("")}
+    </tbody>
+  `;
 }
 
 function renderEtaServerTabs() {
@@ -2068,6 +2144,9 @@ function wireEvents() {
     etaResetScroll();
     loadEtaRankings(sha ? etaSnapshotUrl(sha) : ETA_RANKING_URL);
   });
+
+  els.etaInfoButton?.addEventListener("click", () => showEtaInfoPanel(true));
+  els.etaInfoBackButton?.addEventListener("click", () => showEtaInfoPanel(false));
 
   els.etaCompareSelect?.addEventListener("change", () => {
     eta.compareDays = Number(els.etaCompareSelect.value) || 1;
