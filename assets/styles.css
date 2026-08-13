@@ -2269,16 +2269,6 @@ img.dmg-chk-icon {
   font-size: 22px;
 }
 
-.eta-info-source {
-  margin-left: auto;
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.eta-info-source:hover {
-  color: var(--accent-strong);
-}
-
 .eta-info h3 {
   margin: 18px 0 8px;
   font-size: 16px;
