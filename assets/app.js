@@ -1035,10 +1035,65 @@ async function loadAbilityDb() {
 }
 
 // ── 아바타 DB ──
-// 데이터: Google Sheets 웹 게시 CSV (아바타 이미지, 아바타 이름, 획득처, 확률, 회차, 月-아이템 교환 가능)
-// 이미지: 시트의 파일명에서 확장자를 뗀 기본명 + "1.png"(아이콘) / "2.png"(착용 이미지)
+// 데이터: Google Sheets 웹 게시 CSV
+// (아바타 목록 이미지, 아바타 상세 이미지, 아바타 이름, 획득처, 확률, 회차, 月-아이템 교환 가능)
 const AVATAR_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS78PnupM0NaJzkrkFCr2Llja9TJKrLcRZqeCqlCUV4GPGlsJd3xSIn3SQAvHwzy_tGtxDbTFtl8oZQ/pub?gid=1331633328&single=true&output=csv";
 const AVATAR_IMAGE_BASE = "./avatar-images/";
+
+// 장비 DB와 동일한 버전 셀 캐시: AZ1 값이 같으면 전체 CSV 다운로드 생략
+const AVATAR_VERSION_URL = `${AVATAR_CSV_URL}&range=AZ1`;
+const AVATAR_CSV_CACHE_KEY = "tw-avatar-csv-cache-v1";
+
+async function fetchAvatarSheetVersion() {
+  try {
+    const response = await fetch(AVATAR_VERSION_URL, { cache: "no-store" });
+    if (!response.ok) return "";
+    const text = (await response.text()).trim().replace(/^"|"$/g, "");
+    // 줄바꿈/쉼표가 없는 40자 이하 값만 버전으로 인정 (AZ1이 비어 전체 CSV가 반환된 경우 배제)
+    if (text && text.length <= 40 && !/[\n\r,<]/.test(text)) return text;
+  } catch (error) {
+    console.info("아바타 시트 버전 확인 실패 — 전체 CSV를 받습니다.", error);
+  }
+  return "";
+}
+
+async function loadAvatarSheetText() {
+  const version = await fetchAvatarSheetVersion();
+
+  if (version) {
+    try {
+      const cached = JSON.parse(localStorage.getItem(AVATAR_CSV_CACHE_KEY) || "null");
+      if (cached && cached.version === version && typeof cached.text === "string" && cached.text) {
+        return cached.text;
+      }
+    } catch (error) {
+      console.info("아바타 CSV 캐시를 읽지 못했습니다.", error);
+    }
+  }
+
+  const response = await fetch(AVATAR_CSV_URL, { cache: "no-store" });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const text = await response.text();
+  if (text.trim().startsWith("<")) {
+    throw new Error("Google Sheet returned an HTML page instead of CSV.");
+  }
+
+  if (version) {
+    try {
+      localStorage.setItem(AVATAR_CSV_CACHE_KEY, JSON.stringify({ version, text }));
+    } catch (error) {
+      console.info("아바타 CSV 캐시 저장 실패(용량 초과 등) — 캐시 없이 동작합니다.", error);
+    }
+  }
+  return text;
+}
+
+// 시트에 확장자 없이 적어도 동작하도록 보정
+function avatarImageFile(value) {
+  const name = clean(value);
+  if (!name) return "";
+  return name.includes(".") ? name : `${name}.png`;
+}
 
 const avatar = {
   records: [],
@@ -1056,29 +1111,34 @@ async function loadAvatarDb() {
   els.avatarStatus.textContent = "데이터 로딩 중";
 
   try {
-    const response = await fetch(AVATAR_CSV_URL, { cache: "no-store" });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const text = (await response.text()).replace(/^﻿/, "");
+    const text = (await loadAvatarSheetText()).replace(/^﻿/, "");
     const rows = parseDelimited(text, ",");
-    // 같은 이름이 여러 행이면(획득처가 다른 경우) 하나로 합치고 획득처를 모두 보관
+    // 같은 이름이 여러 행이면(획득처가 다른 경우) 하나로 합친다.
+    // 목록 이미지는 위 행 우선, 상세 이미지는 서로 다른 것을 모두 보관한다.
     const merged = new Map();
     rows.slice(1).forEach((row) => {
-      const name = clean(row[1]);
+      const name = clean(row[2]);
       if (!name) return;
-      const entry = { source: clean(row[2]), prob: clean(row[3]), round: clean(row[4]) };
+      const listImage = avatarImageFile(row[0]);
+      const detailImage = avatarImageFile(row[1]);
+      const entry = { source: clean(row[3]), prob: clean(row[4]), round: clean(row[5]) };
       const existing = merged.get(name);
       if (existing) {
         if (!existing.sources.some((s) => s.source === entry.source && s.round === entry.round)) {
           existing.sources.push(entry);
         }
-        if (!existing.imageBase) existing.imageBase = clean(row[0]).replace(/\.png$/i, "");
-        if (!existing.exchange) existing.exchange = clean(row[5]);
+        if (!existing.listImage) existing.listImage = listImage;
+        if (detailImage && !existing.detailImages.includes(detailImage)) {
+          existing.detailImages.push(detailImage);
+        }
+        if (!existing.exchange) existing.exchange = clean(row[6]);
       } else {
         merged.set(name, {
-          imageBase: clean(row[0]).replace(/\.png$/i, ""),
+          listImage,
+          detailImages: detailImage ? [detailImage] : [],
           name,
           sources: [entry],
-          exchange: clean(row[5]),
+          exchange: clean(row[6]),
           searchText: name.toLowerCase(),
         });
       }
@@ -1129,7 +1189,7 @@ function renderAvatarList() {
       <td class="equip-info-cell">
         <div class="equip-info">
           <span class="equip-thumb ability-thumb">
-            ${record.imageBase ? `<img src="${AVATAR_IMAGE_BASE}${encodeURIComponent(`${record.imageBase}1.png`)}" alt="" loading="lazy" decoding="async" />` : ""}
+            ${record.listImage ? `<img src="${AVATAR_IMAGE_BASE}${encodeURIComponent(record.listImage)}" alt="" loading="lazy" decoding="async" />` : ""}
           </span>
           <span class="equip-name-block">
             <strong>${escapeHtml(record.name)}</strong>
@@ -1151,12 +1211,12 @@ function renderAvatarDetail() {
     return;
   }
 
-  const iconHtml = record.imageBase
-    ? `<img src="${AVATAR_IMAGE_BASE}${encodeURIComponent(`${record.imageBase}1.png`)}" alt="" decoding="async" />`
+  const iconHtml = record.listImage
+    ? `<img src="${AVATAR_IMAGE_BASE}${encodeURIComponent(record.listImage)}" alt="" decoding="async" />`
     : "";
-  const wearHtml = record.imageBase
-    ? `<img class="avatar-wear-image" src="${AVATAR_IMAGE_BASE}${encodeURIComponent(`${record.imageBase}2.png`)}" alt="${escapeHtml(record.name)} 착용 이미지" decoding="async" />`
-    : "";
+  const wearHtml = record.detailImages
+    .map((file) => `<img class="avatar-wear-image" src="${AVATAR_IMAGE_BASE}${encodeURIComponent(file)}" alt="${escapeHtml(record.name)} 착용 이미지" decoding="async" />`)
+    .join("");
 
   const sourceRows = record.sources.map((s) => `
     <tr>
@@ -1192,14 +1252,16 @@ function renderAvatarDetail() {
     </div>
   `;
 
-  const wearImg = els.avatarDetailCard.querySelector(".avatar-wear-image");
+  const wearImgs = [...els.avatarDetailCard.querySelectorAll(".avatar-wear-image")];
   const missing = els.avatarDetailCard.querySelector(".avatar-wear-missing");
-  if (!wearImg) {
+  if (!wearImgs.length) {
     missing.hidden = false;
   } else {
-    wearImg.addEventListener("error", () => {
-      wearImg.hidden = true;
-      missing.hidden = false;
+    wearImgs.forEach((img) => {
+      img.addEventListener("error", () => {
+        img.hidden = true;
+        if (wearImgs.every((item) => item.hidden)) missing.hidden = false;
+      });
     });
   }
   els.avatarDetailCard.querySelector(".avatar-detail-thumb img")?.addEventListener("error", (event) => {

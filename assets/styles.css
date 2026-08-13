@@ -2508,9 +2508,13 @@ img.dmg-chk-icon {
 }
 
 .avatar-wear-frame {
-  display: grid;
-  place-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 12px;
   min-height: 260px;
+  padding: 12px;
   border: 1px solid rgba(15, 111, 99, 0.24);
   border-radius: 8px;
   background: linear-gradient(145deg, #ffffff, #dfeae4);
@@ -2521,6 +2525,13 @@ img.dmg-chk-icon {
   max-height: 420px;
   object-fit: contain;
   image-rendering: pixelated;
+  /* 흰 배경 이미지도 프레임 배경에 녹아들게 (흰색 = 투명처럼 처리) */
+  mix-blend-mode: multiply;
+}
+
+.avatar-list .equip-thumb img,
+.avatar-detail-thumb img {
+  mix-blend-mode: multiply;
 }
 
 .avatar-wear-missing {
