@@ -844,7 +844,7 @@ function renderEtaInfo() {
   els.etaLevelTable.innerHTML = `
     <thead>
       <tr>
-        <th>LV</th><th>필요 경험치</th><th>필요 SEED</th><th>부재료</th><th>경험의 성수</th>
+        <th>LV</th><th>필요 경험치</th><th>필요 SEED</th><th>부재료</th><th>경험의 정수</th>
         <th>최대 대미지</th><th>최대 HP</th><th>최대 방어력</th><th>최대 스탯</th><th>각성 대미지</th>
       </tr>
     </thead>

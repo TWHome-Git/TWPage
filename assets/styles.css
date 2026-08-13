@@ -2313,7 +2313,7 @@ img.dmg-chk-icon {
 .eta-info-table .eta-info-sub,
 .eta-info-table .eta-info-note {
   text-align: left;
-  white-space: normal;
+  white-space: nowrap;
   min-width: 180px;
 }
 
