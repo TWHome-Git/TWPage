@@ -2402,11 +2402,58 @@ img.dmg-chk-icon {
   text-align: center;
 }
 
-.avatar-source,
+/* 아바타 열은 줄이고 획득처 열을 넓게 (획득처 2개 이상 표기 대응) */
+.avatar-list thead th.equip-info-head {
+  width: 34%;
+}
+
+.avatar-list thead th:last-child {
+  width: 130px;
+}
+
+.avatar-source {
+  text-align: center;
+  font-size: 13px;
+  white-space: normal;
+  word-break: keep-all;
+  min-width: 260px;
+}
+
+.avatar-source span,
+.avatar-round span {
+  display: block;
+  padding: 1px 0;
+}
+
+.avatar-prob {
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+}
+
 .avatar-round {
   text-align: center;
   font-size: 13px;
   white-space: nowrap;
+}
+
+.avatar-source-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.avatar-source-table th,
+.avatar-source-table td {
+  border: 1px solid #dce7e1;
+  padding: 7px 10px;
+  text-align: center;
+  font-size: 13px;
+}
+
+.avatar-source-table thead th {
+  background: var(--panel-strong);
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .avatar-detail-workspace {
@@ -2420,7 +2467,6 @@ img.dmg-chk-icon {
 
 .avatar-detail-meta {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   padding: 12px 16px;
   border-bottom: 1px solid var(--line);

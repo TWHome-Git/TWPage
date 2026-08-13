@@ -1060,26 +1060,30 @@ async function loadAvatarDb() {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const text = (await response.text()).replace(/^﻿/, "");
     const rows = parseDelimited(text, ",");
-    avatar.records = rows
-      .slice(1)
-      .map((row, index) => {
-        const name = clean(row[1]);
-        if (!name) return null;
-        const imageBase = clean(row[0]).replace(/\.png$/i, "");
-        const source = clean(row[2]);
-        const round = clean(row[4]);
-        return {
-          id: index,
-          imageBase,
+    // 같은 이름이 여러 행이면(획득처가 다른 경우) 하나로 합치고 획득처를 모두 보관
+    const merged = new Map();
+    rows.slice(1).forEach((row) => {
+      const name = clean(row[1]);
+      if (!name) return;
+      const entry = { source: clean(row[2]), prob: clean(row[3]), round: clean(row[4]) };
+      const existing = merged.get(name);
+      if (existing) {
+        if (!existing.sources.some((s) => s.source === entry.source && s.round === entry.round)) {
+          existing.sources.push(entry);
+        }
+        if (!existing.imageBase) existing.imageBase = clean(row[0]).replace(/\.png$/i, "");
+        if (!existing.exchange) existing.exchange = clean(row[5]);
+      } else {
+        merged.set(name, {
+          imageBase: clean(row[0]).replace(/\.png$/i, ""),
           name,
-          source,
-          prob: clean(row[3]),
-          round,
+          sources: [entry],
           exchange: clean(row[5]),
           searchText: name.toLowerCase(),
-        };
-      })
-      .filter(Boolean);
+        });
+      }
+    });
+    avatar.records = [...merged.values()];
     avatar.loaded = true;
     els.avatarStatus.textContent = "DB 연결";
   } catch (error) {
@@ -1132,8 +1136,8 @@ function renderAvatarList() {
           </span>
         </div>
       </td>
-      <td class="avatar-source">${escapeHtml(record.source || "-")}</td>
-      <td class="avatar-round">${escapeHtml(record.round || "-")}</td>
+      <td class="avatar-source">${record.sources.map((s) => `<span>${escapeHtml(s.source || "-")}${s.prob ? ` <em class="avatar-prob">(${escapeHtml(s.prob)})</em>` : ""}</span>`).join("")}</td>
+      <td class="avatar-round">${record.sources.map((s) => `<span>${escapeHtml(s.round || "-")}</span>`).join("")}</td>
     </tr>
   `).join("");
 
@@ -1154,20 +1158,31 @@ function renderAvatarDetail() {
     ? `<img class="avatar-wear-image" src="${AVATAR_IMAGE_BASE}${encodeURIComponent(`${record.imageBase}2.png`)}" alt="${escapeHtml(record.name)} 착용 이미지" decoding="async" />`
     : "";
 
+  const sourceRows = record.sources.map((s) => `
+    <tr>
+      <td>${escapeHtml(s.source || "-")}</td>
+      <td>${escapeHtml(s.prob || "-")}</td>
+      <td>${escapeHtml(s.round || "-")}</td>
+    </tr>
+  `).join("");
+
   els.avatarDetailCard.innerHTML = `
     <div class="item-hero">
       <div class="item-image avatar-detail-thumb">${iconHtml}</div>
       <div>
         <p class="item-kind">아바타</p>
         <h2>${escapeHtml(record.name)}</h2>
-        <p class="item-condition">${escapeHtml(record.source || "획득처 정보 없음")}</p>
+        <p class="item-condition">${record.sources.length > 1 ? `획득처 ${record.sources.length}곳` : escapeHtml(record.sources[0]?.source || "획득처 정보 없음")}</p>
       </div>
     </div>
 
     <div class="avatar-detail-meta">
-      <div class="avatar-meta-row"><span>획득처</span><strong>${escapeHtml(record.source || "-")}</strong></div>
-      <div class="avatar-meta-row"><span>획득 회차</span><strong>${escapeHtml(record.round || "-")}</strong></div>
-      <div class="avatar-meta-row"><span>확률</span><strong>${escapeHtml(record.prob || "-")}</strong></div>
+      <table class="avatar-source-table" aria-label="획득처별 정보">
+        <thead>
+          <tr><th>획득처</th><th>확률</th><th>획득 회차</th></tr>
+        </thead>
+        <tbody>${sourceRows}</tbody>
+      </table>
       <div class="avatar-meta-row"><span>月-아이템 교환</span><strong>${escapeHtml(record.exchange || "-")}</strong></div>
     </div>
 
