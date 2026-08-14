@@ -3,6 +3,14 @@ const SNAPSHOT_URL = "./data/equipment-snapshot.json";
 const IMAGE_BASE = "./equipment-images/";
 const CHARACTER_IMAGE_BASE = "./character-images/";
 
+// 대용량 이미지(아바타/어빌리티)는 jsDelivr CDN으로 서빙해 GitHub Pages 대역폭을 아낀다.
+// 새 파일 추가는 즉시 반영되지만, 같은 이름의 파일을 "교체"하면 CDN 캐시 때문에 최대 12시간 후 반영된다.
+const CDN_IMAGE_ROOT = "https://cdn.jsdelivr.net/gh/TWHome-Git/TWPage@main/";
+
+// "기본/16회차_아바타별/파일명.png"처럼 하위 폴더가 포함된 값은 세그먼트별로 인코딩해야
+// 슬래시가 %2F로 바뀌지 않는다 (CDN은 %2F 경로를 찾지 못함).
+const encodeImagePath = (path) => path.split("/").map(encodeURIComponent).join("/");
+
 const STAT_NAMES = [
   "찌르기",
   "베기",
@@ -394,12 +402,12 @@ function restoreLastCharacter() {
 const SHEET_VERSION_URL = `${SHEET_CSV_URL}&range=AZ1`;
 const CSV_CACHE_KEY = "tw-equipment-csv-cache-v1";
 
-async function fetchSheetVersion() {
+async function fetchSheetVersionCell(versionUrl) {
   try {
-    const response = await fetch(SHEET_VERSION_URL, { cache: "no-store" });
+    const response = await fetch(versionUrl, { cache: "no-store" });
     if (!response.ok) return "";
     const text = (await response.text()).trim().replace(/^"|"$/g, "");
-    // 줄바꿈/쉼표가 없는 40자 이하 값만 버전으로 인정 (전체 CSV가 반환된 경우 배제)
+    // 줄바꿈/쉼표가 없는 40자 이하 값만 버전으로 인정 (버전 셀이 비어 전체 CSV가 반환된 경우 배제)
     if (text && text.length <= 40 && !/[\n\r,<]/.test(text)) return text;
   } catch (error) {
     console.info("시트 버전 확인 실패 — 전체 CSV를 받습니다.", error);
@@ -407,22 +415,23 @@ async function fetchSheetVersion() {
   return "";
 }
 
-async function loadSheetRows() {
-  const version = await fetchSheetVersion();
+// 장비/아바타/어빌리티 시트 공용: 버전 셀이 같으면 localStorage 캐시를 재사용하고,
+// 다르면 전체 CSV를 받아 캐시를 갱신한다.
+async function loadSheetTextCached(csvUrl, versionUrl, cacheKey) {
+  const version = await fetchSheetVersionCell(versionUrl);
 
-  // 버전이 같으면 localStorage에 저장해둔 CSV 재사용
   if (version) {
     try {
-      const cached = JSON.parse(localStorage.getItem(CSV_CACHE_KEY) || "null");
+      const cached = JSON.parse(localStorage.getItem(cacheKey) || "null");
       if (cached && cached.version === version && typeof cached.text === "string" && cached.text) {
-        return parseDelimited(cached.text, ",");
+        return cached.text;
       }
     } catch (error) {
       console.info("CSV 캐시를 읽지 못했습니다.", error);
     }
   }
 
-  const response = await fetch(SHEET_CSV_URL, { cache: "no-store" });
+  const response = await fetch(csvUrl, { cache: "no-store" });
   if (!response.ok) {
     throw new Error(`Google Sheet CSV ${response.status}`);
   }
@@ -433,12 +442,16 @@ async function loadSheetRows() {
 
   if (version) {
     try {
-      localStorage.setItem(CSV_CACHE_KEY, JSON.stringify({ version, text }));
+      localStorage.setItem(cacheKey, JSON.stringify({ version, text }));
     } catch (error) {
       console.info("CSV 캐시 저장 실패(용량 초과 등) — 캐시 없이 동작합니다.", error);
     }
   }
-  return parseDelimited(text, ",");
+  return text;
+}
+
+async function loadSheetRows() {
+  return parseDelimited(await loadSheetTextCached(SHEET_CSV_URL, SHEET_VERSION_URL, CSV_CACHE_KEY), ",");
 }
 
 async function fetchJson(url) {
@@ -991,7 +1004,11 @@ function activateDbTab(key) {
 // ── 어빌리티 DB ──
 // 데이터: Google Sheets 웹 게시 CSV (이미지 파일, 종류, 어빌리티명, 획득확률, 효과1~6)
 const ABILITY_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS78PnupM0NaJzkrkFCr2Llja9TJKrLcRZqeCqlCUV4GPGlsJd3xSIn3SQAvHwzy_tGtxDbTFtl8oZQ/pub?gid=1875452616&single=true&output=csv";
-const ABILITY_IMAGE_BASE = "./ability-images/";
+const ABILITY_IMAGE_BASE = `${CDN_IMAGE_ROOT}ability-images/`;
+
+// 장비/아바타와 동일한 버전 셀 캐시: 어빌리티 시트 탭의 AZ1 값이 같으면 전체 CSV 다운로드 생략
+const ABILITY_VERSION_URL = `${ABILITY_CSV_URL}&range=AZ1`;
+const ABILITY_CSV_CACHE_KEY = "tw-ability-csv-cache-v1";
 const ability = {
   records: [],
   category: "all",
@@ -1005,9 +1022,7 @@ async function loadAbilityDb() {
   els.abilityStatus.textContent = "데이터 로딩 중";
 
   try {
-    const response = await fetch(ABILITY_CSV_URL, { cache: "no-store" });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const text = (await response.text()).replace(/^﻿/, "");
+    const text = (await loadSheetTextCached(ABILITY_CSV_URL, ABILITY_VERSION_URL, ABILITY_CSV_CACHE_KEY)).replace(/^﻿/, "");
     const rows = parseDelimited(text, ",");
     ability.records = rows
       .slice(1)
@@ -1041,54 +1056,14 @@ async function loadAbilityDb() {
 // 데이터: Google Sheets 웹 게시 CSV
 // (아바타 목록 이미지, 아바타 상세 이미지, 아바타 이름, 획득처, 확률, 회차, 月-아이템 교환 가능)
 const AVATAR_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS78PnupM0NaJzkrkFCr2Llja9TJKrLcRZqeCqlCUV4GPGlsJd3xSIn3SQAvHwzy_tGtxDbTFtl8oZQ/pub?gid=1331633328&single=true&output=csv";
-const AVATAR_IMAGE_BASE = "./avatar-images/";
+const AVATAR_IMAGE_BASE = `${CDN_IMAGE_ROOT}avatar-images/`;
 
 // 장비 DB와 동일한 버전 셀 캐시: AZ1 값이 같으면 전체 CSV 다운로드 생략
 const AVATAR_VERSION_URL = `${AVATAR_CSV_URL}&range=AZ1`;
 const AVATAR_CSV_CACHE_KEY = "tw-avatar-csv-cache-v1";
 
-async function fetchAvatarSheetVersion() {
-  try {
-    const response = await fetch(AVATAR_VERSION_URL, { cache: "no-store" });
-    if (!response.ok) return "";
-    const text = (await response.text()).trim().replace(/^"|"$/g, "");
-    // 줄바꿈/쉼표가 없는 40자 이하 값만 버전으로 인정 (AZ1이 비어 전체 CSV가 반환된 경우 배제)
-    if (text && text.length <= 40 && !/[\n\r,<]/.test(text)) return text;
-  } catch (error) {
-    console.info("아바타 시트 버전 확인 실패 — 전체 CSV를 받습니다.", error);
-  }
-  return "";
-}
-
 async function loadAvatarSheetText() {
-  const version = await fetchAvatarSheetVersion();
-
-  if (version) {
-    try {
-      const cached = JSON.parse(localStorage.getItem(AVATAR_CSV_CACHE_KEY) || "null");
-      if (cached && cached.version === version && typeof cached.text === "string" && cached.text) {
-        return cached.text;
-      }
-    } catch (error) {
-      console.info("아바타 CSV 캐시를 읽지 못했습니다.", error);
-    }
-  }
-
-  const response = await fetch(AVATAR_CSV_URL, { cache: "no-store" });
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  const text = await response.text();
-  if (text.trim().startsWith("<")) {
-    throw new Error("Google Sheet returned an HTML page instead of CSV.");
-  }
-
-  if (version) {
-    try {
-      localStorage.setItem(AVATAR_CSV_CACHE_KEY, JSON.stringify({ version, text }));
-    } catch (error) {
-      console.info("아바타 CSV 캐시 저장 실패(용량 초과 등) — 캐시 없이 동작합니다.", error);
-    }
-  }
-  return text;
+  return loadSheetTextCached(AVATAR_CSV_URL, AVATAR_VERSION_URL, AVATAR_CSV_CACHE_KEY);
 }
 
 // 시트에 확장자 없이 적어도 동작하도록 보정
@@ -1194,7 +1169,7 @@ function renderAvatarList() {
       <td class="equip-info-cell">
         <div class="equip-info">
           <span class="equip-thumb ability-thumb">
-            ${record.listImage ? `<img src="${AVATAR_IMAGE_BASE}${encodeURIComponent(record.listImage)}" alt="" loading="lazy" decoding="async" />` : ""}
+            ${record.listImage ? `<img src="${AVATAR_IMAGE_BASE}${encodeImagePath(record.listImage)}" alt="" loading="lazy" decoding="async" />` : ""}
           </span>
           <span class="equip-name-block">
             <strong>${escapeHtml(record.name)}</strong>
@@ -1217,10 +1192,10 @@ function renderAvatarDetail() {
   }
 
   const iconHtml = record.listImage
-    ? `<img src="${AVATAR_IMAGE_BASE}${encodeURIComponent(record.listImage)}" alt="" decoding="async" />`
+    ? `<img src="${AVATAR_IMAGE_BASE}${encodeImagePath(record.listImage)}" alt="" decoding="async" />`
     : "";
   const wearHtml = record.detailImages
-    .map((file) => `<img class="avatar-wear-image" src="${AVATAR_IMAGE_BASE}${encodeURIComponent(file)}" alt="${escapeHtml(record.name)} 착용 이미지" decoding="async" />`)
+    .map((file) => `<img class="avatar-wear-image" src="${AVATAR_IMAGE_BASE}${encodeImagePath(file)}" alt="${escapeHtml(record.name)} 착용 이미지" decoding="async" />`)
     .join("");
 
   const sourceRows = record.sources.map((s) => `
@@ -1305,7 +1280,7 @@ function renderAbilityList() {
       <td class="equip-info-cell">
         <div class="equip-info">
           <span class="equip-thumb ability-thumb">
-            ${record.imageFile ? `<img src="${ABILITY_IMAGE_BASE}${encodeURIComponent(record.imageFile)}" alt="" decoding="async" />` : ""}
+            ${record.imageFile ? `<img src="${ABILITY_IMAGE_BASE}${encodeImagePath(record.imageFile)}" alt="" decoding="async" />` : ""}
           </span>
           <span class="equip-name-block">
             <strong>${escapeHtml(record.name)}</strong>
@@ -2125,11 +2100,25 @@ function f2(value) {
   });
 }
 
+// 입력 필드 → 한계치 힌트 필드 매핑 (마우스 오버 시 MAX 표기)
+const HINT_FIELD_BY_INPUT = {
+  attackEnchant: "attackEnchantMaxHint",
+  defenseEnchant: "defenseEnchantMaxHint",
+  hitValue: "hitMaxHint",
+  primaryStatValue: "primaryStatMaxHint",
+  secondaryStatValue: "secondaryStatMaxHint",
+};
+
 function makeNumberInput(row, field, onCommit) {
   const input = document.createElement("input");
   input.type = "number";
   input.value = f0(row[field]);
   input.dataset.field = field;
+  const hintField = HINT_FIELD_BY_INPUT[field];
+  const showHint = row.isStat
+    ? field === "primaryStatValue" || field === "secondaryStatValue"
+    : !row.isAbility && !ACCESSORY_SLOTS.includes(row.slotName);
+  if (hintField && showHint) input.title = row[hintField];
   input.addEventListener("input", () => {
     row[field] = Number(input.value) || 0;
     recalcRow(row, calc.type);
