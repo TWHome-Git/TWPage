@@ -1056,7 +1056,10 @@ async function loadAbilityDb() {
 // 데이터: Google Sheets 웹 게시 CSV
 // (아바타 목록 이미지, 아바타 상세 이미지, 아바타 이름, 획득처, 확률, 회차, 月-아이템 교환 가능)
 const AVATAR_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS78PnupM0NaJzkrkFCr2Llja9TJKrLcRZqeCqlCUV4GPGlsJd3xSIn3SQAvHwzy_tGtxDbTFtl8oZQ/pub?gid=1331633328&single=true&output=csv";
-const AVATAR_IMAGE_BASE = `${CDN_IMAGE_ROOT}avatar-images/`;
+// avatar-images는 Icons(목록용 아이콘)와 Details(착용 상세 이미지)로 나뉘어 있다.
+// 시트는 폴더 없이 파일명만 주므로 여기서 폴더를 붙인다.
+const AVATAR_ICON_BASE = `${CDN_IMAGE_ROOT}avatar-images/Icons/`;
+const AVATAR_DETAIL_BASE = `${CDN_IMAGE_ROOT}avatar-images/Details/`;
 
 // 장비 DB와 동일한 버전 셀 캐시: AZ1 값이 같으면 전체 CSV 다운로드 생략
 const AVATAR_VERSION_URL = `${AVATAR_CSV_URL}&range=AZ1`;
@@ -1070,7 +1073,7 @@ async function loadAvatarSheetText() {
 function avatarImageFile(value) {
   const name = clean(value);
   if (!name) return "";
-  return name.includes(".") ? name : `${name}.png`;
+  return name.includes(".") ? name : `${name}.webp`;
 }
 
 const avatar = {
@@ -1169,7 +1172,7 @@ function renderAvatarList() {
       <td class="equip-info-cell">
         <div class="equip-info">
           <span class="equip-thumb ability-thumb">
-            ${record.listImage ? `<img src="${AVATAR_IMAGE_BASE}${encodeImagePath(record.listImage)}" alt="" loading="lazy" decoding="async" />` : ""}
+            ${record.listImage ? `<img src="${AVATAR_ICON_BASE}${encodeImagePath(record.listImage)}" alt="" loading="lazy" decoding="async" />` : ""}
           </span>
           <span class="equip-name-block">
             <strong>${escapeHtml(record.name)}</strong>
@@ -1192,10 +1195,10 @@ function renderAvatarDetail() {
   }
 
   const iconHtml = record.listImage
-    ? `<img src="${AVATAR_IMAGE_BASE}${encodeImagePath(record.listImage)}" alt="" decoding="async" />`
+    ? `<img src="${AVATAR_ICON_BASE}${encodeImagePath(record.listImage)}" alt="" decoding="async" />`
     : "";
   const wearHtml = record.detailImages
-    .map((file) => `<img class="avatar-wear-image" src="${AVATAR_IMAGE_BASE}${encodeImagePath(file)}" alt="${escapeHtml(record.name)} 착용 이미지" decoding="async" />`)
+    .map((file) => `<img class="avatar-wear-image" src="${AVATAR_DETAIL_BASE}${encodeImagePath(file)}" alt="${escapeHtml(record.name)} 착용 이미지" decoding="async" />`)
     .join("");
 
   const sourceRows = record.sources.map((s) => `

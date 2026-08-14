@@ -28,13 +28,25 @@ Google Sheets에 유지하는 실제 장비 DB를 읽어서 웹페이지에서 �
 ├─ Project.md
 ├─ assets/
 │  ├─ app.js
-│  └─ styles.css
-└─ equipment-images/   (PNG 373개)
+│  ├─ styles.css
+│  └─ *.json           (buffs / eta_info / skills)
+├─ avatar-images/
+│  ├─ Icons/           (WebP 2480개 — 아바타 목록용 아이콘, `이름1.webp`)
+│  └─ Details/         (WebP 2147개 — 아바타 착용 상세 이미지, `이름2.webp`)
+├─ ability-images/     (PNG 5개)
+├─ character-images/   (PNG 19개)
+├─ equipment-images/   (PNG 373개)
+└─ images/             (PNG 41개 + buff/ 50개 + etachar/ 19개)
 ```
 
-이전 문서에는 `web/` 하위 폴더, `.github/workflows/deploy-pages.yml`, `README.md`, `PROJECT_HANDOFF.md`, `character-images/`, `.codex-work/`, `outputs/`가 있었지만 현재 이 폴더에는 없습니다.
+### 아바타 이미지 폴더 구분
 
-주의: `assets/app.js`는 `CHARACTER_IMAGE_BASE = "./character-images/"`를 참조하고 있는데, 실제 `character-images/` 폴더가 없습니다. 계수 계산기 캐릭터 카드 이미지가 현재 깨져 있을 가능성이 높습니다. 이미지가 남아 있는 곳이 있는지 확인하거나, 새로 준비해서 이 폴더에 추가해야 합니다.
+아바타 이미지는 용도에 따라 두 폴더로 나뉩니다.
+
+- `avatar-images/Icons/` — 아바타 DB **목록**에 뜨는 작은 아이콘. 게임 아바타 상점 UI에서 잘라낸 55x55 무손실 WebP입니다.
+- `avatar-images/Details/` — 아바타 **상세**(착용) 이미지. 캐릭터가 해당 아바타를 착용한 모습입니다.
+
+Google Sheets 아바타 시트는 A열(아바타 리스트 이미지)과 B열(아바타 상세 이미지)에 **폴더 경로 없이 파일명만** 적습니다(예: `파일럿_캡1.webp`, `파일럿_캡2.webp`). 폴더는 `assets/app.js`의 `AVATAR_ICON_BASE`와 `AVATAR_DETAIL_BASE`가 붙입니다. 폴더 구조를 바꾸면 이 두 상수를 함께 고쳐야 합니다.
 
 ## 4. 로컬 실행 방법
 
