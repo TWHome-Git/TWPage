@@ -368,8 +368,14 @@ async function boot() {
   initDamageCalculator();
   initSimulators();
 
+  renderList(); // 장비 DB가 오기 전까지 로딩 스피너를 띄운다
+
   try {
-    const rows = await loadSheetRows();
+    const rows = await loadSheetRows((freshRows) => {
+      state.records = normalizeRows(freshRows);
+      populateCategorySelect();
+      applyFilters();
+    });
     state.records = normalizeRows(rows);
     state.source = "live";
   } catch (error) {
@@ -384,6 +390,19 @@ async function boot() {
 
   if (calc.active) refreshAllRows();
   else restoreLastCharacter();
+
+  prefetchSecondaryDbs();
+}
+
+// 장비 DB가 준비된 뒤, 어빌리티/아바타 DB를 미리 받아둔다.
+// 탭을 처음 눌렀을 때 기다리지 않도록 하는 목적이라 유휴 시간에만 돌린다.
+function prefetchSecondaryDbs() {
+  const run = () => {
+    if (!ability.loaded && !ability.loading) loadAbilityDb();
+    if (!avatar.loaded && !avatar.loading) loadAvatarDb();
+  };
+  if (typeof requestIdleCallback === "function") requestIdleCallback(run, { timeout: 3000 });
+  else setTimeout(run, 800);
 }
 
 // 재접속 시 마지막으로 보던 캐릭터를 자동으로 열어줌
@@ -415,22 +434,26 @@ async function fetchSheetVersionCell(versionUrl) {
   return "";
 }
 
-// 장비/아바타/어빌리티 시트 공용: 버전 셀이 같으면 localStorage 캐시를 재사용하고,
-// 다르면 전체 CSV를 받아 캐시를 갱신한다.
-async function loadSheetTextCached(csvUrl, versionUrl, cacheKey) {
-  const version = await fetchSheetVersionCell(versionUrl);
-
-  if (version) {
-    try {
-      const cached = JSON.parse(localStorage.getItem(cacheKey) || "null");
-      if (cached && cached.version === version && typeof cached.text === "string" && cached.text) {
-        return cached.text;
-      }
-    } catch (error) {
-      console.info("CSV 캐시를 읽지 못했습니다.", error);
-    }
+function readCsvCache(cacheKey) {
+  try {
+    const cached = JSON.parse(localStorage.getItem(cacheKey) || "null");
+    if (cached && typeof cached.text === "string" && cached.text) return cached;
+  } catch (error) {
+    console.info("CSV 캐시를 읽지 못했습니다.", error);
   }
+  return null;
+}
 
+function writeCsvCache(cacheKey, version, text) {
+  if (!version) return;
+  try {
+    localStorage.setItem(cacheKey, JSON.stringify({ version, text }));
+  } catch (error) {
+    console.info("CSV 캐시 저장 실패(용량 초과 등) — 캐시 없이 동작합니다.", error);
+  }
+}
+
+async function fetchSheetCsv(csvUrl) {
   const response = await fetch(csvUrl, { cache: "no-store" });
   if (!response.ok) {
     throw new Error(`Google Sheet CSV ${response.status}`);
@@ -439,19 +462,44 @@ async function loadSheetTextCached(csvUrl, versionUrl, cacheKey) {
   if (text.trim().startsWith("<")) {
     throw new Error("Google Sheet returned an HTML page instead of CSV.");
   }
-
-  if (version) {
-    try {
-      localStorage.setItem(cacheKey, JSON.stringify({ version, text }));
-    } catch (error) {
-      console.info("CSV 캐시 저장 실패(용량 초과 등) — 캐시 없이 동작합니다.", error);
-    }
-  }
   return text;
 }
 
-async function loadSheetRows() {
-  return parseDelimited(await loadSheetTextCached(SHEET_CSV_URL, SHEET_VERSION_URL, CSV_CACHE_KEY), ",");
+// 백그라운드 검증: 버전이 바뀐 경우에만 전체 CSV를 다시 받아 캐시를 갱신하고 onFresh로 알린다.
+async function revalidateSheetCache(csvUrl, versionUrl, cacheKey, cachedVersion, onFresh) {
+  try {
+    const version = await fetchSheetVersionCell(versionUrl);
+    if (!version || version === cachedVersion) return;
+    const text = await fetchSheetCsv(csvUrl);
+    writeCsvCache(cacheKey, version, text);
+    onFresh(text);
+  } catch (error) {
+    console.info("시트 갱신 확인 실패 — 캐시 데이터를 계속 사용합니다.", error);
+  }
+}
+
+// 장비/아바타/어빌리티 시트 공용 (stale-while-revalidate).
+// 캐시가 있으면 네트워크를 기다리지 않고 즉시 반환해 화면을 먼저 그린다.
+// 버전 확인(수 바이트지만 왕복 0.6~0.9초)과 재다운로드는 백그라운드에서 진행하고,
+// 시트가 실제로 바뀐 경우에만 onFresh로 새 데이터를 넘긴다.
+// 캐시가 없을 때만 기존처럼 버전 확인 → 전체 CSV 순서로 기다린다.
+async function loadSheetTextCached(csvUrl, versionUrl, cacheKey, onFresh) {
+  const cached = readCsvCache(cacheKey);
+  if (cached) {
+    const notify = typeof onFresh === "function" ? onFresh : () => {};
+    revalidateSheetCache(csvUrl, versionUrl, cacheKey, cached.version, notify);
+    return cached.text;
+  }
+
+  const version = await fetchSheetVersionCell(versionUrl);
+  const text = await fetchSheetCsv(csvUrl);
+  writeCsvCache(cacheKey, version, text);
+  return text;
+}
+
+async function loadSheetRows(onFresh) {
+  const notify = typeof onFresh === "function" ? (text) => onFresh(parseDelimited(text, ",")) : undefined;
+  return parseDelimited(await loadSheetTextCached(SHEET_CSV_URL, SHEET_VERSION_URL, CSV_CACHE_KEY, notify), ",");
 }
 
 async function fetchJson(url) {
@@ -460,6 +508,18 @@ async function fetchJson(url) {
     throw new Error(`Snapshot ${response.status}`);
   }
   return response.json();
+}
+
+// 목록이 비었을 때 표시할 행. 아직 로딩 중이면 회전 아이콘을, 로딩이 끝났으면 안내 문구를 보여준다.
+function listPlaceholderRow(colspan, isLoaded, emptyTitle, emptyHint) {
+  const inner = isLoaded
+    ? `<strong>${emptyTitle}</strong><span>${emptyHint}</span>`
+    : `<div class="loading-spinner" role="status" aria-label="불러오는 중"></div><span>데이터를 불러오는 중입니다.</span>`;
+  return `
+    <tr><td colspan="${colspan}">
+      <div class="empty-state${isLoaded ? "" : " is-loading"}">${inner}</div>
+    </td></tr>
+  `;
 }
 
 function parseDelimited(text, delimiter) {
@@ -683,6 +743,7 @@ let etaLoadSeq = 0;
 async function loadEtaRankings(url = ETA_RANKING_URL) {
   const seq = ++etaLoadSeq; // 연속 요청 시 마지막 요청만 화면에 반영
   eta.loading = true;
+  renderEtaRanking(); // 로딩 스피너를 먼저 띄운다
   loadEtaIndex();
 
   try {
@@ -939,9 +1000,7 @@ function renderEtaRanking() {
 
   if (!visible.length) {
     els.etaRankingBody.innerHTML = `
-      <tr><td colspan="5">
-        <div class="empty-state"><strong>표시할 순위가 없습니다</strong><span>${eta.loaded ? "조건을 조금 넓혀보세요." : "데이터를 불러오는 중입니다."}</span></div>
-      </td></tr>
+      ${listPlaceholderRow(5, eta.loaded, "표시할 순위가 없습니다", "조건을 조금 넓혀보세요.")}
     `;
     return;
   }
@@ -1017,32 +1076,40 @@ const ability = {
   loading: false,
 };
 
+// CSV 텍스트 → ability.records. 최초 로딩과 백그라운드 갱신 양쪽에서 쓴다.
+function applyAbilityText(rawText) {
+  const rows = parseDelimited(rawText.replace(/^﻿/, ""), ",");
+  ability.records = rows
+    .slice(1)
+    .map((row) => {
+      const name = clean(row[2]);
+      if (!name) return null;
+      const effects = row.slice(4, 10).map(clean).filter(Boolean);
+      return {
+        imageFile: clean(row[0]),
+        category: clean(row[1]),
+        name,
+        prob: clean(row[3]),
+        effects,
+        searchText: [row[1], name, effects.join(" ")].join(" ").toLowerCase(),
+      };
+    })
+    .filter(Boolean);
+  ability.loaded = true;
+  els.abilityStatus.textContent = "DB 연결";
+  populateAbilityCategorySelect();
+}
+
 async function loadAbilityDb() {
   ability.loading = true;
   els.abilityStatus.textContent = "데이터 로딩 중";
+  renderAbilityList(); // 로딩 스피너를 먼저 띄운다
 
   try {
-    const text = (await loadSheetTextCached(ABILITY_CSV_URL, ABILITY_VERSION_URL, ABILITY_CSV_CACHE_KEY)).replace(/^﻿/, "");
-    const rows = parseDelimited(text, ",");
-    ability.records = rows
-      .slice(1)
-      .map((row) => {
-        const name = clean(row[2]);
-        if (!name) return null;
-        const effects = row.slice(4, 10).map(clean).filter(Boolean);
-        return {
-          imageFile: clean(row[0]),
-          category: clean(row[1]),
-          name,
-          prob: clean(row[3]),
-          effects,
-          searchText: [row[1], name, effects.join(" ")].join(" ").toLowerCase(),
-        };
-      })
-      .filter(Boolean);
-    ability.loaded = true;
-    els.abilityStatus.textContent = "DB 연결";
-    populateAbilityCategorySelect();
+    applyAbilityText(await loadSheetTextCached(ABILITY_CSV_URL, ABILITY_VERSION_URL, ABILITY_CSV_CACHE_KEY, (fresh) => {
+      applyAbilityText(fresh);
+      renderAbilityList();
+    }));
   } catch (error) {
     console.warn("어빌리티 DB 로딩 실패", error);
     els.abilityStatus.textContent = "데이터 로드 실패";
@@ -1065,8 +1132,8 @@ const AVATAR_DETAIL_BASE = `${CDN_IMAGE_ROOT}avatar-images/Details/`;
 const AVATAR_VERSION_URL = `${AVATAR_CSV_URL}&range=AZ1`;
 const AVATAR_CSV_CACHE_KEY = "tw-avatar-csv-cache-v1";
 
-async function loadAvatarSheetText() {
-  return loadSheetTextCached(AVATAR_CSV_URL, AVATAR_VERSION_URL, AVATAR_CSV_CACHE_KEY);
+async function loadAvatarSheetText(onFresh) {
+  return loadSheetTextCached(AVATAR_CSV_URL, AVATAR_VERSION_URL, AVATAR_CSV_CACHE_KEY, onFresh);
 }
 
 // 시트에 확장자 없이 적어도 동작하도록 보정
@@ -1087,17 +1154,14 @@ const avatar = {
   loading: false,
 };
 
-async function loadAvatarDb() {
-  avatar.loading = true;
-  els.avatarStatus.textContent = "데이터 로딩 중";
-
-  try {
-    const text = (await loadAvatarSheetText()).replace(/^﻿/, "");
-    const rows = parseDelimited(text, ",");
-    // 같은 이름이 여러 행이면(획득처가 다른 경우) 하나로 합친다.
-    // 목록 이미지는 위 행 우선, 상세 이미지는 서로 다른 것을 모두 보관한다.
-    const merged = new Map();
-    rows.slice(1).forEach((row) => {
+// CSV 텍스트 → avatar.records. 최초 로딩과 백그라운드 갱신 양쪽에서 쓴다.
+function applyAvatarText(rawText) {
+  const text = rawText.replace(/^﻿/, "");
+  const rows = parseDelimited(text, ",");
+  // 같은 이름이 여러 행이면(획득처가 다른 경우) 하나로 합친다.
+  // 목록 이미지는 위 행 우선, 상세 이미지는 서로 다른 것을 모두 보관한다.
+  const merged = new Map();
+  rows.slice(1).forEach((row) => {
       const name = clean(row[2]);
       if (!name) return;
       const listImage = avatarImageFile(row[0]);
@@ -1125,10 +1189,23 @@ async function loadAvatarDb() {
           searchText: name.toLowerCase(),
         });
       }
-    });
-    avatar.records = [...merged.values()];
-    avatar.loaded = true;
-    els.avatarStatus.textContent = "DB 연결";
+  });
+  avatar.records = [...merged.values()];
+  avatar.loaded = true;
+  els.avatarStatus.textContent = "DB 연결";
+}
+
+async function loadAvatarDb() {
+  avatar.loading = true;
+  els.avatarStatus.textContent = "데이터 로딩 중";
+  renderAvatar(); // 로딩 스피너를 먼저 띄운다
+
+  try {
+    // 캐시가 있으면 즉시 반환된다. 시트가 바뀐 경우에만 뒤늦게 onFresh로 다시 그린다.
+    applyAvatarText(await loadAvatarSheetText((fresh) => {
+      applyAvatarText(fresh);
+      renderAvatar();
+    }));
   } catch (error) {
     console.warn("아바타 DB 로딩 실패", error);
     els.avatarStatus.textContent = "데이터 로드 실패";
@@ -1159,11 +1236,7 @@ function renderAvatar() {
 
 function renderAvatarList() {
   if (!avatar.filtered.length) {
-    els.avatarListBody.innerHTML = `
-      <tr><td colspan="3">
-        <div class="empty-state"><strong>검색 결과가 없습니다</strong><span>${avatar.loaded ? "조건을 조금 넓혀보세요." : "데이터를 불러오는 중입니다."}</span></div>
-      </td></tr>
-    `;
+    els.avatarListBody.innerHTML = listPlaceholderRow(3, avatar.loaded, "검색 결과가 없습니다", "조건을 조금 넓혀보세요.");
     return;
   }
 
@@ -1270,11 +1343,7 @@ function renderAbilityList() {
   els.abilityCount.textContent = `${rows.length.toLocaleString("ko-KR")}개`;
 
   if (!rows.length) {
-    els.abilityListBody.innerHTML = `
-      <tr><td colspan="3">
-        <div class="empty-state"><strong>검색 결과가 없습니다</strong><span>${ability.loaded ? "조건을 조금 넓혀보세요." : "데이터를 불러오는 중입니다."}</span></div>
-      </td></tr>
-    `;
+    els.abilityListBody.innerHTML = listPlaceholderRow(3, ability.loaded, "검색 결과가 없습니다", "조건을 조금 넓혀보세요.");
     return;
   }
 
@@ -2718,16 +2787,12 @@ function openEquipmentDetail(index) {
 
 function renderList() {
   if (!state.filtered.length) {
-    els.equipmentListBody.innerHTML = `
-      <tr>
-        <td colspan="${STAT_NAMES.length + 1}">
-          <div class="empty-state">
-            <strong>검색 결과가 없습니다</strong>
-            <span>조건을 조금 넓혀보세요.</span>
-          </div>
-        </td>
-      </tr>
-    `;
+    els.equipmentListBody.innerHTML = listPlaceholderRow(
+      STAT_NAMES.length + 1,
+      state.records.length > 0,
+      "검색 결과가 없습니다",
+      "조건을 조금 넓혀보세요.",
+    );
     return;
   }
 
