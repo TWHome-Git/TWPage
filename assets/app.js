@@ -304,6 +304,9 @@ const els = {
   extraPanels: document.querySelectorAll("[data-extra-panel]"),
   simulatorTabButtons: document.querySelectorAll("[data-simulator-tab]"),
   simulatorPanels: document.querySelectorAll("[data-simulator-panel]"),
+  overlayReadme: document.querySelector("#overlayReadme"),
+  overlayDownload: document.querySelector("#overlayDownload"),
+  overlayReleaseMeta: document.querySelector("#overlayReleaseMeta"),
   characterGrid: document.querySelector("#characterGrid"),
   coefficientSelectView: document.querySelector("#coefficientSelectView"),
   coefficientDetailView: document.querySelector("#coefficientDetailView"),
@@ -733,6 +736,10 @@ function activateMainTab(key) {
 
   if (key === "eta" && !eta.loaded && !eta.loading) {
     loadEtaRankings();
+  }
+
+  if (key === "overlay") {
+    loadOverlayTab();
   }
 }
 
@@ -1400,6 +1407,282 @@ function activateExtraTab(key) {
     panel.hidden = !isActive;
     panel.classList.toggle("is-active", isActive);
   });
+}
+
+// ══════════════════════════════════════════════════════════════
+//  TWChatOverlay 탭 — GitHub README + 최신 릴리스 다운로드
+// ══════════════════════════════════════════════════════════════
+
+const OVERLAY_REPO = "TWHome-Git/TWChatOverlay";
+const OVERLAY_REPO_URL = `https://github.com/${OVERLAY_REPO}`;
+const OVERLAY_RAW_BASE = `https://raw.githubusercontent.com/${OVERLAY_REPO}/HEAD/`;
+const OVERLAY_README_API = `https://api.github.com/repos/${OVERLAY_REPO}/readme`;
+const OVERLAY_RELEASE_API = `https://api.github.com/repos/${OVERLAY_REPO}/releases/latest`;
+
+// "idle"일 때만 요청한다. 실패하면 다시 "idle"로 되돌려서 탭을 다시 눌렀을 때 재시도되게 한다.
+const overlay = { readme: "idle", release: "idle" };
+
+function loadOverlayTab() {
+  if (overlay.readme === "idle") loadOverlayReadme();
+  if (overlay.release === "idle") loadOverlayRelease();
+}
+
+async function loadOverlayRelease() {
+  if (!els.overlayDownload || !els.overlayReleaseMeta) return;
+  overlay.release = "loading";
+
+  try {
+    const response = await fetch(OVERLAY_RELEASE_API, { headers: { Accept: "application/vnd.github+json" } });
+    if (!response.ok) throw new Error(`Release ${response.status}`);
+    const release = await response.json();
+
+    const assets = Array.isArray(release.assets) ? release.assets : [];
+    const asset = assets.find((item) => /\.zip$/i.test(item.name || "")) || assets[0];
+
+    // 첨부 파일이 있으면 바로 받아지게, 없으면 릴리스 페이지로 보낸다
+    els.overlayDownload.href = asset?.browser_download_url || release.html_url || `${OVERLAY_REPO_URL}/releases/latest`;
+
+    const meta = [];
+    if (release.tag_name) meta.push(`v${String(release.tag_name).replace(/^v/i, "")}`);
+    if (asset?.size) meta.push(formatOverlaySize(asset.size));
+    if (release.published_at) meta.push(String(release.published_at).slice(0, 10));
+    els.overlayReleaseMeta.textContent = meta.join(" · ") || "Latest Release";
+
+    overlay.release = "loaded";
+  } catch (error) {
+    console.warn("TWChatOverlay 릴리스 정보를 불러오지 못했습니다.", error);
+    els.overlayReleaseMeta.textContent = "Latest Release";
+    overlay.release = "idle";
+  }
+}
+
+function formatOverlaySize(bytes) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "";
+  const mb = bytes / (1024 * 1024);
+  return mb >= 1 ? `${mb.toFixed(1)}MB` : `${Math.round(bytes / 1024)}KB`;
+}
+
+async function loadOverlayReadme() {
+  if (!els.overlayReadme) return;
+  overlay.readme = "loading";
+  els.overlayReadme.innerHTML = `
+    <div class="overlay-loading">
+      <div class="loading-spinner" role="status" aria-label="불러오는 중"></div>
+      <span>README를 불러오는 중입니다.</span>
+    </div>
+  `;
+
+  try {
+    els.overlayReadme.innerHTML = await fetchOverlayReadme();
+    decorateOverlayReadme();
+    overlay.readme = "loaded";
+  } catch (error) {
+    console.warn("TWChatOverlay README를 불러오지 못했습니다.", error);
+    overlay.readme = "idle";
+    els.overlayReadme.innerHTML = `
+      <div class="empty-state overlay-error">
+        <strong>README를 불러오지 못했습니다</strong>
+        <span>GitHub 응답이 없거나 API 요청 한도에 걸렸을 수 있습니다.</span>
+        <div class="overlay-error-actions">
+          <button class="sim-btn" type="button" data-overlay-retry>다시 시도</button>
+          <a href="${OVERLAY_REPO_URL}#readme" target="_blank" rel="noopener noreferrer">GitHub에서 바로 보기</a>
+        </div>
+      </div>
+    `;
+    els.overlayReadme.querySelector("[data-overlay-retry]")?.addEventListener("click", loadOverlayReadme);
+  }
+}
+
+// 1순위는 GitHub이 직접 렌더링해준 HTML이다. 문법 재현이 정확하고 서버에서 살균까지 끝난 상태다.
+// API 요청 한도(비로그인 시간당 60회)에 걸리면 raw 마크다운을 받아 내장 변환기로 그린다.
+async function fetchOverlayReadme() {
+  try {
+    const response = await fetch(OVERLAY_README_API, { headers: { Accept: "application/vnd.github.html" } });
+    if (!response.ok) throw new Error(`README ${response.status}`);
+    return await response.text();
+  } catch (error) {
+    console.info("GitHub README API 실패. raw 마크다운으로 대체합니다.", error);
+    const response = await fetch(`${OVERLAY_RAW_BASE}README.md`);
+    if (!response.ok) throw new Error(`README raw ${response.status}`);
+    return renderOverlayMarkdown(await response.text());
+  }
+}
+
+// README는 저장소 루트 기준으로 쓰여 있어서, 상대 경로를 GitHub 절대 주소로 바꿔줘야 한다.
+function decorateOverlayReadme() {
+  els.overlayReadme.querySelectorAll("a[href]").forEach((anchor) => {
+    const href = anchor.getAttribute("href") || "";
+
+    if (href.startsWith("#")) {
+      // 문서 내 앵커는 탭 안에서 페이지 전체를 튀게 만들어서 비활성화한다
+      anchor.removeAttribute("href");
+      anchor.classList.add("is-inert");
+      return;
+    }
+
+    const resolved = resolveOverlayUrl(href, `${OVERLAY_REPO_URL}/blob/HEAD/`);
+    if (!resolved) {
+      anchor.removeAttribute("href");
+      return;
+    }
+    anchor.href = stabilizeOverlayImageUrl(resolved);
+    anchor.target = "_blank";
+    anchor.rel = "noopener noreferrer";
+  });
+
+  els.overlayReadme.querySelectorAll("img[src]").forEach((image) => {
+    const resolved = resolveOverlayUrl(image.getAttribute("src") || "", OVERLAY_RAW_BASE);
+    if (resolved) image.src = stabilizeOverlayImageUrl(resolved);
+    image.loading = "lazy";
+    image.decoding = "async";
+  });
+}
+
+// GitHub README API는 첨부 이미지를 5분짜리 서명 URL(private-user-images)로 바꿔서 내려준다.
+// 지연 로딩으로 아래쪽 이미지를 나중에 불러오면 이미 만료된 뒤라서 깨진다.
+// 파일명에 남아 있는 UUID로 만료되지 않는 user-attachments 주소를 복원한다.
+function stabilizeOverlayImageUrl(url) {
+  if (!/^https:\/\/private-user-images\.githubusercontent\.com\//i.test(url)) return url;
+  const uuid = /-([0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12})\.[a-z0-9]+(?:[?#]|$)/i.exec(url)?.[1];
+  return uuid ? `https://github.com/user-attachments/assets/${uuid}` : url;
+}
+
+function resolveOverlayUrl(value, base) {
+  try {
+    const url = new URL(value, base);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.href : "";
+  } catch (error) {
+    return "";
+  }
+}
+
+// GitHub API가 막혔을 때만 쓰는 최소 마크다운 변환기.
+// 이 README가 실제로 쓰는 문법(제목 / 목록 / 강조 / 링크 / 이미지 / 구분선 / 코드)만 다룬다.
+function renderOverlayMarkdown(source) {
+  const rawImages = [];
+
+  const text = String(source)
+    .replace(/^\uFEFF+/, "")
+    .replace(/\r\n?/g, "\n")
+    // 마크다운에 직접 박아둔 <img> 태그는 허용 속성만 남겨 따로 보관했다가 마지막에 되돌린다
+    .replace(/<img\b[^>]*>/gi, (tag) => {
+      const src = /\bsrc\s*=\s*["']([^"']+)["']/i.exec(tag)?.[1] || "";
+      if (!resolveOverlayUrl(src, OVERLAY_RAW_BASE)) return "";
+      const alt = /\balt\s*=\s*["']([^"']*)["']/i.exec(tag)?.[1] || "";
+      rawImages.push(`<img src="${escapeHtml(src)}" alt="${escapeHtml(alt)}" />`);
+      return `@@TWIMG${rawImages.length - 1}@@`;
+    });
+
+  const inline = (value) => escapeHtml(value)
+    .replace(/`([^`]+)`/g, (match, code) => `<code>${code}</code>`)
+    .replace(/!\[([^\]]*)\]\(\s*([^)\s]+)[^)]*\)/g, (match, alt, url) => `<img src="${url}" alt="${alt}" />`)
+    .replace(/\[([^\]]+)\]\(\s*([^)\s]+)[^)]*\)/g, (match, label, url) => `<a href="${url}">${label}</a>`)
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<em>$2</em>")
+    .replace(/@@TWIMG(\d+)@@/g, (match, index) => rawImages[Number(index)] || "");
+
+  const out = [];
+  const stack = []; // 열려 있는 목록 { tag, indent }
+  let paragraph = [];
+  let codeLines = null;
+
+  const flushParagraph = () => {
+    if (!paragraph.length) return;
+    out.push(`<p>${inline(paragraph.join(" "))}</p>`);
+    paragraph = [];
+  };
+
+  const closeLists = (indent = -1) => {
+    while (stack.length && stack[stack.length - 1].indent > indent) {
+      out.push(`</li></${stack.pop().tag}>`);
+    }
+  };
+
+  const openItem = (indent, tag, content) => {
+    flushParagraph();
+    closeLists(indent);
+
+    if (!stack.length || indent > stack[stack.length - 1].indent) {
+      stack.push({ tag, indent });
+      out.push(`<${tag}>`);
+    } else {
+      out.push("</li>");
+      if (stack[stack.length - 1].tag !== tag) {
+        out.push(`</${stack.pop().tag}>`);
+        stack.push({ tag, indent });
+        out.push(`<${tag}>`);
+      }
+    }
+    out.push(`<li>${inline(content)}`);
+  };
+
+  text.split("\n").forEach((line) => {
+    const fence = /^\s*```/.test(line);
+    if (fence) {
+      if (codeLines) {
+        out.push(`<pre><code>${escapeHtml(codeLines.join("\n"))}</code></pre>`);
+        codeLines = null;
+      } else {
+        flushParagraph();
+        closeLists();
+        codeLines = [];
+      }
+      return;
+    }
+    if (codeLines) {
+      codeLines.push(line);
+      return;
+    }
+
+    if (!line.trim()) {
+      flushParagraph();
+      return;
+    }
+
+    const heading = /^(#{1,6})\s+(.*)$/.exec(line);
+    if (heading) {
+      flushParagraph();
+      closeLists();
+      const level = Math.min(heading[1].length + 1, 6); // 페이지에 h1이 이미 있어서 한 단계씩 낮춘다
+      out.push(`<h${level}>${inline(heading[2].trim())}</h${level}>`);
+      return;
+    }
+
+    if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(line)) {
+      flushParagraph();
+      closeLists();
+      out.push("<hr />");
+      return;
+    }
+
+    const bullet = /^(\s*)[-*+]\s+(.*)$/.exec(line);
+    if (bullet) {
+      openItem(bullet[1].length, "ul", bullet[2]);
+      return;
+    }
+
+    const ordered = /^(\s*)\d+[.)]\s+(.*)$/.exec(line);
+    if (ordered) {
+      openItem(ordered[1].length, "ol", ordered[2]);
+      return;
+    }
+
+    // 목록 안에서 들여쓴 본문(주로 스크린샷)은 현재 <li>에 이어 붙인다
+    if (stack.length && /^\s+/.test(line)) {
+      out.push(`<div>${inline(line.trim())}</div>`);
+      return;
+    }
+
+    flushParagraph();
+    closeLists();
+    paragraph.push(line.trim());
+  });
+
+  if (codeLines) out.push(`<pre><code>${escapeHtml(codeLines.join("\n"))}</code></pre>`);
+  flushParagraph();
+  closeLists();
+
+  return out.join("");
 }
 
 function renderCharacterGrid() {

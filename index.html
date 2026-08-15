@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>TW DB</title>
-    <link rel="stylesheet" href="./assets/styles.css?v=20260814-swr-1" />
+    <link rel="stylesheet" href="./assets/styles.css?v=20260816-overlay-tab" />
   </head>
   <body>
     <main class="app-shell">
@@ -14,6 +14,7 @@
         <button class="tab-button" type="button" data-main-tab="equipment" aria-controls="equipmentView">DB 검색</button>
         <button class="tab-button" type="button" data-main-tab="calculator" aria-controls="calculatorView">계산기</button>
         <button class="tab-button" type="button" data-main-tab="simulator" aria-controls="simulatorView">시뮬레이터</button>
+        <button class="tab-button" type="button" data-main-tab="overlay" aria-controls="overlayView">TWChatOverlay</button>
       </nav>
 
       <section id="etaView" class="main-panel" data-main-panel="eta" hidden>
@@ -581,6 +582,31 @@
         </div>
       </section>
 
+      <section id="overlayView" class="main-panel addon-view" data-main-panel="overlay" hidden>
+        <div class="addon-titlebar">
+          <div class="brand-block">
+            <p class="eyebrow">TW DB</p>
+            <h1>TWChatOverlay</h1>
+          </div>
+          <div class="addon-tab-field overlay-actions-field">
+            <span>다운로드</span>
+            <div class="overlay-actions">
+              <a id="overlayDownload" class="overlay-download" href="https://github.com/TWHome-Git/TWChatOverlay/releases/latest" target="_blank" rel="noopener noreferrer">
+                <strong>최신 버전 다운로드</strong>
+                <small id="overlayReleaseMeta">Latest Release</small>
+              </a>
+              <a class="overlay-repo-link" href="https://github.com/TWHome-Git/TWChatOverlay/" target="_blank" rel="noopener noreferrer">GitHub 저장소</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="addon-window">
+          <section class="addon-content is-active overlay-panel">
+            <div id="overlayReadme" class="markdown-body" aria-live="polite"></div>
+          </section>
+        </div>
+      </section>
+
       <section id="extraView" class="main-panel addon-view is-active" data-main-panel="extra">
         <div class="addon-titlebar">
           <div class="brand-block">
@@ -617,7 +643,7 @@
       </div>
     </template>
 
-    <script src="./assets/app.js?v=20260814-swr-1" type="module"></script>
+    <script src="./assets/app.js?v=20260816-overlay-tab" type="module"></script>
     <!-- GoatCounter 방문자 분석 (localhost 방문은 count.js가 기본으로 집계 제외) -->
     <script data-goatcounter="https://holedis88.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
   </body>
