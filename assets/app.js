@@ -1145,6 +1145,13 @@ async function loadAvatarSheetText(onFresh) {
   return loadSheetTextCached(AVATAR_CSV_URL, AVATAR_VERSION_URL, AVATAR_CSV_CACHE_KEY, onFresh);
 }
 
+// 시트의 "(1)"/"(2)"는 이름이 같은 다른 아바타를 구분하려는 표기라 화면에서는 감춘다.
+// 레코드 식별은 원래 이름 그대로 해야 두 아바타가 하나로 합쳐지지 않는다.
+// 끝에 붙은 (숫자)만 떼므로 "군모(빨강)", "앨리스 망토 (그린 민트)" 같은 이름은 그대로 남는다.
+function avatarDisplayName(name) {
+  return name.replace(/\s*\(\d+\)\s*$/, "");
+}
+
 // 시트에 확장자 없이 적어도 동작하도록 보정
 function avatarImageFile(value) {
   const name = clean(value);
@@ -1196,6 +1203,7 @@ function applyAvatarText(rawText) {
           listImage,
           detailImages: detailImage ? [detailImage] : [],
           name,
+          displayName: avatarDisplayName(name),
           slot: entry.slot,
           slots: entry.slot ? [entry.slot] : [],
           sources: [entry],
@@ -1326,7 +1334,7 @@ function renderAvatarList() {
             ${record.listImage ? `<img src="${AVATAR_ICON_BASE}${encodeImagePath(record.listImage)}" alt="" loading="lazy" decoding="async" />` : ""}
           </span>
           <span class="equip-name-block">
-            <strong>${escapeHtml(record.name)}</strong>
+            <strong>${escapeHtml(record.displayName)}</strong>
           </span>
         </div>
       </td>
@@ -1350,7 +1358,7 @@ function renderAvatarDetail() {
     ? `<img src="${AVATAR_ICON_BASE}${encodeImagePath(record.listImage)}" alt="" decoding="async" />`
     : "";
   const wearHtml = record.detailImages
-    .map((file) => `<img class="avatar-wear-image" src="${AVATAR_DETAIL_BASE}${encodeImagePath(file)}" alt="${escapeHtml(record.name)} 착용 이미지" decoding="async" />`)
+    .map((file) => `<img class="avatar-wear-image" src="${AVATAR_DETAIL_BASE}${encodeImagePath(file)}" alt="${escapeHtml(record.displayName)} 착용 이미지" decoding="async" />`)
     .join("");
 
   const sourceRows = record.sources.map((s) => `
@@ -1366,7 +1374,7 @@ function renderAvatarDetail() {
       <div class="item-image avatar-detail-thumb">${iconHtml}</div>
       <div>
         <p class="item-kind">아바타</p>
-        <h2>${escapeHtml(record.name)}</h2>
+        <h2>${escapeHtml(record.displayName)}</h2>
         <p class="item-condition">${record.sources.length > 1 ? `획득처 ${record.sources.length}곳` : escapeHtml(record.sources[0]?.source || "획득처 정보 없음")}</p>
       </div>
     </div>
