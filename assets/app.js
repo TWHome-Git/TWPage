@@ -1194,7 +1194,8 @@ function applyAvatarText(rawText) {
       if (!name) return;
       const listImage = avatarImageFile(row[0]);
       const detailImage = avatarImageFile(row[1]);
-      const setImage = avatarImageFile(row[7]);
+      // 세트 이미지도 획득처처럼 " / "로 여러 개 올 수 있다 (한 아바타가 두 세트에 동시에 속하는 경우)
+      const setImages = splitMulti(row[7]).map(avatarImageFile).filter(Boolean);
       const srcList = splitMulti(row[3]).filter(Boolean);
       const probList = splitMulti(row[4]);
       const slot = clean(row[5]);
@@ -1207,7 +1208,9 @@ function applyAvatarText(rawText) {
         });
         if (!existing.listImage) existing.listImage = listImage;
         if (detailImage && !existing.detailImages.includes(detailImage)) existing.detailImages.push(detailImage);
-        if (setImage && !existing.setImage) existing.setImage = setImage;
+        setImages.forEach((file) => {
+          if (!existing.setImages.includes(file)) existing.setImages.push(file);
+        });
         if (!existing.exchange) existing.exchange = clean(row[6]);
         if (!existing.slot) existing.slot = slot;
         if (slot && !existing.slots.includes(slot)) existing.slots.push(slot);
@@ -1215,7 +1218,7 @@ function applyAvatarText(rawText) {
         merged.set(name, {
           listImage,
           detailImages: detailImage ? [detailImage] : [],
-          setImage,
+          setImages,
           name,
           displayName: avatarDisplayName(name),
           slot,
@@ -1366,7 +1369,7 @@ function renderAvatarDetail() {
   // 개별 상세 이미지를 먼저, 세트 대표 이미지를 뒤에 (폴더가 달라 경로를 따로 만든다)
   const wearHtml = [
     ...record.detailImages.map((file) => [AVATAR_DETAIL_BASE, file]),
-    ...(record.setImage ? [[AVATAR_SET_BASE, record.setImage]] : []),
+    ...record.setImages.map((file) => [AVATAR_SET_BASE, file]),
   ]
     .map(([base, file]) => `<img class="avatar-wear-image" src="${base}${encodeImagePath(file)}" alt="${escapeHtml(record.displayName)} 착용 이미지" decoding="async" />`)
     .join("");
