@@ -2815,6 +2815,22 @@ img.dmg-chk-icon {
   max-width: 100%;
 }
 
+/* 3장이면 첫 장(개별 착용 이미지)을 윗줄에 혼자, 세트 대표 2장을 아랫줄에 */
+.avatar-wear-frame[data-count="3"] {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  justify-items: center;
+}
+
+.avatar-wear-frame[data-count="3"] .avatar-wear-image {
+  max-width: 100%;
+}
+
+.avatar-wear-frame[data-count="3"] .avatar-wear-image:first-of-type,
+.avatar-wear-frame[data-count="3"] .avatar-wear-missing {
+  grid-column: 1 / -1;
+}
+
 .avatar-list .equip-thumb img,
 .avatar-detail-thumb img {
   mix-blend-mode: multiply;

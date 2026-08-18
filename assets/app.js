@@ -1367,10 +1367,11 @@ function renderAvatarDetail() {
     ? `<img src="${AVATAR_ICON_BASE}${encodeImagePath(record.listImage)}" alt="" decoding="async" />`
     : "";
   // 개별 상세 이미지를 먼저, 세트 대표 이미지를 뒤에 (폴더가 달라 경로를 따로 만든다)
-  const wearHtml = [
+  const wearFiles = [
     ...record.detailImages.map((file) => [AVATAR_DETAIL_BASE, file]),
     ...record.setImages.map((file) => [AVATAR_SET_BASE, file]),
-  ]
+  ];
+  const wearHtml = wearFiles
     .map(([base, file]) => `<img class="avatar-wear-image" src="${base}${encodeImagePath(file)}" alt="${escapeHtml(record.displayName)} 착용 이미지" decoding="async" />`)
     .join("");
 
@@ -1405,7 +1406,7 @@ function renderAvatarDetail() {
 
     <div class="avatar-wear-section">
       <span>착용 이미지</span>
-      <div class="avatar-wear-frame">${wearHtml}<b class="avatar-wear-missing" hidden>✕ 이미지 준비 중</b></div>
+      <div class="avatar-wear-frame" data-count="${wearFiles.length}">${wearHtml}<b class="avatar-wear-missing" hidden>✕ 이미지 준비 중</b></div>
     </div>
   `;
 
