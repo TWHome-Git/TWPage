@@ -304,6 +304,11 @@ const els = {
   calculatorPanels: document.querySelectorAll("[data-calculator-panel]"),
   extraTabButtons: document.querySelectorAll("[data-extra-tab]"),
   extraPanels: document.querySelectorAll("[data-extra-panel]"),
+  buffTabButtons: document.querySelectorAll("[data-buff-tab]"),
+  buffPanels: document.querySelectorAll("[data-buff-panel]"),
+  expBaseBox: document.querySelector("#expBaseBox"),
+  expResultBox: document.querySelector("#expResultBox"),
+  expBuffBody: document.querySelector("#expBuffBody"),
   simulatorTabButtons: document.querySelectorAll("[data-simulator-tab]"),
   simulatorPanels: document.querySelectorAll("[data-simulator-panel]"),
   overlayReadme: document.querySelector("#overlayReadme"),
@@ -1136,6 +1141,8 @@ const AVATAR_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS78Pnup
 // 시트는 폴더 없이 파일명만 주므로 여기서 폴더를 붙인다.
 const AVATAR_ICON_BASE = `${CDN_IMAGE_ROOT}avatar-images/Icons/`;
 const AVATAR_DETAIL_BASE = `${CDN_IMAGE_ROOT}avatar-images/Details/`;
+// 세트 대표 이미지는 개별 상세와 성격이 달라 폴더를 나눠 둔다
+const AVATAR_SET_BASE = `${CDN_IMAGE_ROOT}avatar-images/Sets/`;
 
 // 장비 DB와 동일한 버전 셀 캐시: AZ1 값이 같으면 전체 CSV 다운로드 생략
 const AVATAR_VERSION_URL = `${AVATAR_CSV_URL}&range=AZ1`;
@@ -1172,42 +1179,49 @@ const avatar = {
   loading: false,
 };
 
+// 시트는 아바타당 한 줄이고, 획득처가 여러 곳이면 " / "로 이어 붙여 둔다.
+// 획득처와 확률은 같은 순서로 짝을 이룬다.
+const AVATAR_MULTI_SEP = " / ";
+const splitMulti = (value) => clean(value).split(AVATAR_MULTI_SEP).map((s) => s.trim());
+
 // CSV 텍스트 → avatar.records. 최초 로딩과 백그라운드 갱신 양쪽에서 쓴다.
 function applyAvatarText(rawText) {
   const text = rawText.replace(/^﻿/, "");
   const rows = parseDelimited(text, ",");
-  // 같은 이름이 여러 행이면(획득처가 다른 경우) 하나로 합친다.
-  // 목록 이미지는 위 행 우선, 상세 이미지는 서로 다른 것을 모두 보관한다.
   const merged = new Map();
   rows.slice(1).forEach((row) => {
       const name = clean(row[2]);
       if (!name) return;
       const listImage = avatarImageFile(row[0]);
       const detailImage = avatarImageFile(row[1]);
-      const entry = { source: clean(row[3]), prob: clean(row[4]), slot: clean(row[5]), round: clean(row[6]) };
+      const setImage = avatarImageFile(row[7]);
+      const srcList = splitMulti(row[3]).filter(Boolean);
+      const probList = splitMulti(row[4]);
+      const slot = clean(row[5]);
+      const sources = srcList.map((source, i) => ({ source, prob: probList[i] || "" }));
       const existing = merged.get(name);
       if (existing) {
-        if (!existing.sources.some((s) => s.source === entry.source && s.round === entry.round)) {
-          existing.sources.push(entry);
-        }
+        // 시트가 아바타당 한 줄이라 여기까지 오는 일은 없지만, 중복 줄이 생겨도 정보가 사라지지 않게 둔다
+        sources.forEach((s) => {
+          if (!existing.sources.some((x) => x.source === s.source && x.prob === s.prob)) existing.sources.push(s);
+        });
         if (!existing.listImage) existing.listImage = listImage;
-        if (detailImage && !existing.detailImages.includes(detailImage)) {
-          existing.detailImages.push(detailImage);
-        }
-        if (!existing.exchange) existing.exchange = clean(row[7]);
-        if (!existing.slot) existing.slot = entry.slot;
-        // 부위는 획득처 중복 제거와 무관하게 모든 행에서 모은다 (분류 필터용)
-        if (entry.slot && !existing.slots.includes(entry.slot)) existing.slots.push(entry.slot);
+        if (detailImage && !existing.detailImages.includes(detailImage)) existing.detailImages.push(detailImage);
+        if (setImage && !existing.setImage) existing.setImage = setImage;
+        if (!existing.exchange) existing.exchange = clean(row[6]);
+        if (!existing.slot) existing.slot = slot;
+        if (slot && !existing.slots.includes(slot)) existing.slots.push(slot);
       } else {
         merged.set(name, {
           listImage,
           detailImages: detailImage ? [detailImage] : [],
+          setImage,
           name,
           displayName: avatarDisplayName(name),
-          slot: entry.slot,
-          slots: entry.slot ? [entry.slot] : [],
-          sources: [entry],
-          exchange: clean(row[7]),
+          slot,
+          slots: slot ? [slot] : [],
+          sources,
+          exchange: clean(row[6]),
           searchText: name.toLowerCase(),
         });
       }
@@ -1313,16 +1327,9 @@ function avatarSourceSummary(record) {
   return rest > 0 ? `${label} <em class="avatar-more">외 ${rest}곳</em>` : label;
 }
 
-// 회차는 아바타가 처음 나온 시점이라 값이 있는 것만 보여준다.
-// (획득처 줄 수에 맞춰 "-"를 채우면 정보 없는 빈 줄만 늘어난다)
-function avatarRoundSummary(record) {
-  const rounds = [...new Set(record.sources.map((s) => s.round).filter(Boolean))];
-  return rounds.length ? rounds.map((r) => `<span>${escapeHtml(r)}</span>`).join("") : "-";
-}
-
 function renderAvatarList() {
   if (!avatar.filtered.length) {
-    els.avatarListBody.innerHTML = listPlaceholderRow(4, avatar.loaded, "검색 결과가 없습니다", "조건을 조금 넓혀보세요.");
+    els.avatarListBody.innerHTML = listPlaceholderRow(3, avatar.loaded, "검색 결과가 없습니다", "조건을 조금 넓혀보세요.");
     return;
   }
 
@@ -1340,7 +1347,6 @@ function renderAvatarList() {
       </td>
       <td class="avatar-slot">${escapeHtml(record.slots.join(", ") || "-")}</td>
       <td class="avatar-source">${avatarSourceSummary(record)}</td>
-      <td class="avatar-round">${avatarRoundSummary(record)}</td>
     </tr>
   `).join("");
 
@@ -1357,17 +1363,22 @@ function renderAvatarDetail() {
   const iconHtml = record.listImage
     ? `<img src="${AVATAR_ICON_BASE}${encodeImagePath(record.listImage)}" alt="" decoding="async" />`
     : "";
-  const wearHtml = record.detailImages
-    .map((file) => `<img class="avatar-wear-image" src="${AVATAR_DETAIL_BASE}${encodeImagePath(file)}" alt="${escapeHtml(record.displayName)} 착용 이미지" decoding="async" />`)
+  // 개별 상세 이미지를 먼저, 세트 대표 이미지를 뒤에 (폴더가 달라 경로를 따로 만든다)
+  const wearHtml = [
+    ...record.detailImages.map((file) => [AVATAR_DETAIL_BASE, file]),
+    ...(record.setImage ? [[AVATAR_SET_BASE, record.setImage]] : []),
+  ]
+    .map(([base, file]) => `<img class="avatar-wear-image" src="${base}${encodeImagePath(file)}" alt="${escapeHtml(record.displayName)} 착용 이미지" decoding="async" />`)
     .join("");
 
-  const sourceRows = record.sources.map((s) => `
-    <tr>
-      <td>${escapeHtml(s.source || "-")}</td>
-      <td>${escapeHtml(s.prob || "-")}</td>
-      <td>${escapeHtml(s.round || "-")}</td>
-    </tr>
-  `).join("");
+  const sourceRows = record.sources.length
+    ? record.sources.map((s) => `
+        <tr>
+          <td>${escapeHtml(s.source || "-")}</td>
+          <td>${escapeHtml(s.prob || "-")}</td>
+        </tr>
+      `).join("")
+    : '<tr><td colspan="2">획득처 정보 없음</td></tr>';
 
   els.avatarDetailCard.innerHTML = `
     <div class="item-hero">
@@ -1382,7 +1393,7 @@ function renderAvatarDetail() {
     <div class="avatar-detail-meta">
       <table class="avatar-source-table" aria-label="획득처별 정보">
         <thead>
-          <tr><th>획득처</th><th>확률</th><th>획득 회차</th></tr>
+          <tr><th>획득처</th><th>확률</th></tr>
         </thead>
         <tbody>${sourceRows}</tbody>
       </table>
@@ -1487,6 +1498,151 @@ function activateExtraTab(key) {
     panel.hidden = !isActive;
     panel.classList.toggle("is-active", isActive);
   });
+  // 버프 탭은 처음 열릴 때 기본 하위 탭(경험치)을 그린다
+  if (key === "buff") loadExpBuffs();
+}
+
+// ══════════════════════════════════════════════════════════════
+//  버프 아이템 탭 — 경험치 버프 / 레어 버프
+// ══════════════════════════════════════════════════════════════
+const BUFF_ICON_BASE = "./images/";
+const EXP_BUFF_URL = "./assets/exp-buffs.json";
+let expBuffLoaded = false;
+
+function activateBuffTab(key) {
+  els.buffTabButtons.forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.buffTab === key);
+  });
+  els.buffPanels.forEach((panel) => {
+    panel.hidden = panel.dataset.buffPanel !== key;
+  });
+  if (key === "exp") loadExpBuffs();
+}
+
+// 계산기 상태: 기본 경험치 선택과 버프 체크 상태를 함께 들고 있는다
+const expCalc = { data: null, baseIndex: -1, baseCustom: "", checked: new Set(), helmetValue: "" };
+
+// 아이콘이 아직 없는 항목은 빈 자리를 남겨 나중에 채워 넣을 수 있게 한다.
+// "buff/이름.png"처럼 하위 폴더를 적어도 되도록 세그먼트별로 인코딩한다.
+function buffIconHtml(item) {
+  if (!item["아이콘"]) return '<span class="buff-icon is-empty" aria-hidden="true"></span>';
+  return `<span class="buff-icon"><img src="${BUFF_ICON_BASE}${encodeImagePath(item["아이콘"])}" alt="" loading="lazy" decoding="async" /></span>`;
+}
+
+function expBaseValue() {
+  const list = expCalc.data?.["기본경험치"] || [];
+  const picked = list[expCalc.baseIndex];
+  if (!picked) return 0;
+  if (picked["직접입력"]) return Number(expCalc.baseCustom) || 0;
+  return Number(picked["값"]) || 0;
+}
+
+// 일반 경험치 배율 = 1 + (선택한 버프 배율의 합)
+function expTotalRate() {
+  let sum = 0;
+  (expCalc.data?.["버프"] || []).forEach((row, ri) => {
+    row.forEach((item, ci) => {
+      if (!expCalc.checked.has(`${ri}-${ci}`)) return;
+      if (item["입력"]) sum += (Number(expCalc.helmetValue) || 0) / 100;
+      else sum += Number(item["배율"]) || 0;
+    });
+  });
+  return 1 + sum;
+}
+
+function renderExpBase() {
+  const list = expCalc.data?.["기본경험치"] || [];
+  const picked = list[expCalc.baseIndex];
+  els.expBaseBox.innerHTML = `
+    <p class="buff-section-title">기본 획득 경험치</p>
+    <div class="buff-base-buttons">
+      ${list.map((b, i) => `
+        <button type="button" class="buff-base-btn${i === expCalc.baseIndex ? " is-active" : ""}" data-base-index="${i}">
+          ${escapeHtml(b["이름"] || "")}
+        </button>
+      `).join("")}
+    </div>
+    ${picked?.["직접입력"] ? `
+      <label class="buff-inline-field">
+        <span>직접 입력</span>
+        <input id="expBaseCustom" type="number" min="0" step="1" inputmode="numeric" placeholder="기본 경험치" value="${escapeHtml(expCalc.baseCustom)}" />
+      </label>
+    ` : ""}
+  `;
+}
+
+function renderExpResult() {
+  const base = expBaseValue();
+  const rate = expTotalRate();
+  const total = Math.floor(base * rate);
+  const fmt = (n) => n.toLocaleString("ko-KR");
+  els.expResultBox.innerHTML = `
+    <div class="buff-result-row">
+      <span>기본 경험치</span><strong>${fmt(base)}</strong>
+    </div>
+    <div class="buff-result-row">
+      <span>일반 경험치 배율</span><strong>×${rate.toFixed(2)}</strong>
+    </div>
+    <div class="buff-result-row is-total">
+      <span>획득 경험치</span><strong>${fmt(total)}</strong>
+    </div>
+  `;
+}
+
+function expItemHtml(item, ri, ci) {
+  const key = `${ri}-${ci}`;
+  const on = expCalc.checked.has(key);
+  return `
+    <label class="buff-item">
+      <input type="checkbox" class="buff-check" data-buff-key="${key}"${on ? " checked" : ""} />
+      ${buffIconHtml(item)}
+      <span class="buff-name">${escapeHtml(item["이름"] || "")}</span>
+    </label>
+    ${item["입력"] && on ? `
+      <input id="expHelmetValue" class="buff-num" type="number"
+        min="${item["입력"]["최소"]}" max="${item["입력"]["최대"]}" step="1" inputmode="numeric"
+        placeholder="${item["입력"]["최소"]}~${item["입력"]["최대"]}" value="${escapeHtml(expCalc.helmetValue)}" />
+      <span class="buff-unit">${escapeHtml(item["입력"]["단위"] || "")}</span>
+    ` : ""}
+  `;
+}
+
+function renderExpBuffs() {
+  const rows = expCalc.data?.["버프"] || [];
+  els.expBuffBody.innerHTML = `
+    <p class="buff-section-title">버프 아이템 목록</p>
+    <div class="buff-grid">
+      ${rows.map((row, ri) => {
+        // 같은 카테고리(택 1)는 한 줄을 통째로 써서 묶어 보여준다
+        const exclusive = row.length > 1;
+        return `<div class="buff-cell${exclusive ? " is-exclusive" : ""}">
+          ${row.map((item, ci) => expItemHtml(item, ri, ci)).join("")}
+          ${exclusive ? '<span class="buff-badge">택 1</span>' : ""}
+        </div>`;
+      }).join("")}
+    </div>
+  `;
+}
+
+function renderExpCalculator() {
+  renderExpBase();
+  renderExpBuffs();
+  renderExpResult();
+}
+
+async function loadExpBuffs() {
+  if (expBuffLoaded || !els.expBuffBody) return;
+  expBuffLoaded = true;
+  try {
+    const res = await fetch(EXP_BUFF_URL, { cache: "no-store" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    expCalc.data = await res.json();
+    renderExpCalculator();
+  } catch (error) {
+    expBuffLoaded = false;
+    console.warn("경험치 버프 데이터를 불러오지 못했습니다.", error);
+    els.expBuffBody.innerHTML = '<div class="coming-soon">경험치 버프 정보를 불러오지 못했습니다.</div>';
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -2943,6 +3099,61 @@ function wireEvents() {
       activateExtraTab(button.dataset.extraTab);
     });
   });
+
+  els.buffTabButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      activateBuffTab(button.dataset.buffTab);
+    });
+  });
+
+  els.expBaseBox?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-base-index]");
+    if (!button) return;
+    expCalc.baseIndex = Number(button.dataset.baseIndex);
+    renderExpBase();
+    renderExpResult();
+    document.querySelector("#expBaseCustom")?.focus();
+  });
+
+  els.expBaseBox?.addEventListener("input", (event) => {
+    if (event.target.id !== "expBaseCustom") return;
+    expCalc.baseCustom = event.target.value;
+    renderExpResult();
+  });
+
+  els.expBuffBody?.addEventListener("change", (event) => {
+    const box = event.target.closest(".buff-check");
+    if (!box) return;
+    const [ri] = box.dataset.buffKey.split("-");
+    if (box.checked) {
+      // 같은 줄(같은 카테고리)은 하나만 선택할 수 있다
+      (expCalc.data["버프"][Number(ri)] || []).forEach((_, ci) => expCalc.checked.delete(`${ri}-${ci}`));
+      expCalc.checked.add(box.dataset.buffKey);
+    } else {
+      expCalc.checked.delete(box.dataset.buffKey);
+    }
+    renderExpBuffs();
+    renderExpResult();
+    document.querySelector("#expHelmetValue")?.focus();
+  });
+
+  els.expBuffBody?.addEventListener("input", (event) => {
+    if (event.target.id !== "expHelmetValue") return;
+    expCalc.helmetValue = event.target.value;
+    renderExpResult();
+  });
+
+  // 범위를 벗어난 입력은 포커스를 뗄 때 최소/최대로 맞춘다
+  els.expBuffBody?.addEventListener("blur", (event) => {
+    const input = event.target;
+    if (input.id !== "expHelmetValue" || input.value === "") return;
+    const clamped = Math.min(Number(input.max), Math.max(Number(input.min), Number(input.value)));
+    if (String(clamped) !== input.value) {
+      expCalc.helmetValue = String(clamped);
+      input.value = expCalc.helmetValue;
+      renderExpResult();
+    }
+  }, true);
 
   els.characterGrid?.addEventListener("click", (event) => {
     const button = event.target.closest("[data-character]");

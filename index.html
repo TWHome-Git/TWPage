@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>TW DB</title>
-    <link rel="stylesheet" href="./assets/styles.css?v=20260818-avatar-name-3" />
+    <link rel="stylesheet" href="./assets/styles.css?v=20260818-avatar-8col-1" />
   </head>
   <body>
     <main class="app-shell">
@@ -270,7 +270,6 @@
                     <th class="equip-info-head">아바타</th>
                     <th class="avatar-slot-head">분류</th>
                     <th>획득처</th>
-                    <th>획득 회차</th>
                   </tr>
                 </thead>
                 <tbody id="avatarListBody"></tbody>
@@ -637,7 +636,20 @@
           </section>
 
           <section class="addon-content" data-extra-panel="buff" hidden>
-            <div class="coming-soon">버프 아이템 정보 준비중</div>
+            <nav class="buff-subtabs" aria-label="버프 종류">
+              <button class="buff-tab is-active" type="button" data-buff-tab="exp">경험치 버프</button>
+              <button class="buff-tab" type="button" data-buff-tab="rare">레어 버프</button>
+            </nav>
+
+            <section class="buff-panel" data-buff-panel="exp">
+              <div id="expBaseBox" class="buff-base"></div>
+              <div id="expResultBox" class="buff-result"></div>
+              <div id="expBuffBody" class="buff-body"></div>
+            </section>
+
+            <section class="buff-panel" data-buff-panel="rare" hidden>
+              <div class="coming-soon">레어 버프 정보 준비중</div>
+            </section>
           </section>
         </div>
       </section>
@@ -652,7 +664,7 @@
       </div>
     </template>
 
-    <script src="./assets/app.js?v=20260818-avatar-name-3" type="module"></script>
+    <script src="./assets/app.js?v=20260818-avatar-8col-1" type="module"></script>
     <!-- GoatCounter 방문자 분석 (localhost 방문은 count.js가 기본으로 집계 제외) -->
     <script data-goatcounter="https://holedis88.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
   </body>
