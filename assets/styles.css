@@ -2391,11 +2391,11 @@ img.dmg-chk-icon {
 /* ── 아바타 DB ──────────────────────────────────────── */
 
 .avatar-control-grid {
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(180px, 1.1fr) minmax(120px, 0.6fr) minmax(200px, 1.3fr);
 }
 
 .avatar-list {
-  min-width: 720px;
+  min-width: 800px;
 }
 
 .avatar-list thead th {
@@ -2404,11 +2404,21 @@ img.dmg-chk-icon {
 
 /* 아바타 열은 줄이고 획득처 열을 넓게 (획득처 2개 이상 표기 대응) */
 .avatar-list thead th.equip-info-head {
-  width: 34%;
+  width: 30%;
+}
+
+.avatar-list thead th.avatar-slot-head {
+  width: 84px;
 }
 
 .avatar-list thead th:last-child {
   width: 130px;
+}
+
+.avatar-slot {
+  text-align: center;
+  font-size: 13px;
+  white-space: nowrap;
 }
 
 .avatar-source {

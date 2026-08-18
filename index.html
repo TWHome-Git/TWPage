@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>TW DB</title>
-    <link rel="stylesheet" href="./assets/styles.css?v=20260816-overlay-tab" />
+    <link rel="stylesheet" href="./assets/styles.css?v=20260818-avatar-filter" />
   </head>
   <body>
     <main class="app-shell">
@@ -239,6 +239,14 @@
             </div>
 
             <div class="control-grid avatar-control-grid">
+              <label class="field">
+                <span>카테고리</span>
+                <select id="avatarSourceSelect"></select>
+              </label>
+              <label class="field">
+                <span>분류</span>
+                <select id="avatarSlotSelect"></select>
+              </label>
               <label class="field search-field">
                 <span>검색</span>
                 <input id="avatarSearchInput" type="search" placeholder="아바타명" autocomplete="off" />
@@ -260,6 +268,7 @@
                 <thead>
                   <tr>
                     <th class="equip-info-head">아바타</th>
+                    <th class="avatar-slot-head">분류</th>
                     <th>획득처</th>
                     <th>획득 회차</th>
                   </tr>
@@ -643,7 +652,7 @@
       </div>
     </template>
 
-    <script src="./assets/app.js?v=20260816-overlay-tab" type="module"></script>
+    <script src="./assets/app.js?v=20260818-avatar-filter" type="module"></script>
     <!-- GoatCounter 방문자 분석 (localhost 방문은 count.js가 기본으로 집계 제외) -->
     <script data-goatcounter="https://holedis88.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
   </body>

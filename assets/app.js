@@ -289,6 +289,8 @@ const els = {
   abilityCount: document.querySelector("#abilityCount"),
   abilityStatus: document.querySelector("#abilityStatus"),
   abilityListBody: document.querySelector("#abilityListBody"),
+  avatarSourceSelect: document.querySelector("#avatarSourceSelect"),
+  avatarSlotSelect: document.querySelector("#avatarSlotSelect"),
   avatarSearchInput: document.querySelector("#avatarSearchInput"),
   avatarCount: document.querySelector("#avatarCount"),
   avatarStatus: document.querySelector("#avatarStatus"),
@@ -1157,6 +1159,8 @@ const avatar = {
   detailIndex: 0,
   listScroll: 0,
   query: "",
+  source: "all",
+  slot: "all",
   loaded: false,
   loading: false,
 };
@@ -1185,12 +1189,15 @@ function applyAvatarText(rawText) {
         }
         if (!existing.exchange) existing.exchange = clean(row[7]);
         if (!existing.slot) existing.slot = entry.slot;
+        // 부위는 획득처 중복 제거와 무관하게 모든 행에서 모은다 (분류 필터용)
+        if (entry.slot && !existing.slots.includes(entry.slot)) existing.slots.push(entry.slot);
       } else {
         merged.set(name, {
           listImage,
           detailImages: detailImage ? [detailImage] : [],
           name,
           slot: entry.slot,
+          slots: entry.slot ? [entry.slot] : [],
           sources: [entry],
           exchange: clean(row[7]),
           searchText: name.toLowerCase(),
@@ -1199,6 +1206,7 @@ function applyAvatarText(rawText) {
   });
   avatar.records = [...merged.values()];
   avatar.loaded = true;
+  populateAvatarFilters();
   els.avatarStatus.textContent = "DB 연결";
 }
 
@@ -1222,10 +1230,55 @@ async function loadAvatarDb() {
   }
 }
 
+// 획득처 표시 순서: 화려한 모음집(회차순) → 세트 상자 Vol → 세트 모음집 상자 → 봄날 → 한여름
+// 규칙에 안 맞는 새 획득처가 생기면 맨 뒤에 가나다순으로 붙는다.
+const AVATAR_SOURCE_GROUPS = [
+  /화려한\s*아바타\s*모음집\s*\((\d+)/,
+  /세트\s*상자\s*Vol\.?\s*(\d+)/i,
+  /세트\s*모음집\s*상자\s*(\d+)/,
+  /^봄날/,
+  /^한여름/,
+];
+
+function avatarSourceRank(name) {
+  for (let i = 0; i < AVATAR_SOURCE_GROUPS.length; i += 1) {
+    const matched = name.match(AVATAR_SOURCE_GROUPS[i]);
+    if (matched) return [i, Number(matched[1]) || 0];
+  }
+  return [AVATAR_SOURCE_GROUPS.length, 0];
+}
+
+function compareAvatarSource(a, b) {
+  const [rankA, numA] = avatarSourceRank(a);
+  const [rankB, numB] = avatarSourceRank(b);
+  return rankA - rankB || numA - numB || a.localeCompare(b, "ko");
+}
+
+// 부위는 시트 등장 순서를 그대로 쓴다 (투구→머리→몸→다리→효과 = 게임 내 순서)
+function populateAvatarFilters() {
+  const sources = [...new Set(avatar.records.flatMap((record) => record.sources.map((s) => s.source)))]
+    .filter(Boolean)
+    .sort(compareAvatarSource);
+  const slots = [...new Set(avatar.records.flatMap((record) => record.slots))].filter(Boolean);
+
+  els.avatarSourceSelect.innerHTML = optionHtml("all", "전체 획득처") + sources.map((s) => optionHtml(s, s)).join("");
+  els.avatarSlotSelect.innerHTML = optionHtml("all", "전체 부위") + slots.map((s) => optionHtml(s, s)).join("");
+
+  // 캐시본으로 먼저 그린 뒤 최신 시트로 다시 채울 때, 고르고 있던 항목이 사라졌으면 전체로 되돌린다
+  // (그냥 두면 셀렉트는 빈칸인데 필터는 걸려 있는 상태가 된다)
+  if (!sources.includes(avatar.source)) avatar.source = "all";
+  if (!slots.includes(avatar.slot)) avatar.slot = "all";
+  els.avatarSourceSelect.value = avatar.source;
+  els.avatarSlotSelect.value = avatar.slot;
+}
+
 function renderAvatar() {
-  avatar.filtered = avatar.query
-    ? avatar.records.filter((record) => record.searchText.includes(avatar.query))
-    : avatar.records;
+  avatar.filtered = avatar.records.filter((record) => {
+    if (avatar.source !== "all" && !record.sources.some((s) => s.source === avatar.source)) return false;
+    if (avatar.slot !== "all" && !record.slots.includes(avatar.slot)) return false;
+    if (avatar.query && !record.searchText.includes(avatar.query)) return false;
+    return true;
+  });
 
   els.avatarCount.textContent = `${avatar.filtered.length.toLocaleString("ko-KR")}개`;
 
@@ -1243,7 +1296,7 @@ function renderAvatar() {
 
 function renderAvatarList() {
   if (!avatar.filtered.length) {
-    els.avatarListBody.innerHTML = listPlaceholderRow(3, avatar.loaded, "검색 결과가 없습니다", "조건을 조금 넓혀보세요.");
+    els.avatarListBody.innerHTML = listPlaceholderRow(4, avatar.loaded, "검색 결과가 없습니다", "조건을 조금 넓혀보세요.");
     return;
   }
 
@@ -1259,6 +1312,7 @@ function renderAvatarList() {
           </span>
         </div>
       </td>
+      <td class="avatar-slot">${escapeHtml(record.slots.join(", ") || "-")}</td>
       <td class="avatar-source">${record.sources.map((s) => `<span>${escapeHtml(s.source || "-")}${s.prob ? ` <em class="avatar-prob">(${escapeHtml(s.prob)})</em>` : ""}</span>`).join("")}</td>
       <td class="avatar-round">${record.sources.map((s) => `<span>${escapeHtml(s.round || "-")}</span>`).join("")}</td>
     </tr>
@@ -2803,6 +2857,15 @@ function wireEvents() {
       renderAbilityList();
     }, 200);
   });
+
+  const applyAvatarFilter = (key) => (event) => {
+    avatar[key] = event.currentTarget.value;
+    avatar.view = "list";
+    avatar.listScroll = 0;
+    renderAvatar();
+  };
+  els.avatarSourceSelect?.addEventListener("change", applyAvatarFilter("source"));
+  els.avatarSlotSelect?.addEventListener("change", applyAvatarFilter("slot"));
 
   let avatarSearchTimer = null;
   els.avatarSearchInput?.addEventListener("input", () => {
