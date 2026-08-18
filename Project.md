@@ -73,12 +73,23 @@ http://127.0.0.1:5173/
 
 ## 5. 배포 방식
 
-현재 이 폴더에는 GitHub Pages 배포 워크플로우 파일이 없습니다. 과거에는 `.github/workflows/deploy-pages.yml`로 `web/` 폴더를 GitHub Pages artifact로 자동 업로드했지만, 그 설정 파일은 삭제되어 지금 폴더에는 없습니다.
+GitHub Pages로 서비스 중입니다. 주소는 <https://twhome-git.github.io/TWPage/> 입니다.
 
-배포를 다시 연결하려면 다음을 정해야 합니다.
+`.github/workflows` 폴더가 없는데도 배포가 되는 이유는, GitHub Actions 워크플로우가 아니라 **GitHub이 브랜치를 직접 빌드해 주는 레거시 Pages 방식**을 쓰기 때문입니다. `main`에 push하면 GitHub이 알아서 배포합니다. 빌드 단계가 없으므로 이 폴더가 그대로 배포 결과물입니다.
 
-- 이 폴더를 그대로 어떤 저장소/브랜치에 올릴지
-- GitHub Actions를 다시 쓸지, 다른 방식(예: 수동 push, Netlify 등)을 쓸지
+배포 상태는 API로 확인할 수 있습니다.
+
+```bash
+curl -s "https://api.github.com/repos/TWHome-Git/TWPage/deployments?per_page=3"
+```
+
+커밋마다 `"environment": "github-pages"` 배포 기록이 남습니다. 개별 배포의 진행 상태(`queued` / `in_progress` / `success`)는 `deployments/<id>/statuses`로 볼 수 있습니다.
+
+push 후 사이트에 반영되기까지 보통 1~5분 걸립니다. 반영이 안 된 것 같으면 배포가 끝났는지부터 확인하세요. `index.html`의 `?v=...` 값을 보면 새 버전이 나갔는지 바로 알 수 있습니다.
+
+```bash
+curl -s "https://twhome-git.github.io/TWPage/index.html" | grep -o 'app.js?v=[^"]*'
+```
 
 ## 6. 데이터 연결 방식
 
@@ -172,7 +183,7 @@ const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS78PnupM
 
 계수 계산기:
 
-- 캐릭터 선택 카드 19개 (`CHARACTER_NAMES`, `character-images/`에서 이미지 로드 — 현재 폴더 없음)
+- 캐릭터 선택 카드 19개 (`CHARACTER_NAMES`, `character-images/`에서 이미지 로드)
 - 캐릭터 선택 시 상세 입력 테이블 화면으로 전환, 뒤로 버튼으로 복귀
 - `activateCalculatorTab`, `showCoefficientDetail`, `showCoefficientSelect` 등 화면 전환 로직은 있음
 - 입력 테이블(부위별 찌르기/베기/명중/계수)과 결과 요약은 현재 하드코딩된 샘플 값(HTML에 정적으로 박혀 있음), 실제 계산 함수는 없음
@@ -250,23 +261,19 @@ git tag v1.0.1 && git push origin v1.0.1
 
 ## 11. 알려진 이슈 / 확인 필요 사항
 
-- `character-images/` 폴더가 없어서 계수 계산기 캐릭터 이미지가 깨져 있을 가능성 높음
-- `data/equipment-snapshot.json`이 없어서 CSV 로딩 실패 시 fallback 없음
-- 배포 워크플로우가 삭제되어 현재 자동 배포 수단이 없음 — 재구성 필요
+- `data/equipment-snapshot.json`이 없어서 CSV 로딩 실패 시 fallback 없음. `assets/app.js`의 `SNAPSHOT_URL`이 이 경로를 가리키고, 시트를 못 불러오면 여기서 읽으려 하는데 파일 자체가 없습니다
 - 계수 계산기 / 대미지 계산기의 실제 계산 공식이 아직 정리되어 있지 않음 (게임 내 공식 정리 필요)
 
 ## 12. 다음 작업 후보
 
-1. `character-images/` 복구 또는 재준비
-2. 배포 방식 재설정 (저장소, 브랜치, GitHub Actions 여부 결정)
-3. `data/equipment-snapshot.json` 생성 방식 추가
-4. 계수 계산기 실제 계산 로직 연결
-5. 대미지 계산기 실제 계산 로직 연결
-6. 인크립트 시뮬 구현
-7. 코어 강화 시뮬 구현
-8. 신조 렐릭 시뮬 구현
-9. 모바일 화면에서 장비 비교 영역 UX 추가 개선
-10. 이미지 누락 여부 점검 스크립트 추가
+1. `data/equipment-snapshot.json` 생성 방식 추가
+2. 계수 계산기 실제 계산 로직 연결
+3. 대미지 계산기 실제 계산 로직 연결
+4. 인크립트 시뮬 구현
+5. 코어 강화 시뮬 구현
+6. 신조 렐릭 시뮬 구현
+7. 모바일 화면에서 장비 비교 영역 UX 추가 개선
+8. 이미지 누락 여부 점검 스크립트 추가
 
 ## 13. 작업 시 주의할 점
 
