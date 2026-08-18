@@ -1294,6 +1294,24 @@ function renderAvatar() {
   }
 }
 
+// 목록은 획득처를 한 줄로 요약한다 (전체 내역은 상세 화면의 획득처 표에서 확인).
+// 획득처 필터가 걸려 있으면 그 획득처를 대표로 올려, 왜 걸렸는지 바로 보이게 한다.
+function avatarSourceSummary(record) {
+  const list = record.sources;
+  const head = (avatar.source !== "all" && list.find((s) => s.source === avatar.source)) || list[0];
+  if (!head) return "-";
+  const label = `${escapeHtml(head.source || "-")}${head.prob ? ` <em class="avatar-prob">(${escapeHtml(head.prob)})</em>` : ""}`;
+  const rest = list.length - 1;
+  return rest > 0 ? `${label} <em class="avatar-more">외 ${rest}곳</em>` : label;
+}
+
+// 회차는 아바타가 처음 나온 시점이라 값이 있는 것만 보여준다.
+// (획득처 줄 수에 맞춰 "-"를 채우면 정보 없는 빈 줄만 늘어난다)
+function avatarRoundSummary(record) {
+  const rounds = [...new Set(record.sources.map((s) => s.round).filter(Boolean))];
+  return rounds.length ? rounds.map((r) => `<span>${escapeHtml(r)}</span>`).join("") : "-";
+}
+
 function renderAvatarList() {
   if (!avatar.filtered.length) {
     els.avatarListBody.innerHTML = listPlaceholderRow(4, avatar.loaded, "검색 결과가 없습니다", "조건을 조금 넓혀보세요.");
@@ -1313,8 +1331,8 @@ function renderAvatarList() {
         </div>
       </td>
       <td class="avatar-slot">${escapeHtml(record.slots.join(", ") || "-")}</td>
-      <td class="avatar-source">${record.sources.map((s) => `<span>${escapeHtml(s.source || "-")}${s.prob ? ` <em class="avatar-prob">(${escapeHtml(s.prob)})</em>` : ""}</span>`).join("")}</td>
-      <td class="avatar-round">${record.sources.map((s) => `<span>${escapeHtml(s.round || "-")}</span>`).join("")}</td>
+      <td class="avatar-source">${avatarSourceSummary(record)}</td>
+      <td class="avatar-round">${avatarRoundSummary(record)}</td>
     </tr>
   `).join("");
 
