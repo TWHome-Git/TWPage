@@ -220,6 +220,34 @@ const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS78PnupM
 
 CSS나 JS 수정 후 배포했는데 브라우저가 예전 화면을 보여주면 `?v=...` 값을 바꾸는 방식으로 캐시를 우회합니다.
 
+### 이미지 CDN 태그 (중요)
+
+아바타/어빌리티 이미지는 jsDelivr로 서빙하고, `assets/app.js`의 `CDN_IMAGE_ROOT`가 **semver 태그로 고정**되어 있습니다.
+
+```js
+const CDN_IMAGE_ROOT = "https://cdn.jsdelivr.net/gh/TWHome-Git/TWPage@v1.0.0/";
+```
+
+jsDelivr는 참조 방식에 따라 캐시 정책을 다르게 줍니다. 실측값입니다.
+
+| 참조 | Cache-Control | 엣지 캐시 |
+|---|---|---|
+| `@main` | `max-age=604800, s-maxage=43200` | 12시간마다 만료 |
+| `@images-v1` (semver 아닌 태그) | `max-age=604800, s-maxage=43200` | 12시간마다 만료 |
+| `@v1.0.0` (semver 태그) | `max-age=31536000, immutable` | 1년 |
+| `@<커밋 SHA>` | `max-age=31536000, immutable` | 1년 |
+
+엣지 캐시에 있으면 이미지 한 장에 10~20ms, 만료돼서 없으면 400~800ms입니다.
+
+**이미지를 추가하거나 교체하면 새 semver 태그를 찍고 `CDN_IMAGE_ROOT`를 함께 올려야 합니다.**
+
+```bash
+git tag v1.0.1 && git push origin v1.0.1
+# assets/app.js의 CDN_IMAGE_ROOT를 @v1.0.1로 수정 후 커밋
+```
+
+기존 태그를 옮기면 안 됩니다. 캐시가 `immutable`이라 이미 배포된 태그 URL은 1년간 옛 내용을 그대로 내보냅니다. 태그를 올리지 않으면 새로 추가한 이미지는 404가 납니다.
+
 ## 11. 알려진 이슈 / 확인 필요 사항
 
 - `character-images/` 폴더가 없어서 계수 계산기 캐릭터 이미지가 깨져 있을 가능성 높음

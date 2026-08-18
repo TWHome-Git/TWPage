@@ -4,8 +4,15 @@ const IMAGE_BASE = "./equipment-images/";
 const CHARACTER_IMAGE_BASE = "./character-images/";
 
 // 대용량 이미지(아바타/어빌리티)는 jsDelivr CDN으로 서빙해 GitHub Pages 대역폭을 아낀다.
-// 새 파일 추가는 즉시 반영되지만, 같은 이름의 파일을 "교체"하면 CDN 캐시 때문에 최대 12시간 후 반영된다.
-const CDN_IMAGE_ROOT = "https://cdn.jsdelivr.net/gh/TWHome-Git/TWPage@main/";
+//
+// @main이 아니라 semver 태그로 고정한다. jsDelivr는 semver 태그와 커밋 SHA만 immutable로 보고
+// max-age=1년을 주고, @main이나 그 외 이름의 태그는 엣지 캐시가 12시간마다 만료된다(s-maxage=43200).
+// 만료된 뒤 첫 요청은 400~800ms가 걸리는 반면 캐시에 있으면 10~20ms다.
+//
+// 그래서 이미지를 추가/교체하면 반드시 **새 태그**를 찍고 이 상수를 함께 올려야 한다.
+// 기존 태그를 옮기면 안 된다. 캐시가 immutable이라 옛 이미지가 1년간 그대로 나간다.
+//   git tag v1.0.1 && git push origin v1.0.1
+const CDN_IMAGE_ROOT = "https://cdn.jsdelivr.net/gh/TWHome-Git/TWPage@v1.0.0/";
 
 // "기본/16회차_아바타별/파일명.png"처럼 하위 폴더가 포함된 값은 세그먼트별로 인코딩해야
 // 슬래시가 %2F로 바뀌지 않는다 (CDN은 %2F 경로를 찾지 못함).
