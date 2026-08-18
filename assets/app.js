@@ -1135,9 +1135,10 @@ async function loadAbilityDb() {
 
 // ── 아바타 DB ──
 // 데이터: Google Sheets 웹 게시 CSV
-// (아바타 목록 이미지, 아바타 상세 이미지, 아바타 이름, 획득처, 확률, 회차, 月-아이템 교환 가능)
+// (아바타 목록 이미지, 아바타 상세 이미지, 아바타 이름, 획득처, 확률, 부위, 月-아이템 교환 가능, 세트 이미지)
 const AVATAR_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS78PnupM0NaJzkrkFCr2Llja9TJKrLcRZqeCqlCUV4GPGlsJd3xSIn3SQAvHwzy_tGtxDbTFtl8oZQ/pub?gid=1331633328&single=true&output=csv";
 // avatar-images는 Icons(목록용 아이콘)와 Details(착용 상세 이미지)로 나뉘어 있다.
+// 두 폴더 모두 파일이 2000개를 넘어 GitHub 목록이 1000개에서 잘리므로, 다시 부위별 하위 폴더로 나눠 담는다.
 // 시트는 폴더 없이 파일명만 주므로 여기서 폴더를 붙인다.
 const AVATAR_ICON_BASE = `${CDN_IMAGE_ROOT}avatar-images/Icons/`;
 const AVATAR_DETAIL_BASE = `${CDN_IMAGE_ROOT}avatar-images/Details/`;
@@ -1166,6 +1167,11 @@ function avatarImageFile(value) {
   return name.includes(".") ? name : `${name}.webp`;
 }
 
+// Icons/Details는 부위별 하위 폴더로 나뉘어 있다. 부위가 비어 있으면 폴더 없이 그대로 둔다.
+function avatarSlotPath(file, slot) {
+  return file && slot ? `${slot}/${file}` : file;
+}
+
 const avatar = {
   records: [],
   filtered: [],
@@ -1192,13 +1198,13 @@ function applyAvatarText(rawText) {
   rows.slice(1).forEach((row) => {
       const name = clean(row[2]);
       if (!name) return;
-      const listImage = avatarImageFile(row[0]);
-      const detailImage = avatarImageFile(row[1]);
+      const slot = clean(row[5]);
+      const listImage = avatarSlotPath(avatarImageFile(row[0]), slot);
+      const detailImage = avatarSlotPath(avatarImageFile(row[1]), slot);
       // 세트 이미지도 획득처처럼 " / "로 여러 개 올 수 있다 (한 아바타가 두 세트에 동시에 속하는 경우)
       const setImages = splitMulti(row[7]).map(avatarImageFile).filter(Boolean);
       const srcList = splitMulti(row[3]).filter(Boolean);
       const probList = splitMulti(row[4]);
-      const slot = clean(row[5]);
       const sources = srcList.map((source, i) => ({ source, prob: probList[i] || "" }));
       const existing = merged.get(name);
       if (existing) {
