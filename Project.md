@@ -93,11 +93,8 @@ curl -s "https://twhome-git.github.io/TWPage/index.html" | grep -o 'app.js?v=[^"
 
 ## 6. 데이터 연결 방식
 
-데이터 URL은 `assets/app.js` 상단에 있습니다.
-
-```js
-const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS78PnupM0NaJzkrkFCr2Llja9TJKrLcRZqeCqlCUV4GPGlsJd3xSIn3SQAvHwzy_tGtxDbTFtl8oZQ/pub?gid=898941035&single=true&output=csv";
-```
+데이터 URL은 `assets/app.js` 상단의 `SHEET_CSV_URL`, `ABILITY_CSV_URL`, `AVATAR_CSV_URL` 상수에 있습니다.
+문서에는 주소를 적지 않습니다(불필요한 접근을 줄이기 위해). 실제 값은 코드에서 확인하세요.
 
 현재 방식:
 
