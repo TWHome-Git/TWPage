@@ -1,0 +1,111 @@
+# 새 태그를 밀면 그 태그가 덮는 이미지를 CDN에서 한 번씩 받아 캐시를 데운다.
+#
+# jsDelivr는 태그별로 URL이 달라서, 태그를 올리면 그 묶음은 전부 캐시 미스가 된다.
+# 미스는 400~800ms, 히트는 10~20ms라 첫 방문자가 그대로 뒤집어쓴다.
+# 미리 한 번씩 긁어두면 그 부담을 사용자가 아니라 이 워크플로가 진다.
+#
+# 태그 메이저 번호로 묶음을 구분한다 (assets/app.js의 CDN_* 상수와 같은 규칙).
+#   v1.x  아바타   avatar-images
+#   v2.x  장비     equipment-images
+#   v3.x  그 외    ability-images, character-images, images
+name: CDN 캐시 워밍
+
+on:
+  push:
+    tags:
+      - "v*"
+  # 실패했거나 다른 지역을 데우고 싶을 때 태그를 골라 직접 돌릴 수 있다
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "데울 태그 (예: v3.0.1)"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  warm:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 태그 확인
+        id: pick
+        run: |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          case "$TAG" in
+            v1.*) DIRS="avatar-images" ;;
+            v2.*) DIRS="equipment-images" ;;
+            v3.*) DIRS="ability-images character-images images" ;;
+            *)    echo "::error::메이저 번호로 묶음을 알 수 없는 태그: $TAG"; exit 1 ;;
+          esac
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "dirs=$DIRS" >> "$GITHUB_OUTPUT"
+          echo "태그 $TAG → $DIRS"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.pick.outputs.tag }}
+
+      - name: 대상 목록 만들기
+        id: list
+        run: |
+          # 태그에 실제로 들어 있는 파일만 대상으로 한다. 작업 트리에만 있는 파일을
+          # 넣으면 CDN에는 없어서 404를 데우게 된다.
+          #
+          # core.quotepath를 끄지 않으면 한글 파일명이 이스케이프돼 나와서
+          # 확장자 매칭에 걸리지 않는다 (165개 중 19개만 잡힌다).
+          git -c core.quotepath=false ls-files -- ${{ steps.pick.outputs.dirs }} \
+            | grep -Ei '\.(png|webp|jpe?g|gif|svg)$' > files.txt || true
+          COUNT=$(wc -l < files.txt)
+          echo "count=$COUNT" >> "$GITHUB_OUTPUT"
+          echo "대상 $COUNT개"
+          if [ "$COUNT" -eq 0 ]; then echo "::error::대상 파일이 없다"; exit 1; fi
+
+      - name: 캐시 데우기
+        env:
+          TAG: ${{ steps.pick.outputs.tag }}
+        run: |
+          export BASE="https://cdn.jsdelivr.net/gh/${GITHUB_REPOSITORY}@${TAG}"
+
+          # 경로는 세그먼트별로 인코딩한다. 슬래시가 %2F가 되면 CDN이 못 찾는다.
+          # (app.js의 encodeImagePath와 같은 규칙)
+          python3 - <<'PY' > urls.txt
+          import os, urllib.parse
+          base = os.environ["BASE"]
+          with open("files.txt", encoding="utf-8") as fp:
+              for line in fp:
+                  path = line.strip()
+                  if not path:
+                      continue
+                  quoted = "/".join(urllib.parse.quote(p) for p in path.split("/"))
+                  print(f"{base}/{quoted}")
+          PY
+
+          echo "워밍 시작: $(wc -l < urls.txt)개"
+
+          # HEAD가 아니라 GET으로 받는다. 캐시에 실제로 올라가는 건 본문이라
+          # HEAD만 쳐서는 다음 방문자가 그대로 미스를 맞는다. 본문은 버린다.
+          # 동시 20개면 4,800개가 2~3분이다. 더 올리면 429가 날 수 있다.
+          xargs -a urls.txt -P 20 -I{} \
+            curl -sS -o /dev/null -w '%{http_code} %{url_effective}\n' \
+                 --retry 3 --retry-delay 2 --max-time 30 \
+                 -H 'User-Agent: TWPage-cdn-warm' \
+                 '{}' > result.txt || true
+
+          TOTAL=$(wc -l < result.txt)
+          OK=$(grep -c '^200 ' result.txt || true)
+          echo "성공 $OK / $TOTAL"
+
+          # 실패한 건 다음 방문자가 미스를 맞는다는 뜻이라 그대로 드러낸다
+          if [ "$OK" -ne "$TOTAL" ]; then
+            echo "::warning::데우지 못한 파일 $((TOTAL - OK))개"
+            grep -v '^200 ' result.txt | head -30
+          fi
+
+          {
+            echo "### CDN 캐시 워밍 — \`${TAG}\`"
+            echo ""
+            echo "- 대상 폴더: ${{ steps.pick.outputs.dirs }}"
+            echo "- 성공 **$OK** / $TOTAL"
+          } >> "$GITHUB_STEP_SUMMARY"
+        shell: bash
