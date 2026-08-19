@@ -1537,12 +1537,75 @@ function activateBuffTab(key) {
 }
 
 // 계산기 상태: 기본 경험치 선택과 버프 체크 상태를 함께 들고 있는다
-const expCalc = { data: null, baseIndex: -1, baseCustom: "", checked: new Set(), helmetValue: "" };
+// inputs: 직접 입력이 있는 항목(투구 부가, 시오칸 코어)의 값을 항목별로 담는다
+const expCalc = { data: null, baseIndex: -1, baseCustom: "", checked: new Set(), inputs: {} };
+
+// 선택 상태는 브라우저에 남긴다. 줄/칸 위치는 목록을 손대면 바뀌므로
+// 위치가 아니라 버프 "이름"으로 저장해서, 순서를 바꿔도 그대로 복원되게 한다.
+const EXP_SAVE_KEY = "tw-exp-buff-save-v1";
+
+const expNameOf = (key) => expBuffItem(key)?.["이름"] || "";
+
+function expKeyByName() {
+  const map = new Map();
+  (expCalc.data?.["버프"] || []).forEach((row, ri) => {
+    row.forEach((item, ci) => map.set(item["이름"], `${ri}-${ci}`));
+  });
+  return map;
+}
+
+function expSaveState() {
+  try {
+    const inputs = {};
+    Object.entries(expCalc.inputs).forEach(([key, value]) => {
+      const name = expNameOf(key);
+      if (name && value !== "") inputs[name] = value;
+    });
+    localStorage.setItem(EXP_SAVE_KEY, JSON.stringify({
+      기본: (expCalc.data?.["기본경험치"] || [])[expCalc.baseIndex]?.["이름"] || "",
+      기본직접: expCalc.baseCustom,
+      버프: [...expCalc.checked].map(expNameOf).filter(Boolean),
+      입력: inputs,
+    }));
+  } catch {
+    // 저장 공간 부족 등은 무시 (저장은 편의일 뿐)
+  }
+}
+
+function expRestoreState() {
+  let saved = null;
+  try {
+    saved = JSON.parse(localStorage.getItem(EXP_SAVE_KEY) || "null");
+  } catch {
+    return;
+  }
+  if (!saved) return;
+
+  const bases = expCalc.data?.["기본경험치"] || [];
+  const baseIndex = bases.findIndex((base) => base["이름"] === saved["기본"]);
+  if (baseIndex >= 0) expCalc.baseIndex = baseIndex;
+  expCalc.baseCustom = saved["기본직접"] || "";
+
+  // 저장한 뒤 이름이 사라졌거나 배타 규칙이 바뀌었을 수 있다.
+  // 하나씩 넣으면서 그때그때 잠기는지 보고, 충돌하는 건 버린다.
+  const byName = expKeyByName();
+  (saved["버프"] || []).forEach((name) => {
+    const key = byName.get(name);
+    if (key && !expIsLocked(expBuffItem(key), key, expLockedGroups())) expCalc.checked.add(key);
+  });
+  Object.entries(saved["입력"] || {}).forEach(([name, value]) => {
+    const key = byName.get(name);
+    if (key) expCalc.inputs[key] = value;
+  });
+}
 
 // 아이콘이 아직 없는 항목은 빈 자리를 남겨 나중에 채워 넣을 수 있게 한다.
 // "buff/이름.png"처럼 하위 폴더를 적어도 되도록 세그먼트별로 인코딩한다.
 function buffIconHtml(item) {
-  if (!item["아이콘"]) return '<span class="buff-icon is-empty" aria-hidden="true"></span>';
+  // 아이콘이 없는 항목은 글자표기로 대신할 수 있다 (그외 이벤트 버프 = E)
+  if (item["표기"]) return `<span class="buff-icon is-text" aria-hidden="true">${escapeHtml(item["표기"])}</span>`;
+  // 아이콘이 없으면 자리도 비우지 않는다 (해피아워 등)
+  if (!item["아이콘"]) return "";
   return `<span class="buff-icon"><img src="${BUFF_ICON_BASE}${encodeImagePath(item["아이콘"])}" alt="" loading="lazy" decoding="async" /></span>`;
 }
 
@@ -1555,50 +1618,61 @@ function expBaseValue() {
 }
 
 // 일반 경험치 배율 = 1 + (선택한 버프 배율의 합)
-function expTotalRate() {
+// 원래 공식이 [[[기본 × 일반배율] × 해피아워] × 펫스킬] 이라
+// 해피아워·펫 스킬은 일반 배율에 더하지 않고 따로 곱한다.
+function expRates() {
   let sum = 0;
+  const mults = [];
   (expCalc.data?.["버프"] || []).forEach((row, ri) => {
     row.forEach((item, ci) => {
-      if (!expCalc.checked.has(`${ri}-${ci}`)) return;
-      if (item["입력"]) sum += (Number(expCalc.helmetValue) || 0) / 100;
+      const key = `${ri}-${ci}`;
+      if (!expCalc.checked.has(key)) return;
+      if (item["곱연산"]) mults.push({ name: item["이름"], value: Number(item["배수"]) || 1, group: Number(item["그룹"]) || 3 });
+      else if (item["입력"]) sum += (Number(expCalc.inputs[key]) || 0) / 100;
       else sum += Number(item["배율"]) || 0;
     });
   });
-  return 1 + sum;
+  return { normal: 1 + sum, mults };
 }
 
 function renderExpBase() {
   const list = expCalc.data?.["기본경험치"] || [];
   const picked = list[expCalc.baseIndex];
+  // 버튼과 직접 입력칸을 한 줄에 둔다 ("기타"를 골랐을 때만 입력칸이 오른쪽에 붙는다)
   els.expBaseBox.innerHTML = `
     <p class="buff-section-title">기본 획득 경험치</p>
-    <div class="buff-base-buttons">
+    <div class="buff-base-row">
       ${list.map((b, i) => `
         <button type="button" class="buff-base-btn${i === expCalc.baseIndex ? " is-active" : ""}" data-base-index="${i}">
           ${escapeHtml(b["이름"] || "")}
         </button>
       `).join("")}
+      ${picked?.["직접입력"] ? `
+        <input id="expBaseCustom" class="buff-base-input" type="number" min="0" step="1"
+          inputmode="numeric" placeholder="기본 경험치 직접 입력" value="${escapeHtml(expCalc.baseCustom)}" />
+      ` : ""}
     </div>
-    ${picked?.["직접입력"] ? `
-      <label class="buff-inline-field">
-        <span>직접 입력</span>
-        <input id="expBaseCustom" type="number" min="0" step="1" inputmode="numeric" placeholder="기본 경험치" value="${escapeHtml(expCalc.baseCustom)}" />
-      </label>
-    ` : ""}
   `;
 }
 
 function renderExpResult() {
   const base = expBaseValue();
-  const rate = expTotalRate();
-  const total = Math.floor(base * rate);
+  const { normal, mults } = expRates();
+  const total = Math.floor(mults.reduce((acc, m) => acc * m.value, base * normal));
   const fmt = (n) => n.toLocaleString("ko-KR");
+  // 선택한 곳에 딸린 설명(예: 골고다 2종 평균)은 그 값 바로 옆에 붙여야 뜻이 통한다
+  const note = (expCalc.data?.["기본경험치"] || [])[expCalc.baseIndex]?.["비고"];
   els.expResultBox.innerHTML = `
     <div class="buff-result-row">
-      <span>기본 경험치</span><strong>${fmt(base)}</strong>
+      <span>기본 경험치${note ? `<em class="buff-base-note">${escapeHtml(note)}</em>` : ""}</span><strong>${fmt(base)}</strong>
     </div>
-    <div class="buff-result-row">
-      <span>일반 경험치 배율</span><strong>×${rate.toFixed(2)}</strong>
+    ${mults.map((m) => `
+      <div class="buff-result-row" data-group="${m.group}">
+        <span>${escapeHtml(m.name)}</span><strong>×${m.value}</strong>
+      </div>
+    `).join("")}
+    <div class="buff-result-row" data-group="3">
+      <span>일반 경험치 배율</span><strong>×${normal.toFixed(2)}</strong>
     </div>
     <div class="buff-result-row is-total">
       <span>획득 경험치</span><strong>${fmt(total)}</strong>
@@ -1606,38 +1680,101 @@ function renderExpResult() {
   `;
 }
 
-function expItemHtml(item, ri, ci) {
+// 배타 그룹을 공유하는 항목끼리는 같이 못 쓴다. 그룹은 줄을 넘나든다
+// (눈사람족 특제 포션은 일루미네이션과도, 클럽/에오스 파편과도 충돌한다).
+const expBuffItem = (key) => {
+  const [ri, ci] = String(key).split("-").map(Number);
+  return expCalc.data?.["버프"]?.[ri]?.[ci] || null;
+};
+
+function expExclOf(item) {
+  return Array.isArray(item?.["배타"]) ? item["배타"] : [];
+}
+
+// 지금 체크된 항목들이 점유한 배타 그룹과, 그 그룹을 점유한 항목의 키
+function expLockedGroups() {
+  const held = new Map();
+  (expCalc.data?.["버프"] || []).forEach((row, ri) => {
+    row.forEach((item, ci) => {
+      const key = `${ri}-${ci}`;
+      if (!expCalc.checked.has(key)) return;
+      expExclOf(item).forEach((g) => held.set(g, key));
+    });
+  });
+  return held;
+}
+
+// 자기가 점유한 그룹은 빼고 본다. 안 그러면 켜진 항목이 스스로를 잠근다
+const expIsLocked = (item, key, held) =>
+  expExclOf(item).some((g) => held.has(g) && held.get(g) !== key);
+
+// 숫자를 직접 넣는 항목(투구/시오칸 코어)은 값이 정해져 있지 않으니 표기하지 않는다
+function expRateLabel(item) {
+  if (item["입력"]) return "";
+  if (item["곱연산"]) return `<span class="buff-rate">x${item["배수"]}</span>`;
+  const rate = Number(item["배율"]) || 0;
+  return rate ? `<span class="buff-rate">+${Math.round(rate * 1000) / 10}%</span>` : "";
+}
+
+// "택 1" 안내 문구 대신 체크박스를 잠가서 규칙 자체로 드러낸다.
+function expItemHtml(item, ri, ci, locked) {
   const key = `${ri}-${ci}`;
   const on = expCalc.checked.has(key);
   return `
-    <label class="buff-item">
-      <input type="checkbox" class="buff-check" data-buff-key="${key}"${on ? " checked" : ""} />
+    <label class="buff-item${locked ? " is-locked" : ""}">
+      <input type="checkbox" class="buff-check" data-buff-key="${key}"${on ? " checked" : ""}${locked ? " disabled" : ""} />
       ${buffIconHtml(item)}
       <span class="buff-name">${escapeHtml(item["이름"] || "")}</span>
+      ${expRateLabel(item)}
     </label>
     ${item["입력"] && on ? `
-      <input id="expHelmetValue" class="buff-num" type="number"
+      <input class="buff-num" data-buff-input="${key}" type="number"
         min="${item["입력"]["최소"]}" max="${item["입력"]["최대"]}" step="1" inputmode="numeric"
-        placeholder="${item["입력"]["최소"]}~${item["입력"]["최대"]}" value="${escapeHtml(expCalc.helmetValue)}" />
+        placeholder="${item["입력"]["최소"]}~${item["입력"]["최대"]}" value="${escapeHtml(expCalc.inputs[key] || "")}" />
       <span class="buff-unit">${escapeHtml(item["입력"]["단위"] || "")}</span>
     ` : ""}
   `;
 }
 
+// 그룹은 데이터(그룹 필드)로 정한다. 배치와 색을 순서에 의존시키지 않기 위해서다.
+const expGroupOf = (item) => Number(item?.["그룹"]) || 3;
+
+// 못 쓰는 조합은 체크박스 잠금으로 드러나므로 묶음 테두리를 두지 않는다.
+// 모든 항목이 같은 크기의 한 칸을 쓴다.
+function expCellHtml(entry, held) {
+  const { item, key, first } = entry;
+  const [ri, ci] = key.split("-").map(Number);
+  // 데이터의 한 줄이 화면의 한 줄이다. 두 칸짜리 줄 뒤에 다음 줄이 딸려 올라오지 않도록
+  // 줄의 첫 칸을 1열에 고정한다.
+  return `<div class="buff-cell" data-group="${expGroupOf(item)}"${first ? ' style="grid-column-start:1"' : ""}>
+    ${expItemHtml(item, ri, ci, expIsLocked(item, key, held))}
+  </div>`;
+}
+
 function renderExpBuffs() {
-  const rows = expCalc.data?.["버프"] || [];
+  const held = expLockedGroups();
+  const all = [];
+  (expCalc.data?.["버프"] || []).forEach((row, ri) => {
+    row.forEach((item, ci) => all.push({ item, key: `${ri}-${ci}`, first: ci === 0 }));
+  });
+
+  // 곱해지는 단계(그룹1 해피아워 / 그룹2 펫 스킬)는 성격이 달라 맨 위에 두고,
+  // 더해지는 일반 배율(그룹3)만 아래 격자에 넣는다.
+  const top = all.filter((e) => expGroupOf(e.item) < 3);
+  const rest = all.filter((e) => expGroupOf(e.item) === 3);
+
+  // 그룹3은 접속 종료 시 버프 시간이 흐르는지로 다시 둘로 나눠 보여준다
+  const label = expCalc.data?.["소분류"] || {};
+  const section = (title, list) => (list.length ? `
+    <p class="buff-sub-title">${escapeHtml(title)}</p>
+    <div class="buff-grid">${list.map((e) => expCellHtml(e, held)).join("")}</div>
+  ` : "");
+
   els.expBuffBody.innerHTML = `
+    ${top.length ? `<div class="buff-top">${top.map((e) => expCellHtml(e, held)).join("")}</div>` : ""}
     <p class="buff-section-title">버프 아이템 목록</p>
-    <div class="buff-grid">
-      ${rows.map((row, ri) => {
-        // 같은 카테고리(택 1)는 한 줄을 통째로 써서 묶어 보여준다
-        const exclusive = row.length > 1;
-        return `<div class="buff-cell${exclusive ? " is-exclusive" : ""}">
-          ${row.map((item, ci) => expItemHtml(item, ri, ci)).join("")}
-          ${exclusive ? '<span class="buff-badge">택 1</span>' : ""}
-        </div>`;
-      }).join("")}
-    </div>
+    ${section(label["소진"] || "접속 종료 시에도, 버프 시간 소진되는 버프 목록", rest.filter((e) => e.item["소진"]))}
+    ${section(label["유지"] || "접속 종료 시, 버프 시간 소진 안되는 버프 목록", rest.filter((e) => !e.item["소진"]))}
   `;
 }
 
@@ -1654,6 +1791,7 @@ async function loadExpBuffs() {
     const res = await fetch(EXP_BUFF_URL, { cache: "no-store" });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     expCalc.data = await res.json();
+    expRestoreState();
     renderExpCalculator();
   } catch (error) {
     expBuffLoaded = false;
@@ -3127,6 +3265,7 @@ function wireEvents() {
     const button = event.target.closest("[data-base-index]");
     if (!button) return;
     expCalc.baseIndex = Number(button.dataset.baseIndex);
+    expSaveState();
     renderExpBase();
     renderExpResult();
     document.querySelector("#expBaseCustom")?.focus();
@@ -3135,39 +3274,48 @@ function wireEvents() {
   els.expBaseBox?.addEventListener("input", (event) => {
     if (event.target.id !== "expBaseCustom") return;
     expCalc.baseCustom = event.target.value;
+    expSaveState();
     renderExpResult();
   });
 
   els.expBuffBody?.addEventListener("change", (event) => {
     const box = event.target.closest(".buff-check");
     if (!box) return;
-    const [ri] = box.dataset.buffKey.split("-");
+    const key = box.dataset.buffKey;
     if (box.checked) {
-      // 같은 줄(같은 카테고리)은 하나만 선택할 수 있다
-      (expCalc.data["버프"][Number(ri)] || []).forEach((_, ci) => expCalc.checked.delete(`${ri}-${ci}`));
-      expCalc.checked.add(box.dataset.buffKey);
+      // 충돌하는 건 이미 잠겨서 여기 올 일이 없지만, 방어적으로 비운다
+      const held = expLockedGroups();
+      expExclOf(expBuffItem(key)).forEach((g) => {
+        if (held.has(g)) expCalc.checked.delete(held.get(g));
+      });
+      expCalc.checked.add(key);
     } else {
-      expCalc.checked.delete(box.dataset.buffKey);
+      expCalc.checked.delete(key);
     }
+    expSaveState();
     renderExpBuffs();
     renderExpResult();
-    document.querySelector("#expHelmetValue")?.focus();
+    els.expBuffBody.querySelector(`[data-buff-input="${key}"]`)?.focus();
   });
 
   els.expBuffBody?.addEventListener("input", (event) => {
-    if (event.target.id !== "expHelmetValue") return;
-    expCalc.helmetValue = event.target.value;
+    const key = event.target.dataset?.buffInput;
+    if (!key) return;
+    expCalc.inputs[key] = event.target.value;
+    expSaveState();
     renderExpResult();
   });
 
   // 범위를 벗어난 입력은 포커스를 뗄 때 최소/최대로 맞춘다
   els.expBuffBody?.addEventListener("blur", (event) => {
     const input = event.target;
-    if (input.id !== "expHelmetValue" || input.value === "") return;
+    const key = input.dataset?.buffInput;
+    if (!key || input.value === "") return;
     const clamped = Math.min(Number(input.max), Math.max(Number(input.min), Number(input.value)));
     if (String(clamped) !== input.value) {
-      expCalc.helmetValue = String(clamped);
-      input.value = expCalc.helmetValue;
+      expCalc.inputs[key] = String(clamped);
+      input.value = expCalc.inputs[key];
+      expSaveState();
       renderExpResult();
     }
   }, true);

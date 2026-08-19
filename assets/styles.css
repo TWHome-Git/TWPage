@@ -1985,55 +1985,68 @@ img.dmg-chk-icon {
   font-weight: 700;
 }
 
+/* 그룹3 안의 소분류 (버프 시간 소진 여부) */
+.buff-sub-title {
+  margin: 14px 0 6px;
+  padding-left: 10px;
+  border-left: 3px solid #cfdcd4;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.buff-sub-title:first-of-type {
+  margin-top: 4px;
+}
+
 .buff-base {
   margin: 16px 16px 12px;
 }
 
-.buff-base-buttons {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
+.buff-base-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
 }
 
+/* 버튼은 글자 길이만큼만 차지한다 (전에는 4등분이라 불필요하게 넓었다) */
 .buff-base-btn {
-  min-height: 40px;
-  padding: 0 8px;
+  min-height: 34px;
+  padding: 0 14px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #fff;
   color: var(--ink);
   font-size: 13px;
   font-weight: 700;
-  word-break: keep-all;
+  white-space: nowrap;
+}
+
+/* 선택한 기본 경험치에 딸린 설명. 결과창의 값 옆에 작게 붙인다 */
+.buff-base-note {
+  margin-left: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 500;
+}
+
+/* "기타" 선택 시에만 나타나 버튼 오른쪽에 붙는다 */
+.buff-base-input {
+  flex: 1 1 180px;
+  max-width: 240px;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  font-size: 14px;
 }
 
 .buff-base-btn.is-active {
   color: #fff;
   border-color: var(--accent);
   background: var(--accent);
-}
-
-.buff-inline-field {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 10px;
-}
-
-.buff-inline-field > span {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.buff-inline-field input {
-  flex: 1;
-  max-width: 220px;
-  min-height: 36px;
-  padding: 0 10px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  font-size: 14px;
 }
 
 .buff-result {
@@ -2076,6 +2089,43 @@ img.dmg-chk-icon {
   padding: 0 16px 16px;
 }
 
+/* 해피아워 / 펫 스킬은 일반 배율과 곱해지는 별도 단계라 위에 따로 나란히 둔다 */
+.buff-top {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+/* 그룹별 색. 버프 칸과 결과창 줄에 같은 색을 써서 어느 그룹의 배율인지 잇는다.
+   그룹1 해피아워 = 주황, 그룹2 펫 스킬 = 보라, 그룹3 일반 배율 = 초록 */
+.buff-cell[data-group="1"] {
+  border-color: #e6c9a0;
+  background: #fdf6ec;
+}
+
+.buff-cell[data-group="2"] {
+  border-color: #cfc4e8;
+  background: #f6f3fd;
+}
+
+.buff-cell[data-group="3"] {
+  border-color: #cfdcd4;
+  background: #f4f8f5;
+}
+
+.buff-result-row[data-group="1"] strong {
+  color: #b5761b;
+}
+
+.buff-result-row[data-group="2"] strong {
+  color: #6b4fb8;
+}
+
+.buff-result-row[data-group="3"] strong {
+  color: var(--accent-strong, #2e8b57);
+}
+
 .buff-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -2093,24 +2143,18 @@ img.dmg-chk-icon {
   min-width: 0;
 }
 
-/* 택 1 묶음은 한 줄을 통째로 써서 같은 카테고리임을 드러낸다 */
-.buff-cell.is-exclusive {
-  grid-column: 1 / -1;
-  flex-wrap: wrap;
-  background: #f7faf8;
-  border-color: #d7e5db;
-}
-
 .buff-item {
-  display: inline-flex;
+  display: flex;
+  flex: 1 1 auto;
   align-items: center;
   gap: 7px;
   min-width: 0;
   cursor: pointer;
 }
 
-.buff-cell.is-exclusive .buff-item {
-  margin-right: 10px;
+/* 칸마다 항목이 하나뿐이라 이름이 길어도 칸 높이가 들쭉날쭉하지 않게 맞춘다 */
+.buff-cell {
+  min-height: 42px;
 }
 
 .buff-check {
@@ -2157,10 +2201,13 @@ img.dmg-chk-icon {
   object-fit: contain;
 }
 
-/* 아이콘 미등록 자리 표시 */
-.buff-icon.is-empty {
-  border: 1px dashed #cfdcd4;
-  background: #f4f8f5;
+/* 아이콘 대신 글자를 쓰는 자리 */
+.buff-icon.is-text {
+  border: 1px solid #cfdcd4;
+  background: #fff;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
 }
 
 .buff-name {
@@ -2169,26 +2216,35 @@ img.dmg-chk-icon {
   word-break: keep-all;
 }
 
-.buff-badge {
-  flex: 0 0 auto;
-  padding: 2px 8px;
-  border-radius: 10px;
-  background: #e8f0ea;
+.buff-rate {
+  margin-left: auto;
+  padding-left: 6px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   white-space: nowrap;
 }
 
+/* 같은 줄의 다른 항목이 선택돼 고를 수 없는 상태 */
+.buff-item.is-locked {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.buff-item.is-locked .buff-check {
+  cursor: not-allowed;
+}
+
 @media (max-width: 900px) {
-  .buff-grid {
+  .buff-grid,
+  .buff-top {
     grid-template-columns: repeat(2, 1fr);
   }
 }
 
 @media (max-width: 640px) {
   .buff-grid,
-  .buff-base-buttons {
+  .buff-top {
     grid-template-columns: 1fr;
   }
 
