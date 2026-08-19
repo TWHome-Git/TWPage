@@ -6,7 +6,7 @@
     <title>TW DB</title>
     <!-- 이미지 CDN. 첫 이미지 요청 전에 DNS+TLS를 미리 끝내둔다 -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
-    <link rel="stylesheet" href="./assets/styles.css?v=20260818-avatar-wear-3up" />
+    <link rel="stylesheet" href="./assets/styles.css?v=20260818-rate-modal-2" />
   </head>
   <body>
     <main class="app-shell">
@@ -557,6 +557,7 @@
                 <label class="sim-radio"><input type="radio" name="coreType" value="normal" /><span>이클립스/루비코나</span></label>
                 <label class="sim-check"><input id="coreMainStat" type="checkbox" checked /><span>주스탯</span></label>
                 <label class="sim-check"><input id="coreHasDust" type="checkbox" /><span>가루 보유</span></label>
+                <button id="coreRateButton" class="eta-help-button" type="button" title="강화 확률표" aria-label="강화 확률표">?</button>
               </div>
               <div class="sim-fields">
                 <label class="field"><span>시작 단계</span><select id="coreStartStage"></select></label>
@@ -576,6 +577,7 @@
               <div class="sim-row">
                 <label class="sim-radio"><input type="radio" name="relicType" value="pendant" checked /><span>펜던트</span></label>
                 <label class="sim-radio"><input type="radio" name="relicType" value="bracelet" /><span>브레이슬릿</span></label>
+                <button id="relicRateButton" class="eta-help-button" type="button" title="강화 확률표" aria-label="강화 확률표">?</button>
               </div>
               <div class="sim-fields">
                 <label class="field"><span>현재 레벨 (0~19)</span><input id="relicCurrent" type="number" value="0" /></label>
@@ -659,6 +661,19 @@
       <footer class="site-footer"></footer>
     </main>
 
+    <!-- 확률표 모달 (시뮬레이터의 ? 버튼들이 공용으로 쓴다) -->
+    <div id="rateModal" class="modal" hidden>
+      <div class="modal-backdrop" data-rate-close></div>
+      <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="rateModalTitle">
+        <div class="modal-head">
+          <h2 id="rateModalTitle"></h2>
+          <button class="modal-close" type="button" data-rate-close aria-label="닫기">✕</button>
+        </div>
+        <p id="rateModalNote" class="modal-note"></p>
+        <div id="rateModalBody" class="modal-body"></div>
+      </div>
+    </div>
+
     <template id="emptyTemplate">
       <div class="empty-state">
         <strong>검색 결과가 없습니다</strong>
@@ -666,7 +681,7 @@
       </div>
     </template>
 
-    <script src="./assets/app.js?v=20260819-exp-buff-icons" type="module"></script>
+    <script src="./assets/app.js?v=20260818-rate-modal-2" type="module"></script>
     <!-- GoatCounter 방문자 분석 (localhost 방문은 count.js가 기본으로 집계 제외) -->
     <script data-goatcounter="https://holedis88.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
   </body>

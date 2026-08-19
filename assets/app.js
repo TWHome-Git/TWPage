@@ -4188,7 +4188,11 @@ function initSimulators() {
     "coreMainStat", "coreHasDust", "coreStartStage", "coreTargetStage",
     "coreBoxPrice", "coreBoxPriceField", "coreCalc", "coreSummary", "coreTable",
     "relicCurrent", "relicTarget", "relicDifficulty", "relicCalc", "relicSummary", "relicTable",
+    "relicRateButton", "coreRateButton",
+    "rateModal", "rateModalTitle", "rateModalNote", "rateModalBody",
   ].forEach((id) => (simEls[id] = q(id)));
+
+  wireRateModal();
 
   wireEncryptSim();
   wireCoreSim();
@@ -4792,6 +4796,101 @@ function relicRenderTable(rows) {
     .join("");
   simEls.relicTable.innerHTML = `<thead><tr>${head.map((h) => `<th><span class="sim-th">${h}</span></th>`).join("")}</tr></thead><tbody>${body}</tbody>`;
 }
+// 강화 확률표는 계산에 쓰는 RELIC_RATES를 그대로 그린다 (수치를 두 곳에 두지 않는다).
+// 넥슨 원본은 0.0000%까지 적힌 20x20 표라 눈에 안 들어와서, 정수 %로 줄이고
+// 0%는 "-"로 죽인 뒤 확률이 높을수록 진해지는 배경을 깔았다.
+function relicRateTableHtml() {
+  const cur = Number(simEls.relicCurrent?.value);
+  const diff = Number(simEls.relicDifficulty?.value);
+  const head = ['<th class="rr-corner">단계 \\ 난이도</th>']
+    .concat(RELIC_RATES[0].map((_, i) => {
+      const n = i + 1;
+      return `<th class="${n === diff ? "is-on" : ""}">${n}</th>`;
+    }))
+    .join("");
+
+  const body = RELIC_RATES.map((row, ri) => {
+    const level = ri + 1;
+    // 현재 레벨에서 다음 단계로 갈 확률이므로, 현재 레벨 + 1 행이 지금 시도할 줄이다
+    const isNext = level === cur + 1;
+    const group = level === 1 || level === 11 ? " is-group" : "";
+    const cells = row.map((v, ci) => {
+      const pct = Math.round(v * 100);
+      if (!pct) return '<td class="rr-zero">-</td>';
+      // 10~54% 구간을 0~1로 펴서 배경 진하기로 쓴다
+      const t = Math.min(1, Math.max(0, (pct - 10) / 44));
+      return `<td class="${ci + 1 === diff ? "is-on" : ""}" style="--rr:${t.toFixed(2)}">${pct}</td>`;
+    }).join("");
+    return `<tr class="${isNext ? "is-next" : ""}${group}"><th>${escapeHtml(relicFmtLevel(level))}</th>${cells}</tr>`;
+  }).join("");
+
+  return `<table class="rr-table"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+}
+
+// 코어 확률표. 두 계열의 확률이 단계마다 다르므로 나란히 두어 비교되게 한다.
+// 수치는 coreBuildStages()가 계산에 쓰는 값을 그대로 뽑아 쓴다.
+function coreRateTableHtml() {
+  const abyss = coreBuildStages(true);
+  const normal = coreBuildStages(false);
+  const curType = coreIsAbyss();
+  const start = Number(simEls.coreStartStage?.value);
+  const target = Number(simEls.coreTargetStage?.value);
+
+  const body = abyss.slice(1).map((s, i) => {
+    const n = normal[i + 1];
+    // 지금 계산 구간에 드는 단계를 표시
+    const inRange = Number.isFinite(start) && Number.isFinite(target) && s.index > start && s.index <= target;
+    const cell = (pct, on) => {
+      const t = Math.min(1, Math.max(0, (pct - 1) / 99));
+      return `<td class="${on ? "is-on" : ""}" style="--rr:${t.toFixed(2)}">${pct}%</td>`;
+    };
+    return `<tr class="${inRange ? "is-next" : ""}${s.tier !== abyss[i].tier ? " is-group" : ""}">
+      <th>${escapeHtml(s.display)}</th>
+      ${cell(s.ratePct, curType)}
+      ${cell(n.ratePct, !curType)}
+      <td class="rr-mat">${s.dust.toLocaleString("ko-KR")}</td>
+      <td class="rr-mat">${s.crystal ? s.crystal.toLocaleString("ko-KR") : "-"}</td>
+      <td class="rr-mat">${(s.seed / 10000).toLocaleString("ko-KR")}만</td>
+    </tr>`;
+  }).join("");
+
+  return `<table class="rr-table rr-core">
+    <thead><tr>
+      <th class="rr-corner">단계</th>
+      <th class="${curType ? "is-on" : ""}">머큐리얼/어비스</th>
+      <th class="${curType ? "" : "is-on"}">이클립스/루비코나</th>
+      <th>가루</th><th>결정</th><th>시드</th>
+    </tr></thead>
+    <tbody>${body}</tbody>
+  </table>`;
+}
+
+function openRateModal(title, note, html) {
+  simEls.rateModalTitle.textContent = title;
+  simEls.rateModalNote.textContent = note;
+  simEls.rateModalBody.innerHTML = html;
+  simEls.rateModal.hidden = false;
+}
+
+function wireRateModal() {
+  simEls.rateModal?.addEventListener("click", (event) => {
+    if (event.target.closest("[data-rate-close]")) simEls.rateModal.hidden = true;
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && simEls.rateModal && !simEls.rateModal.hidden) simEls.rateModal.hidden = true;
+  });
+  simEls.relicRateButton?.addEventListener("click", () => openRateModal(
+    "렐릭 강화 확률",
+    "가로 = 콘텐츠 난이도(강화 가능 단수), 세로 = 현재 렐릭 단계. 값은 다음 단계로 오를 확률입니다.",
+    relicRateTableHtml(),
+  ));
+  simEls.coreRateButton?.addEventListener("click", () => openRateModal(
+    "코어 강화 확률",
+    "단계별 성공 확률과 소모 재료입니다. 재료는 주스탯 기준이며 부스탯은 절반입니다. 선택 중인 계열이 강조됩니다.",
+    coreRateTableHtml(),
+  ));
+}
+
 function wireRelicSim() {
   simEls.relicCalc.addEventListener("click", relicCalc);
 }
