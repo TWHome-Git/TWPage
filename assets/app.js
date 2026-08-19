@@ -12,7 +12,7 @@ const CHARACTER_IMAGE_BASE = "./character-images/";
 // 그래서 이미지를 추가/교체하면 반드시 **새 태그**를 찍고 이 상수를 함께 올려야 한다.
 // 기존 태그를 옮기면 안 된다. 캐시가 immutable이라 옛 이미지가 1년간 그대로 나간다.
 //   git tag v1.0.1 && git push origin v1.0.1
-const CDN_IMAGE_ROOT = "https://cdn.jsdelivr.net/gh/TWHome-Git/TWPage@v1.0.0/";
+const CDN_IMAGE_ROOT = "https://cdn.jsdelivr.net/gh/TWHome-Git/TWPage@v1.0.1/";
 
 // "기본/16회차_아바타별/파일명.png"처럼 하위 폴더가 포함된 값은 세그먼트별로 인코딩해야
 // 슬래시가 %2F로 바뀌지 않는다 (CDN은 %2F 경로를 찾지 못함).
@@ -1105,14 +1105,19 @@ function applyAbilityText(rawText) {
     .map((row) => {
       const name = clean(row[2]);
       if (!name) return null;
-      const effects = row.slice(4, 10).map(clean).filter(Boolean);
+      // 새로 추가된 어빌리티는 기본 효과와 추가 효과가 따로 있고 확률도 각각이다.
+      // 기존 어빌리티는 기본 효과 칸이 비어 있어 추가 효과만 한 줄로 나온다.
+      const baseEffects = row.slice(4, 5).map(clean).filter(Boolean);
+      const effects = row.slice(6, 12).map(clean).filter(Boolean);
       return {
         imageFile: clean(row[0]),
         category: clean(row[1]),
         name,
-        prob: clean(row[3]),
+        baseProb: clean(row[3]),
+        baseEffects,
+        prob: clean(row[5]),
         effects,
-        searchText: [row[1], name, effects.join(" ")].join(" ").toLowerCase(),
+        searchText: [row[1], name, baseEffects.join(" "), effects.join(" ")].join(" ").toLowerCase(),
       };
     })
     .filter(Boolean);
@@ -1462,9 +1467,19 @@ function renderAbilityList() {
     return;
   }
 
-  els.abilityListBody.innerHTML = rows.map((record) => `
-    <tr class="ability-row">
-      <td class="equip-info-cell">
+  // td 자체를 flex로 만들면 표 셀이 아니게 돼 행 높이만큼 늘어나지 않는다.
+  // (기본/추가 사이 구분선이 어긋난다) 안쪽 래퍼에 flex를 준다.
+  const chips = (list) => `<div class="ability-chips">${
+    list.map((effect) => `<b class="ability-chip">${escapeHtml(effect)}</b>`).join("")
+  }</div>`;
+
+  els.abilityListBody.innerHTML = rows.map((record, index) => {
+    // 기본 효과가 있으면 기본/추가를 두 줄로 나눠 보여준다.
+    // 이름 칸은 rowspan으로 묶어 두 줄이 한 어빌리티임을 드러낸다.
+    const split = record.baseEffects.length > 0;
+    const alt = index % 2 === 1 ? " is-alt" : "";
+    const nameCell = `
+      <td class="equip-info-cell"${split ? ' rowspan="2"' : ""}>
         <div class="equip-info">
           <span class="equip-thumb ability-thumb">
             ${record.imageFile ? `<img src="${ABILITY_IMAGE_BASE}${encodeImagePath(record.imageFile)}" alt="" decoding="async" />` : ""}
@@ -1474,13 +1489,30 @@ function renderAbilityList() {
             <small>${escapeHtml(record.category)}</small>
           </span>
         </div>
-      </td>
-      <td class="ability-prob">각 ${escapeHtml(record.prob)}</td>
-      <td class="ability-effects">
-        ${record.effects.map((effect) => `<b class="ability-chip">${escapeHtml(effect)}</b>`).join("")}
-      </td>
-    </tr>
-  `).join("");
+      </td>`;
+
+    if (!split) {
+      return `
+        <tr class="ability-row${alt}">
+          ${nameCell}
+          <td class="ability-prob">각 ${escapeHtml(record.prob)}</td>
+          <td class="ability-effects">${chips(record.effects)}</td>
+        </tr>
+      `;
+    }
+
+    return `
+      <tr class="ability-row is-head${alt}">
+        ${nameCell}
+        <td class="ability-prob"><em class="ability-kind">기본</em>${escapeHtml(record.baseProb)}</td>
+        <td class="ability-effects">${chips(record.baseEffects)}</td>
+      </tr>
+      <tr class="ability-row is-sub${alt}">
+        <td class="ability-prob"><em class="ability-kind">추가</em>각 ${escapeHtml(record.prob)}</td>
+        <td class="ability-effects">${chips(record.effects)}</td>
+      </tr>
+    `;
+  }).join("");
 }
 
 function activateCalculatorTab(key) {

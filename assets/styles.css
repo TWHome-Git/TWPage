@@ -2674,8 +2674,34 @@ img.dmg-chk-icon {
   vertical-align: middle;
 }
 
-.ability-row:nth-child(even) {
+/* 두 줄짜리 어빌리티는 tr이 2개라 nth-child로는 줄무늬가 어긋난다.
+   어빌리티 단위로 번갈아 칠하도록 JS가 is-alt를 붙여준다. */
+.ability-row.is-alt > td {
   background: #f4f8f5;
+}
+
+/* 기본/추가 사이는 옅은 점선으로만 나눠 한 어빌리티임을 유지한다 */
+.ability-row.is-head > td:not(.equip-info-cell) {
+  border-bottom: 1px dashed #e8efeb;
+}
+
+.ability-row.is-head > td.equip-info-cell,
+.ability-row.is-sub > td {
+  vertical-align: top;
+  padding-top: 10px;
+}
+
+.ability-kind {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--accent-strong, #2e8b57);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.ability-row.is-sub .ability-kind {
+  color: #a08048;
 }
 
 .ability-prob {
@@ -2687,10 +2713,13 @@ img.dmg-chk-icon {
 }
 
 .ability-effects {
+  padding-left: 12px;
+}
+
+.ability-chips {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  padding-left: 12px;
 }
 
 .ability-thumb.is-missing::after {
