@@ -4825,15 +4825,25 @@ function coreRenderTable(rows) {
     .join("");
   simEls.coreTable.innerHTML = `<thead><tr>${head.map((h) => `<th><span class="sim-th">${h}</span></th>`).join("")}</tr></thead><tbody>${body}</tbody>`;
 }
+// 코어는 한 캐릭터에 6개를 낀다. 한 개 기준만 보여주면 실제로 드는 양을
+// 가늠하기 어려워서 6개 전부 맞췄을 때도 같이 낸다.
+const CORE_SLOT_COUNT = 6;
+
 function coreRenderSummary(s) {
   const statLabel = s.isMainStat ? "주스탯" : "부스탯";
   const range = `${coreStages[s.startIdx].display} → ${coreStages[s.targetIdx].display}`;
+  const mats = (n) =>
+    `<div class="sim-summary-mats">` +
+    `<span>${simIcon("코어가루.png", 24)}${(s.totalDust * n).toLocaleString("ko-KR")}개</span>` +
+    `<span>${simIcon("코어결정.png", 24)}${(s.totalCrystal * n).toLocaleString("ko-KR")}개</span>` +
+    `<span>${simIcon("시드.png", 24)}${coreFmtEok(s.totalCost * n)}억</span>` +
+    `</div>`;
+
   simEls.coreSummary.innerHTML =
     `<div class="sim-summary-title">${escapeHtml(statLabel)} | ${escapeHtml(range)} 기대값</div>` +
-    `<div class="sim-summary-mats">` +
-    `<span>${simIcon("코어가루.png", 24)}${s.totalDust.toLocaleString("ko-KR")}개</span>` +
-    `<span>${simIcon("코어결정.png", 24)}${s.totalCrystal.toLocaleString("ko-KR")}개</span>` +
-    `<span>${simIcon("시드.png", 24)}${coreFmtEok(s.totalCost)}억</span>` +
+    `<div class="sim-summary-cols">` +
+    `<div class="sim-summary-col"><span class="sim-summary-label">코어 1개</span>${mats(1)}</div>` +
+    `<div class="sim-summary-col"><span class="sim-summary-label">코어 ${CORE_SLOT_COUNT}개 전체</span>${mats(CORE_SLOT_COUNT)}</div>` +
     `</div>`;
 }
 function wireCoreSim() {

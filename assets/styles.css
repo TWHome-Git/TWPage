@@ -1498,6 +1498,45 @@ select {
   margin-bottom: 8px;
 }
 
+/* 코어 1개 / 6개 전체를 나란히. 좁아지면 세로로 접힌다.
+   숫자가 붙어 있으면 어느 쪽 값인지 헷갈려서 사이를 넉넉히 벌리고 구분선을 둔다 */
+.sim-summary-cols {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 0;
+}
+
+.sim-summary-col {
+  display: grid;
+  gap: 4px;
+}
+
+.sim-summary-col + .sim-summary-col {
+  margin-left: 40px;
+  padding-left: 40px;
+  border-left: 1px solid var(--line);
+}
+
+@media (max-width: 900px) {
+  /* 세로로 접히면 왼쪽 선 대신 위쪽 선으로 나눈다 */
+  .sim-summary-col + .sim-summary-col {
+    margin-left: 0;
+    padding: 12px 0 0;
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .sim-summary-col {
+    flex: 1 0 100%;
+  }
+}
+
+.sim-summary-label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .sim-summary-mats {
   display: flex;
   flex-wrap: wrap;
