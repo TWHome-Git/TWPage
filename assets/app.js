@@ -1,18 +1,32 @@
 const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS78PnupM0NaJzkrkFCr2Llja9TJKrLcRZqeCqlCUV4GPGlsJd3xSIn3SQAvHwzy_tGtxDbTFtl8oZQ/pub?gid=898941035&single=true&output=csv";
 const SNAPSHOT_URL = "./data/equipment-snapshot.json";
-const IMAGE_BASE = "./equipment-images/";
-const CHARACTER_IMAGE_BASE = "./character-images/";
 
-// 대용량 이미지(아바타/어빌리티)는 jsDelivr CDN으로 서빙해 GitHub Pages 대역폭을 아낀다.
+// 이미지는 jsDelivr CDN으로 서빙해 GitHub Pages 대역폭을 아낀다.
 //
 // @main이 아니라 semver 태그로 고정한다. jsDelivr는 semver 태그와 커밋 SHA만 immutable로 보고
 // max-age=1년을 주고, @main이나 그 외 이름의 태그는 엣지 캐시가 12시간마다 만료된다(s-maxage=43200).
 // 만료된 뒤 첫 요청은 400~800ms가 걸리는 반면 캐시에 있으면 10~20ms다.
 //
-// 그래서 이미지를 추가/교체하면 반드시 **새 태그**를 찍고 이 상수를 함께 올려야 한다.
+// 태그를 올리면 URL이 통째로 바뀌어 그 태그가 덮는 이미지의 브라우저 캐시가 전부 날아간다.
+// 아바타만 4,800여 개 68MB라, 아이콘 하나 고치자고 전부 다시 받게 할 수는 없다.
+// 그래서 바뀌는 빈도가 다른 묶음끼리 태그를 나눠 둔다.
+//
+// 접두사를 붙인 태그(avatar-v1 등)는 semver로 인식되지 않아 12시간 캐시가 되므로,
+// 유효한 semver를 유지하면서 메이저 번호로 묶음을 구분한다.
+//   v1.x  아바타 (avatar-images)      — 4,838개 68MB, 회차 추가 때만 바뀜
+//   v2.x  장비   (equipment-images)   — 373개
+//   v3.x  그 외  (ability/character/images)
+//
+// 해당 묶음의 이미지를 추가/교체하면 그 묶음의 새 태그를 찍고 아래 상수를 함께 올린다.
 // 기존 태그를 옮기면 안 된다. 캐시가 immutable이라 옛 이미지가 1년간 그대로 나간다.
-//   git tag v1.0.1 && git push origin v1.0.1
-const CDN_IMAGE_ROOT = "https://cdn.jsdelivr.net/gh/TWHome-Git/TWPage@v1.0.1/";
+//   git tag v3.0.1 && git push origin v3.0.1
+const CDN_ROOT = "https://cdn.jsdelivr.net/gh/TWHome-Git/TWPage@";
+const CDN_AVATAR_ROOT = `${CDN_ROOT}v1.0.1/`;
+const CDN_EQUIP_ROOT = `${CDN_ROOT}v2.0.0/`;
+const CDN_ETC_ROOT = `${CDN_ROOT}v3.0.0/`;
+
+const IMAGE_BASE = `${CDN_EQUIP_ROOT}equipment-images/`;
+const CHARACTER_IMAGE_BASE = `${CDN_ETC_ROOT}character-images/`;
 
 // "기본/16회차_아바타별/파일명.png"처럼 하위 폴더가 포함된 값은 세그먼트별로 인코딩해야
 // 슬래시가 %2F로 바뀌지 않는다 (CDN은 %2F 경로를 찾지 못함).
@@ -167,7 +181,7 @@ const ETA_RANKING_URL = "https://raw.githubusercontent.com/TWHome-Git/TWHomeDB/m
 // 날짜 → 커밋 SHA 인덱스. 과거 랭킹은 해당 커밋의 raw 파일로 조회한다.
 const ETA_INDEX_URL = "https://raw.githubusercontent.com/TWHome-Git/TWHomeDB/main/ranking_index.json";
 const etaSnapshotUrl = (sha) => `https://raw.githubusercontent.com/TWHome-Git/TWHomeDB/${sha}/eta_ranking.json`;
-const ETA_CHAR_IMAGE_BASE = "./images/etachar/";
+const ETA_CHAR_IMAGE_BASE = `${CDN_ETC_ROOT}images/etachar/`;
 const ETA_CHARACTER_BY_CODE = {
   0: "루시안", 1: "보리스", 2: "막시민", 3: "시벨린", 4: "조슈아",
   5: "란지에", 6: "이자크", 7: "밀라", 8: "티치엘", 9: "이스핀",
@@ -1084,7 +1098,7 @@ function activateDbTab(key) {
 // ── 어빌리티 DB ──
 // 데이터: Google Sheets 웹 게시 CSV (이미지 파일, 종류, 어빌리티명, 획득확률, 효과1~6)
 const ABILITY_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS78PnupM0NaJzkrkFCr2Llja9TJKrLcRZqeCqlCUV4GPGlsJd3xSIn3SQAvHwzy_tGtxDbTFtl8oZQ/pub?gid=1875452616&single=true&output=csv";
-const ABILITY_IMAGE_BASE = `${CDN_IMAGE_ROOT}ability-images/`;
+const ABILITY_IMAGE_BASE = `${CDN_ETC_ROOT}ability-images/`;
 
 // 장비/아바타와 동일한 버전 셀 캐시: 어빌리티 시트 탭의 AZ1 값이 같으면 전체 CSV 다운로드 생략
 const ABILITY_VERSION_URL = `${ABILITY_CSV_URL}&range=AZ1`;
@@ -1156,10 +1170,10 @@ const AVATAR_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS78Pnup
 // avatar-images는 Icons(목록용 아이콘)와 Details(착용 상세 이미지)로 나뉘어 있다.
 // 두 폴더 모두 파일이 2000개를 넘어 GitHub 목록이 1000개에서 잘리므로, 다시 부위별 하위 폴더로 나눠 담는다.
 // 시트는 폴더 없이 파일명만 주므로 여기서 폴더를 붙인다.
-const AVATAR_ICON_BASE = `${CDN_IMAGE_ROOT}avatar-images/Icons/`;
-const AVATAR_DETAIL_BASE = `${CDN_IMAGE_ROOT}avatar-images/Details/`;
+const AVATAR_ICON_BASE = `${CDN_AVATAR_ROOT}avatar-images/Icons/`;
+const AVATAR_DETAIL_BASE = `${CDN_AVATAR_ROOT}avatar-images/Details/`;
 // 세트 대표 이미지는 개별 상세와 성격이 달라 폴더를 나눠 둔다
-const AVATAR_SET_BASE = `${CDN_IMAGE_ROOT}avatar-images/Sets/`;
+const AVATAR_SET_BASE = `${CDN_AVATAR_ROOT}avatar-images/Sets/`;
 
 // 장비 DB와 동일한 버전 셀 캐시: AZ1 값이 같으면 전체 CSV 다운로드 생략
 const AVATAR_VERSION_URL = `${AVATAR_CSV_URL}&range=AZ1`;
@@ -1558,7 +1572,7 @@ function activateExtraTab(key) {
 // ══════════════════════════════════════════════════════════════
 //  버프 아이템 탭 — 경험치 버프 / 레어 버프
 // ══════════════════════════════════════════════════════════════
-const BUFF_ICON_BASE = "./images/";
+const BUFF_ICON_BASE = `${CDN_ETC_ROOT}images/`;
 const EXP_BUFF_URL = "./assets/exp-buffs.json";
 let expBuffLoaded = false;
 
@@ -4357,7 +4371,7 @@ const simEls = {};
 let simInited = false;
 
 // 시뮬레이터 재료 아이콘 (images 폴더)
-const SIM_IMG_BASE = "./images/";
+const SIM_IMG_BASE = `${CDN_ETC_ROOT}images/`;
 function simIcon(file, size = 18) {
   return `<img class="sim-icon" src="${SIM_IMG_BASE}${encodeURIComponent(file)}" alt="" width="${size}" height="${size}" loading="lazy" />`;
 }
