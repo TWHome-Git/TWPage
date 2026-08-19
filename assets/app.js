@@ -1088,6 +1088,10 @@ const ABILITY_IMAGE_BASE = `${CDN_IMAGE_ROOT}ability-images/`;
 
 // 장비/아바타와 동일한 버전 셀 캐시: 어빌리티 시트 탭의 AZ1 값이 같으면 전체 CSV 다운로드 생략
 const ABILITY_VERSION_URL = `${ABILITY_CSV_URL}&range=AZ1`;
+// 추가 효과는 열 개수가 종류마다 다르고 시트에서 늘어나기도 한다(현재 최대 8).
+// 개수를 박아두지 않고 끝까지 읽되, 버전 셀이 있는 AZ열(0-based 51)은 넘지 않는다.
+const ABILITY_EFFECT_START = 6;
+const ABILITY_EFFECT_END = 51;
 const ABILITY_CSV_CACHE_KEY = "tw-ability-csv-cache-v1";
 const ability = {
   records: [],
@@ -1108,7 +1112,7 @@ function applyAbilityText(rawText) {
       // 새로 추가된 어빌리티는 기본 효과와 추가 효과가 따로 있고 확률도 각각이다.
       // 기존 어빌리티는 기본 효과 칸이 비어 있어 추가 효과만 한 줄로 나온다.
       const baseEffects = row.slice(4, 5).map(clean).filter(Boolean);
-      const effects = row.slice(6, 12).map(clean).filter(Boolean);
+      const effects = row.slice(ABILITY_EFFECT_START, ABILITY_EFFECT_END).map(clean).filter(Boolean);
       return {
         imageFile: clean(row[0]),
         category: clean(row[1]),

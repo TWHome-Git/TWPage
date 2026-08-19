@@ -2722,6 +2722,14 @@ img.dmg-chk-icon {
   gap: 4px;
 }
 
+/* 기본/추가로 나뉜 어빌리티(불사·안식)의 추가 효과는 8개라
+   폭에 맡기면 6+2로 갈라진다. 한 줄에 5개로 고정해 나눈다. */
+.ability-row.is-sub .ability-chips {
+  display: grid;
+  grid-template-columns: repeat(5, max-content);
+  justify-items: start;
+}
+
 .ability-thumb.is-missing::after {
   content: "✕";
   color: #a7b0ad;
