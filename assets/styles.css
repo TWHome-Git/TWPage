@@ -55,7 +55,8 @@ select {
 
 .top-tabs {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  /* 마지막 auto는 오른쪽 끝 문의 버튼 자리. 탭은 그대로 6등분한다 */
+  grid-template-columns: repeat(6, 1fr) auto;
   gap: 4px;
   padding: 5px;
   border-radius: 8px 8px 0 0;
@@ -3798,6 +3799,18 @@ img.dmg-chk-icon {
   }
 }
 
+/* 탭이 좁아지기 시작하면 문의 버튼을 아랫줄로 내린다.
+   같은 줄에 두면 TWChatOverlay가 더 못 줄어들어 나머지 탭만 눌린다 */
+@media (max-width: 900px) {
+  .top-tabs {
+    grid-template-columns: repeat(6, 1fr);
+  }
+
+  .board-open-button {
+    grid-column: 1 / -1;
+  }
+}
+
 @media (max-width: 560px) {
   .app-shell {
     width: min(100vw - 18px, 1180px);
@@ -3819,6 +3832,10 @@ img.dmg-chk-icon {
 
   .top-tabs {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .board-open-button {
+    grid-column: 1 / -1;
   }
 
   .search-field {
@@ -4142,5 +4159,306 @@ img.dmg-chk-icon {
 
   .overlay-panel {
     padding: 14px 12px 20px;
+  }
+}
+
+/* ── 문의 · 건의 게시판 ── */
+
+/* 탭 바 맨 오른쪽. 탭이 아니라 별개 동작이라 생김새를 다르게 둔다 */
+.board-open-button {
+  padding: 8px 14px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--accent-strong, #2e8b57);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.board-open-button:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
+.board-modal-panel {
+  width: min(760px, 94vw);
+}
+
+.board-body {
+  display: grid;
+  gap: 10px;
+}
+
+.board-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.board-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.board-filter {
+  padding: 5px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.board-filter.is-active {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+.board-write-button,
+.board-submit {
+  padding: 7px 16px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.board-submit[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.board-back {
+  justify-self: start;
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.board-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* 제목은 남는 폭을 다 쓰고, 분류/답변/작성정보는 제 너비만 쓴다 */
+.board-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  font-family: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.board-item:hover {
+  border-color: var(--accent);
+}
+
+.board-item-title {
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.board-item-meta {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.board-cat {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.board-cat[data-cat="버그"] { background: #fdecec; color: #b3413f; }
+.board-cat[data-cat="건의"] { background: #eef3fd; color: #43619e; }
+.board-cat[data-cat="문의"] { background: #eef7f1; color: #2e8b57; }
+
+.board-answered {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.board-detail {
+  display: grid;
+  gap: 8px;
+}
+
+.board-detail h3 {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 0;
+  font-size: 16px;
+}
+
+.board-content {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  font-size: 14px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.board-answer {
+  display: grid;
+  gap: 6px;
+  padding-left: 12px;
+  border-left: 3px solid var(--accent);
+}
+
+.board-answer-head {
+  color: var(--accent-strong, #2e8b57);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.board-pending,
+.board-empty {
+  padding: 16px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.board-notice,
+.board-error {
+  margin: 0;
+  padding: 9px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.board-notice {
+  background: #eef7f1;
+  color: var(--accent-strong, #2e8b57);
+}
+
+.board-error {
+  background: #fdecec;
+  color: #b3413f;
+}
+
+.board-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.board-field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.board-field-wide {
+  grid-column: 1 / -1;
+}
+
+.board-field > span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.board-field > span small {
+  font-weight: 600;
+}
+
+.board-field input,
+.board-field select,
+.board-field textarea {
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  font-family: inherit;
+  font-size: 14px;
+  resize: vertical;
+}
+
+/* 봇만 채우는 미끼 칸. 화면에서 완전히 감춘다 */
+.board-honeypot {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.board-form-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  grid-column: 1 / -1;
+}
+
+.board-hint {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .board-item {
+    grid-template-columns: auto 1fr;
+  }
+
+  .board-item-meta {
+    grid-column: 1 / -1;
+  }
+
+  .board-form {
+    grid-template-columns: 1fr;
   }
 }

@@ -5113,3 +5113,280 @@ boot().catch((error) => {
 loadDmgSkills();
 loadDmgBuffs();
 
+// ══════════════════════════════════════════════════════════════
+//  문의 · 건의 게시판
+//  글은 구글 시트에 쌓이고, 읽기/쓰기 모두 Apps Script 웹앱을 거친다.
+//  (게시 CSV는 갱신이 몇 분 늦어, 방금 쓴 글이 안 보이는 문제가 있다)
+//  설치 방법은 저장소 루트의 board-apps-script.gs 주석에 적어 뒀다.
+// ══════════════════════════════════════════════════════════════
+const BOARD_API_URL = "https://script.google.com/macros/s/AKfycbyNioDGVAQp8KSIsgUkPwfVMRY8xtG7CAtaUSjWc0Hs4qiaSvKWxBGGcfEUfsUFWG2U/exec";
+
+const BOARD_CATEGORIES = ["버그", "건의", "문의"];
+const BOARD_LIMITS = { title: 100, author: 20, content: 2000 };
+
+const board = {
+  view: "list",       // "list" | "detail" | "write"
+  posts: [],
+  post: null,         // 본문까지 받아온 글
+  category: "all",
+  loaded: false,
+  busy: false,
+  error: "",
+  notice: "",
+  draft: { category: "", title: "", author: "", content: "" },
+};
+
+const boardEls = {
+  button: document.querySelector("#boardOpenButton"),
+  modal: document.querySelector("#boardModal"),
+  body: document.querySelector("#boardBody"),
+};
+
+const boardApi = (params) => `${BOARD_API_URL}?${new URLSearchParams(params)}`;
+
+function boardDate(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+// 줄바꿈만 살리고 나머지는 escape 한다. 방문자가 쓴 글이라 HTML을 그대로 넣으면 안 된다
+const boardText = (value) => escapeHtml(value || "").replace(/\n/g, "<br />");
+
+async function boardFetch(url, options) {
+  const res = await fetch(url, options);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error || "요청을 처리하지 못했습니다.");
+  return data;
+}
+
+async function boardLoadList(force) {
+  if (board.loaded && !force) return;
+  board.busy = true;
+  board.error = "";
+  boardRender();
+  try {
+    const data = await boardFetch(boardApi({ action: "list" }));
+    board.posts = data.posts || [];
+    board.loaded = true;
+  } catch (error) {
+    board.error = "글 목록을 불러오지 못했습니다.";
+    console.warn("게시판 목록 로딩 실패", error);
+  } finally {
+    board.busy = false;
+    boardRender();
+  }
+}
+
+async function boardOpenPost(id) {
+  board.view = "detail";
+  board.post = null;
+  board.busy = true;
+  board.error = "";
+  boardRender();
+  try {
+    const data = await boardFetch(boardApi({ action: "post", id }));
+    board.post = data.post;
+  } catch (error) {
+    board.error = "글을 불러오지 못했습니다.";
+    console.warn("게시판 글 로딩 실패", error);
+  } finally {
+    board.busy = false;
+    boardRender();
+  }
+}
+
+async function boardSubmit(form) {
+  const draft = {
+    category: form.category.value,
+    title: form.title.value.trim(),
+    author: form.author.value.trim(),
+    content: form.content.value.trim(),
+    website: form.website.value,   // 봇 미끼. 사람은 못 보는 칸이다
+  };
+  board.draft = { category: draft.category, title: draft.title, author: draft.author, content: draft.content };
+
+  if (!BOARD_CATEGORIES.includes(draft.category)) return boardFail("분류를 선택해 주세요.");
+  if (!draft.title) return boardFail("제목을 입력해 주세요.");
+  if (!draft.content) return boardFail("내용을 입력해 주세요.");
+
+  board.busy = true;
+  board.error = "";
+  boardRender();
+  try {
+    // application/json으로 보내면 CORS 프리플라이트가 뜨고 Apps Script가 그걸 못 받는다
+    await boardFetch(BOARD_API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(draft),
+    });
+    board.draft = { category: "", title: "", author: "", content: "" };
+    board.notice = "등록했습니다. 답변은 게시판에서 확인하실 수 있습니다.";
+    board.view = "list";
+    board.busy = false;
+    await boardLoadList(true);
+  } catch (error) {
+    board.busy = false;
+    boardFail(error.message || "등록하지 못했습니다.");
+  }
+}
+
+function boardFail(message) {
+  board.error = message;
+  boardRender();
+}
+
+function boardListHtml() {
+  const rows = board.category === "all"
+    ? board.posts
+    : board.posts.filter((p) => p.category === board.category);
+
+  const filters = ["all", ...BOARD_CATEGORIES]
+    .map((key) => `<button type="button" class="board-filter${board.category === key ? " is-active" : ""}" data-board-filter="${key}">${key === "all" ? "전체" : key}</button>`)
+    .join("");
+
+  const items = rows.length
+    ? rows.map((p) => `
+        <li>
+          <button type="button" class="board-item" data-board-post="${p.id}">
+            <span class="board-cat" data-cat="${escapeHtml(p.category)}">${escapeHtml(p.category)}</span>
+            <span class="board-item-title">${escapeHtml(p.title)}</span>
+            ${p.answer ? '<span class="board-answered">답변 완료</span>' : ""}
+            <span class="board-item-meta">${escapeHtml(p.author)} · ${boardDate(p.createdAt)}</span>
+          </button>
+        </li>
+      `).join("")
+    : `<li class="board-empty">${board.busy ? "불러오는 중…" : "아직 글이 없습니다."}</li>`;
+
+  return `
+    <div class="board-toolbar">
+      <div class="board-filters">${filters}</div>
+      <button type="button" class="board-write-button" data-board-view="write">글쓰기</button>
+    </div>
+    <ul class="board-list">${items}</ul>
+  `;
+}
+
+function boardDetailHtml() {
+  const p = board.post;
+  if (!p) return `<p class="board-empty">${board.busy ? "불러오는 중…" : ""}</p>`;
+  return `
+    <button type="button" class="board-back" data-board-view="list">← 목록</button>
+    <article class="board-detail">
+      <h3>
+        <span class="board-cat" data-cat="${escapeHtml(p.category)}">${escapeHtml(p.category)}</span>
+        ${escapeHtml(p.title)}
+      </h3>
+      <p class="board-item-meta">${escapeHtml(p.author)} · ${boardDate(p.createdAt)}</p>
+      <div class="board-content">${boardText(p.content)}</div>
+      ${p.answer ? `
+        <div class="board-answer">
+          <span class="board-answer-head">운영자 답변 · ${boardDate(p.answeredAt)}</span>
+          <div class="board-content">${boardText(p.answer)}</div>
+        </div>
+      ` : '<p class="board-pending">아직 답변이 등록되지 않았습니다.</p>'}
+    </article>
+  `;
+}
+
+function boardWriteHtml() {
+  const d = board.draft;
+  const options = BOARD_CATEGORIES
+    .map((c) => `<option value="${c}"${d.category === c ? " selected" : ""}>${c}</option>`)
+    .join("");
+  return `
+    <button type="button" class="board-back" data-board-view="list">← 목록</button>
+    <form class="board-form" id="boardForm">
+      <label class="board-field">
+        <span>분류</span>
+        <select name="category" required>
+          <option value="">선택</option>
+          ${options}
+        </select>
+      </label>
+      <label class="board-field">
+        <span>이름 <small>(비우면 익명)</small></span>
+        <input name="author" type="text" maxlength="${BOARD_LIMITS.author}" placeholder="익명" value="${escapeHtml(d.author)}" />
+      </label>
+      <label class="board-field board-field-wide">
+        <span>제목</span>
+        <input name="title" type="text" maxlength="${BOARD_LIMITS.title}" required value="${escapeHtml(d.title)}" />
+      </label>
+      <label class="board-field board-field-wide">
+        <span>내용</span>
+        <textarea name="content" rows="8" maxlength="${BOARD_LIMITS.content}" required>${escapeHtml(d.content)}</textarea>
+      </label>
+      <input class="board-honeypot" name="website" type="text" tabindex="-1" autocomplete="off" aria-hidden="true" />
+      <div class="board-form-foot">
+        <span class="board-hint">글과 이름은 누구나 볼 수 있습니다. 개인정보는 적지 말아 주세요.</span>
+        <button type="submit" class="board-submit"${board.busy ? " disabled" : ""}>${board.busy ? "등록 중…" : "등록"}</button>
+      </div>
+    </form>
+  `;
+}
+
+function boardRender() {
+  if (!boardEls.body) return;
+  if (!BOARD_API_URL) {
+    boardEls.body.innerHTML = '<p class="board-empty">게시판을 준비 중입니다.</p>';
+    return;
+  }
+  const notice = board.notice ? `<p class="board-notice">${escapeHtml(board.notice)}</p>` : "";
+  const error = board.error ? `<p class="board-error">${escapeHtml(board.error)}</p>` : "";
+  const view = board.view === "detail" ? boardDetailHtml()
+    : board.view === "write" ? boardWriteHtml()
+    : boardListHtml();
+  boardEls.body.innerHTML = notice + error + view;
+}
+
+function boardSetView(view) {
+  board.view = view;
+  board.error = "";
+  if (view !== "list") board.notice = "";
+  boardRender();
+}
+
+function boardOpen() {
+  boardEls.modal.hidden = false;
+  boardSetView("list");
+  boardLoadList(false);
+}
+
+function boardClose() {
+  boardEls.modal.hidden = true;
+  board.notice = "";
+}
+
+function wireBoard() {
+  if (!boardEls.button || !boardEls.modal) return;
+  boardEls.button.addEventListener("click", boardOpen);
+  boardEls.modal.addEventListener("click", (event) => {
+    if (event.target.closest("[data-board-close]")) boardClose();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !boardEls.modal.hidden) boardClose();
+  });
+
+  boardEls.body.addEventListener("click", (event) => {
+    const filter = event.target.closest("[data-board-filter]");
+    if (filter) {
+      board.category = filter.dataset.boardFilter;
+      return boardRender();
+    }
+    const viewButton = event.target.closest("[data-board-view]");
+    if (viewButton) return boardSetView(viewButton.dataset.boardView);
+    const item = event.target.closest("[data-board-post]");
+    if (item) boardOpenPost(item.dataset.boardPost);
+  });
+
+  boardEls.body.addEventListener("submit", (event) => {
+    if (event.target.id !== "boardForm") return;
+    event.preventDefault();
+    boardSubmit(event.target);
+  });
+}
+
+wireBoard();

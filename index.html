@@ -6,7 +6,7 @@
     <title>TW DB</title>
     <!-- 이미지 CDN. 첫 이미지 요청 전에 DNS+TLS를 미리 끝내둔다 -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
-    <link rel="stylesheet" href="./assets/styles.css?v=20260819-avatar-v103" />
+    <link rel="stylesheet" href="./assets/styles.css?v=20260820-board-31" />
   </head>
   <body>
     <main class="app-shell">
@@ -17,6 +17,7 @@
         <button class="tab-button" type="button" data-main-tab="calculator" aria-controls="calculatorView">계산기</button>
         <button class="tab-button" type="button" data-main-tab="simulator" aria-controls="simulatorView">시뮬레이터</button>
         <button class="tab-button" type="button" data-main-tab="overlay" aria-controls="overlayView">TWChatOverlay</button>
+        <button id="boardOpenButton" class="board-open-button" type="button" aria-haspopup="dialog">문의 · 건의</button>
       </nav>
 
       <section id="etaView" class="main-panel" data-main-panel="eta" hidden>
@@ -674,6 +675,17 @@
       </div>
     </div>
 
+    <div id="boardModal" class="modal" hidden>
+      <div class="modal-backdrop" data-board-close></div>
+      <div class="modal-panel board-modal-panel" role="dialog" aria-modal="true" aria-labelledby="boardModalTitle">
+        <div class="modal-head">
+          <h2 id="boardModalTitle">문의 · 건의</h2>
+          <button class="modal-close" type="button" data-board-close aria-label="닫기">✕</button>
+        </div>
+        <div id="boardBody" class="modal-body board-body"></div>
+      </div>
+    </div>
+
     <template id="emptyTemplate">
       <div class="empty-state">
         <strong>검색 결과가 없습니다</strong>
@@ -681,7 +693,7 @@
       </div>
     </template>
 
-    <script src="./assets/app.js?v=20260819-avatar-v103" type="module"></script>
+    <script src="./assets/app.js?v=20260820-board-31" type="module"></script>
     <!-- GoatCounter 방문자 분석 (localhost 방문은 count.js가 기본으로 집계 제외) -->
     <script data-goatcounter="https://holedis88.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
   </body>
