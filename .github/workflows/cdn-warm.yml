@@ -83,23 +83,47 @@ jobs:
 
           echo "워밍 시작: $(wc -l < urls.txt)개"
 
+          # 태그를 민 직후에는 jsDelivr가 아직 그 태그를 모를 수 있다.
+          # 바로 긁으면 404가 무더기로 나므로 잠시 기다렸다 시작한다.
+          sleep 20
+
           # HEAD가 아니라 GET으로 받는다. 캐시에 실제로 올라가는 건 본문이라
           # HEAD만 쳐서는 다음 방문자가 그대로 미스를 맞는다. 본문은 버린다.
           # 동시 20개면 4,800개가 2~3분이다. 더 올리면 429가 날 수 있다.
-          xargs -a urls.txt -P 20 -I{} \
-            curl -sS -o /dev/null -w '%{http_code} %{url_effective}\n' \
-                 --retry 3 --retry-delay 2 --max-time 30 \
-                 -H 'User-Agent: TWPage-cdn-warm' \
-                 '{}' > result.txt || true
+          warm() {
+            xargs -a "$1" -P 20 -I{} \
+              curl -sS -o /dev/null -w '%{http_code} %{url_effective}\n' \
+                   --retry 3 --retry-delay 2 --max-time 30 \
+                   -H 'User-Agent: TWPage-cdn-warm' \
+                   '{}' > "$2" || true
+          }
 
-          TOTAL=$(wc -l < result.txt)
+          warm urls.txt result.txt
+
+          # 전파가 덜 끝나 실패한 것들은 잠시 뒤 한 번 더 친다
+          { grep -v '^200 ' result.txt || true; } | awk '{print $2}' > retry.txt
+          RETRY=$(wc -l < retry.txt)
+          if [ "$RETRY" -gt 0 ]; then
+            echo "1차 실패 $RETRY개 — 30초 뒤 재시도"
+            sleep 30
+            warm retry.txt retry_result.txt
+            grep '^200 ' retry_result.txt >> result.txt || true
+            { grep -v '^200 ' retry_result.txt || true; } > failed.txt
+          else
+            : > failed.txt
+          fi
+
+          TOTAL=$(wc -l < urls.txt)
           OK=$(grep -c '^200 ' result.txt || true)
+          FAILED=$(wc -l < failed.txt)
           echo "성공 $OK / $TOTAL"
 
-          # 실패한 건 다음 방문자가 미스를 맞는다는 뜻이라 그대로 드러낸다
-          if [ "$OK" -ne "$TOTAL" ]; then
-            echo "::warning::데우지 못한 파일 $((TOTAL - OK))개"
-            grep -v '^200 ' result.txt | head -30
+          # 재시도까지 실패한 건 다음 방문자가 미스를 맞는다는 뜻이라 그대로 드러낸다.
+          # head로 자르면 grep이 SIGPIPE로 죽고 pipefail 탓에 스텝이 실패하므로
+          # 파일로 받아 두고 잘라 낸다.
+          if [ "$FAILED" -gt 0 ]; then
+            echo "::warning::데우지 못한 파일 ${FAILED}개"
+            head -30 failed.txt
           fi
 
           {
@@ -107,5 +131,9 @@ jobs:
             echo ""
             echo "- 대상 폴더: ${{ steps.pick.outputs.dirs }}"
             echo "- 성공 **$OK** / $TOTAL"
+            if [ "$FAILED" -gt 0 ]; then echo "- 실패 **$FAILED**"; fi
           } >> "$GITHUB_STEP_SUMMARY"
+
+          # 몇 개 못 데운 정도로 워크플로를 실패시키지 않는다. 캐시는 최적화일 뿐이다
+          exit 0
         shell: bash
