@@ -3974,7 +3974,16 @@ function availableCoefTypes(record) {
   return Object.values(CALC).filter((type) => usable.has(type));
 }
 
+// 계수 공식이 쓰는 스탯(찌르기/베기/마법공격/마법방어)이 없거나 계수를 따지지 않는 분류.
+const COEF_HIDDEN_TYPES = ["방패", "밴드", "아머", "슈츠"];
+
+function hasCoefficient(record) {
+  return !COEF_HIDDEN_TYPES.includes(record.type);
+}
+
 function coefficientBlockHtml(record) {
+  if (!hasCoefficient(record)) return "";
+
   const types = availableCoefTypes(record);
   // 고른 계열을 이 장비가 못 쓰면 첫 계열로 보여주되, state는 건드리지 않는다.
   // (쓸 수 있는 장비로 돌아왔을 때 선택이 유지되도록)
@@ -4155,20 +4164,23 @@ function renderCompare() {
   // 비교 목록은 같은 분류끼리만 뜨므로 두 장비의 선택 가능한 계열도 같다.
   const coefTypes = availableCoefTypes(record);
   const coefType = coefTypes.includes(state.coefType) ? state.coefType : coefTypes[0];
-  const coefRows = coefficientSteps(compare, coefType).map(([label, enchant]) => `
-      <div class="diff-row">
-        <span>${escapeHtml(label)}</span>
-        <strong class="neutral">${formatCoefficient(equipmentCoefficient(compare, coefType, enchant))}</strong>
-      </div>
-    `).join("");
+  const coefBlock = hasCoefficient(compare)
+    ? `
+    <div class="compare-coef">
+      <p class="compare-coef-head">${escapeHtml(compare.name)} 계수 · ${escapeHtml(CALC_TYPE_DISPLAY[coefType])}</p>
+      <div class="diff-grid">${coefficientSteps(compare, coefType).map(([label, enchant]) => `
+        <div class="diff-row">
+          <span>${escapeHtml(label)}</span>
+          <strong class="neutral">${formatCoefficient(equipmentCoefficient(compare, coefType, enchant))}</strong>
+        </div>
+      `).join("")}</div>
+    </div>`
+    : "";
 
   els.compareSummary.innerHTML = `
     <p class="compare-name">${escapeHtml(compare.name)} 대비${state.limitCompare ? " · LIMIT" : ""}</p>
     <div class="diff-grid">${diffs}</div>
-    <div class="compare-coef">
-      <p class="compare-coef-head">${escapeHtml(compare.name)} 계수 · ${escapeHtml(CALC_TYPE_DISPLAY[coefType])}</p>
-      <div class="diff-grid">${coefRows}</div>
-    </div>
+    ${coefBlock}
   `;
 }
 
