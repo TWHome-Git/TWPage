@@ -3853,12 +3853,53 @@ const COEF_WEIGHTS = {
 
 // 장비 한 개의 계수.
 // withPrimaryLimit=true면 주스탯을 한계치(LIMIT)까지 강화한 상태로 계산한다.
-function equipmentCoefficient(record, type, withPrimaryLimit) {
+function equipmentCoefficient(record, type, primaryEnchant = 0) {
   const w = COEF_WEIGHTS[type];
   if (!w) return 0;
-  const { pMax, sMax, pLimit } = statByType(record, type);
-  const primaryEnchant = withPrimaryLimit ? Math.max(0, pLimit - pMax) : 0;
-  return w[0] * pMax + w[1] * primaryEnchant + w[2] * sMax;
+  const { pMax, sMax } = statByType(record, type);
+  return w[0] * pMax + w[1] * Math.max(0, primaryEnchant) + w[2] * sMax;
+}
+
+// 주스탯을 한계치까지 올렸을 때의 강화량 (= 스탯표의 "한계" 값)
+function primaryEnchantCap(record, type) {
+  const { pMax, pLimit } = statByType(record, type);
+  return Math.max(0, pLimit - pMax);
+}
+
+// 이클립스부터가 상위 등급이다. 앞의 改-는 개조 표기라 등급 판단에서 무시한다.
+const HIGH_TIER_ARMOR = /^(?:改-)?(?:이클립스|세크리드)\b/;
+// 밴드·방패는 강화작을 사실상 하지 않아 중간 단계를 빼둔다.
+const NO_ENCHANT_STEP_TYPES = ["밴드", "방패"];
+
+// 기본과 한계 사이에 끼워 보여줄 중간 강화 단계. 없으면 0.
+function midEnchantStep(record) {
+  if (record.category === "무기" || record.category === "손목") {
+    return NO_ENCHANT_STEP_TYPES.includes(record.type) ? 0 : 28;
+  }
+  if (record.category === "갑옷" && HIGH_TIER_ARMOR.test(record.name)) return 30;
+  return 0;
+}
+
+// 계열별 주스탯 / 부스탯 이름. statByType()이 어떤 스탯을 쓰는지와 짝을 맞춘다.
+const COEF_STAT_NAMES = {
+  [CALC.STAB]: ["찌르기", "베기"],
+  [CALC.HACK]: ["베기", "찌르기"],
+  [CALC.MAGIC_ATTACK]: ["마법공격", "마법방어"],
+  [CALC.MAGIC_DEFENSE]: ["마법방어", "마법공격"],
+  [CALC.PHYSICAL_HYBRID]: ["찌르기", "베기"],
+  [CALC.MAGIC_HACK]: ["베기", "마법공격"],
+};
+
+// 계수 칸 목록. [라벨, 강화량] 순으로 기본 → 중간 → 한계.
+function coefficientSteps(record, type) {
+  const cap = primaryEnchantCap(record, type);
+  const [primaryName] = COEF_STAT_NAMES[type] || ["주스탯", "부스탯"];
+  const steps = [["기본", 0]];
+  const mid = midEnchantStep(record);
+  // 한계보다 큰 강화는 불가능하므로 그런 경우엔 중간 단계를 건너뛴다.
+  if (mid > 0 && mid < cap) steps.push([`+${mid} ${primaryName}`, mid]);
+  steps.push([`+${formatNumber(cap)} ${primaryName}`, cap]);
+  return steps;
 }
 
 // 소수점이 남을 수 있어 최대 두 자리까지만 보여준다.
@@ -3946,10 +3987,22 @@ function coefficientBlockHtml(record) {
         </label>`
     : `<span class="coef-type-fixed">${escapeHtml(CALC_TYPE_DISPLAY[type])}</span>`;
 
-  const { pMax, sMax, pLimit } = statByType(record, type);
-  const primaryEnchant = Math.max(0, pLimit - pMax);
-  const base = equipmentCoefficient(record, type, false);
-  const full = equipmentCoefficient(record, type, true);
+  const { pMax, sMax } = statByType(record, type);
+  const [primaryName, secondaryName] = COEF_STAT_NAMES[type] || ["주스탯", "부스탯"];
+  const steps = coefficientSteps(record, type);
+  const items = steps.map(([label, enchant], index) => {
+    const isLast = index === steps.length - 1;
+    const note = index === 0
+      ? `${primaryName} ${formatNumber(pMax)} · ${secondaryName} ${formatNumber(sMax)}`
+      : `${primaryName} ${formatNumber(pMax + enchant)}`;
+    return `
+        <div class="coef-item">
+          <span class="coef-label">${escapeHtml(label)}</span>
+          <strong class="coef-value${isLast ? " is-limit" : ""}">${formatCoefficient(equipmentCoefficient(record, type, enchant))}</strong>
+          <span class="coef-note">${note}</span>
+        </div>
+    `;
+  }).join("");
 
   return `
     <div class="coef-block">
@@ -3957,18 +4010,7 @@ function coefficientBlockHtml(record) {
         <span>계수</span>
         ${picker}
       </div>
-      <div class="coef-grid">
-        <div class="coef-item">
-          <span class="coef-label">MAX</span>
-          <strong class="coef-value">${formatCoefficient(base)}</strong>
-          <span class="coef-note">주 ${formatNumber(pMax)} · 부 ${formatNumber(sMax)}</span>
-        </div>
-        <div class="coef-item">
-          <span class="coef-label">MAX + 주스탯 한계</span>
-          <strong class="coef-value is-limit">${formatCoefficient(full)}</strong>
-          <span class="coef-note">주 강화 +${formatNumber(primaryEnchant)}</span>
-        </div>
-      </div>
+      <div class="coef-grid" data-steps="${steps.length}">${items}</div>
     </div>
   `;
 }
@@ -4111,22 +4153,19 @@ function renderCompare() {
   // 비교 목록은 같은 분류끼리만 뜨므로 두 장비의 선택 가능한 계열도 같다.
   const coefTypes = availableCoefTypes(record);
   const coefType = coefTypes.includes(state.coefType) ? state.coefType : coefTypes[0];
-  const coefRow = (label, withLimit) => `
+  const coefRows = coefficientSteps(compare, coefType).map(([label, enchant]) => `
       <div class="diff-row">
-        <span>${label}</span>
-        <strong class="neutral">${formatCoefficient(equipmentCoefficient(compare, coefType, withLimit))}</strong>
+        <span>${escapeHtml(label)}</span>
+        <strong class="neutral">${formatCoefficient(equipmentCoefficient(compare, coefType, enchant))}</strong>
       </div>
-    `;
+    `).join("");
 
   els.compareSummary.innerHTML = `
     <p class="compare-name">${escapeHtml(compare.name)} 대비${state.limitCompare ? " · LIMIT" : ""}</p>
     <div class="diff-grid">${diffs}</div>
     <div class="compare-coef">
       <p class="compare-coef-head">${escapeHtml(compare.name)} 계수 · ${escapeHtml(CALC_TYPE_DISPLAY[coefType])}</p>
-      <div class="diff-grid">
-        ${coefRow("MAX", false)}
-        ${coefRow("MAX + 주스탯 한계", true)}
-      </div>
+      <div class="diff-grid">${coefRows}</div>
     </div>
   `;
 }
