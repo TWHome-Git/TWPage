@@ -1045,7 +1045,6 @@ function etaCalcDaysHtml(subs, spans) {
   });
 
   const total = groups.reduce((sum, g) => sum + g.days, 0);
-  const parallel = groups.some((g) => g.items.length > 1);
 
   return `
     <p class="eta-calc-title">예상 소요 <strong class="eta-calc-days">${etaCalcFmt(total)}일</strong></p>
@@ -1058,8 +1057,6 @@ function etaCalcDaysHtml(subs, spans) {
         </li>
       `).join("")).join("")}
     </ul>
-    ${parallel ? '<p class="eta-calc-hint">레벨 구간이 겹치는 재료는 같이 모이므로 더하지 않고 더 오래 걸리는 쪽만 셉니다.</p>' : ""}
-    ${unknown.length ? `<p class="eta-calc-hint">${escapeHtml(unknown.join(", "))}는 획득처가 등록되지 않아 일수에서 빠졌습니다.</p>` : ""}
   `;
 }
 
