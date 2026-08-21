@@ -3867,7 +3867,8 @@ function primaryEnchantCap(record, type) {
 }
 
 // 이클립스부터가 상위 등급이다. 앞의 改-는 개조 표기라 등급 판단에서 무시한다.
-const HIGH_TIER_ARMOR = /^(?:改-)?(?:이클립스|세크리드)\b/;
+// \b는 한글에서 경계로 잡히지 않으므로(\w가 ASCII 기준) 쓰지 않는다.
+const HIGH_TIER_ARMOR = /^(?:改-)?(?:이클립스|세크리드)\s/;
 // 밴드·방패는 강화작을 사실상 하지 않아 중간 단계를 빼둔다.
 const NO_ENCHANT_STEP_TYPES = ["밴드", "방패"];
 
@@ -3876,7 +3877,8 @@ function midEnchantStep(record) {
   if (record.category === "무기" || record.category === "손목") {
     return NO_ENCHANT_STEP_TYPES.includes(record.type) ? 0 : 28;
   }
-  if (record.category === "갑옷" && HIGH_TIER_ARMOR.test(record.name)) return 30;
+  // 갑옷과 장비 세트(헬름·아뮬렛·윙·부츠·건틀렛)는 이클립스 등급부터 +30을 넣는다.
+  if ((record.category === "갑옷" || record.category === "장비 세트") && HIGH_TIER_ARMOR.test(record.name)) return 30;
   return 0;
 }
 
