@@ -4462,3 +4462,108 @@ img.dmg-chk-icon {
     grid-template-columns: 1fr;
   }
 }
+
+/* ── 에타 레벨 누적 재료 계산 ── */
+.eta-calc {
+  margin-bottom: 18px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-strong);
+}
+
+.eta-calc-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.eta-calc-field {
+  display: grid;
+  gap: 4px;
+}
+
+.eta-calc-field > span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.eta-calc-field input {
+  width: 120px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.eta-calc-arrow {
+  padding-bottom: 9px;
+  color: var(--muted);
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.eta-calc-hint,
+.eta-calc-warn {
+  margin: 12px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.eta-calc-hint { color: var(--muted); }
+.eta-calc-warn { color: #b3413f; }
+
+.eta-calc-title {
+  margin: 14px 0 8px;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+/* 재료 수가 구간마다 달라서 칸 수를 고정하지 않고 폭에 맞춰 흐르게 둔다 */
+.eta-calc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 8px;
+}
+
+.eta-calc-cell {
+  display: grid;
+  gap: 2px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+/* 경험치·Seed·정수는 구간에 상관없이 항상 드는 것이라 눈에 띄게 둔다 */
+.eta-calc-cell.is-main {
+  border-color: #cfe3d6;
+  background: #f4f8f5;
+}
+
+.eta-calc-cell span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.eta-calc-cell strong {
+  font-size: 15px;
+  font-weight: 800;
+}
+
+@media (max-width: 560px) {
+  .eta-calc-field,
+  .eta-calc-field input {
+    width: 100%;
+  }
+
+  .eta-calc-arrow { display: none; }
+}

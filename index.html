@@ -6,7 +6,7 @@
     <title>TW DB</title>
     <!-- 이미지 CDN. 첫 이미지 요청 전에 DNS+TLS를 미리 끝내둔다 -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
-    <link rel="stylesheet" href="./assets/styles.css?v=20260820-monsters-json" />
+    <link rel="stylesheet" href="./assets/styles.css?v=20260820-eta-calc" />
   </head>
   <body>
     <main class="app-shell">
@@ -88,6 +88,21 @@
             <button id="etaInfoBackButton" class="back-list-button" type="button">← 에타 순위</button>
             <h2>에타 정보</h2>
           </div>
+
+          <section class="eta-calc" aria-label="에타 레벨 누적 재료 계산">
+            <div class="eta-calc-fields">
+              <label class="eta-calc-field">
+                <span>현재 에타 레벨</span>
+                <input id="etaCalcFrom" type="number" min="1" max="100" step="1" inputmode="numeric" placeholder="1" />
+              </label>
+              <span class="eta-calc-arrow" aria-hidden="true">→</span>
+              <label class="eta-calc-field">
+                <span>목표 에타 레벨</span>
+                <input id="etaCalcTo" type="number" min="1" max="100" step="1" inputmode="numeric" placeholder="100" />
+              </label>
+            </div>
+            <div id="etaCalcResult" class="eta-calc-result"></div>
+          </section>
 
           <h3>구간 별 필요 재료</h3>
           <div class="eta-info-table-wrap">
@@ -693,7 +708,7 @@
       </div>
     </template>
 
-    <script src="./assets/app.js?v=20260820-monsters-json" type="module"></script>
+    <script src="./assets/app.js?v=20260820-eta-calc" type="module"></script>
     <!-- GoatCounter 방문자 분석 (localhost 방문은 count.js가 기본으로 집계 제외) -->
     <script data-goatcounter="https://holedis88.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
   </body>

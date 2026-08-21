@@ -374,6 +374,9 @@ const els = {
   etaInfoButton: document.querySelector("#etaInfoButton"),
   etaInfoPanel: document.querySelector("#etaInfoPanel"),
   etaInfoBackButton: document.querySelector("#etaInfoBackButton"),
+  etaCalcFrom: document.querySelector("#etaCalcFrom"),
+  etaCalcTo: document.querySelector("#etaCalcTo"),
+  etaCalcResult: document.querySelector("#etaCalcResult"),
   etaSummaryTable: document.querySelector("#etaSummaryTable"),
   etaLevelTable: document.querySelector("#etaLevelTable"),
   etaMainSections: document.querySelectorAll("#etaView > .toolbar, #etaView > .result-band, #etaView > .eta-workspace"),
@@ -944,12 +947,97 @@ async function loadEtaInfo() {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     etaInfo.data = await response.json();
     renderEtaInfo();
+    renderEtaCalc();
   } catch (error) {
     console.warn("에타 정보 로딩 실패", error);
     els.etaSummaryTable.innerHTML = `<tr><td>에타 정보를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.</td></tr>`;
   } finally {
     etaInfo.loading = false;
   }
+}
+
+// ── 에타 레벨 누적 재료 계산 ──
+// levels의 lv N은 "N에서 N+1로 올릴 때" 드는 비용이다. 요약표 11개 구간과
+// 합산 결과가 정확히 일치하는 것을 확인했다. 그래서 현재→목표는 [현재, 목표) 합.
+
+// "950억" → 950, "1,900개" → 1900. 단위가 섞이지 않으므로 숫자만 뽑는다.
+function etaCalcNum(value) {
+  const m = String(value ?? "").trim().match(/^([\d,.]+)\s*(억|개)?$/);
+  return m ? Number(m[1].replace(/,/g, "")) || 0 : 0;
+}
+
+// "제네로 젬마 40개 + 레이티아의 시든 꽃 40개" → [["제네로 젬마",40], ...]
+function etaCalcSubs(value) {
+  return String(value ?? "")
+    .split("+")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => {
+      const m = part.match(/^(.*?)\s+([\d,]+)\s*개?$/);
+      return m ? [m[1].trim(), Number(m[2].replace(/,/g, "")) || 0] : null;
+    })
+    .filter(Boolean);
+}
+
+function etaCalcTotals(from, to) {
+  const levels = etaInfo.data?.levels || [];
+  const totals = { exp: 0, seed: 0, water: 0, subs: new Map() };
+  levels.forEach((row) => {
+    if (row.lv < from || row.lv >= to) return;
+    totals.exp += etaCalcNum(row.exp);
+    totals.seed += etaCalcNum(row.seed);
+    totals.water += etaCalcNum(row.water);
+    etaCalcSubs(row.sub).forEach(([name, count]) => {
+      totals.subs.set(name, (totals.subs.get(name) || 0) + count);
+    });
+  });
+  return totals;
+}
+
+const etaCalcFmt = (n) => n.toLocaleString("ko-KR");
+
+function renderEtaCalc() {
+  if (!els.etaCalcResult) return;
+  const levels = etaInfo.data?.levels || [];
+  if (!levels.length) return;
+
+  const max = levels[levels.length - 1].lv;
+  const raw = (el) => (el && el.value !== "" ? Number(el.value) : null);
+  const from = raw(els.etaCalcFrom);
+  const to = raw(els.etaCalcTo);
+
+  if (from === null || to === null) {
+    els.etaCalcResult.innerHTML = `<p class="eta-calc-hint">현재 레벨과 목표 레벨을 넣으면 필요한 재료를 합쳐서 보여줍니다. (1~${max})</p>`;
+    return;
+  }
+  if (!Number.isFinite(from) || !Number.isFinite(to) || from < 1 || to < 1 || from > max || to > max) {
+    els.etaCalcResult.innerHTML = `<p class="eta-calc-warn">레벨은 1~${max} 사이로 넣어 주세요.</p>`;
+    return;
+  }
+  if (to <= from) {
+    els.etaCalcResult.innerHTML = '<p class="eta-calc-warn">목표 레벨이 현재 레벨보다 높아야 합니다.</p>';
+    return;
+  }
+
+  const t = etaCalcTotals(from, to);
+  const main = [
+    ["필요 경험치", `${etaCalcFmt(t.exp)}억`],
+    ["필요 Seed", `${etaCalcFmt(t.seed)}억`],
+    ["경험의 정수", `${etaCalcFmt(t.water)}개`],
+  ];
+  const subs = [...t.subs.entries()].sort((a, b) => b[1] - a[1]);
+
+  els.etaCalcResult.innerHTML = `
+    <p class="eta-calc-title">${from} → ${to} 누적 재료</p>
+    <div class="eta-calc-grid">
+      ${main.map(([k, v]) => `<div class="eta-calc-cell is-main"><span>${escapeHtml(k)}</span><strong>${escapeHtml(v)}</strong></div>`).join("")}
+      ${subs.map(([k, v]) => `<div class="eta-calc-cell"><span>${escapeHtml(k)}</span><strong>${etaCalcFmt(v)}개</strong></div>`).join("")}
+    </div>
+  `;
+}
+
+function wireEtaCalc() {
+  [els.etaCalcFrom, els.etaCalcTo].forEach((el) => el?.addEventListener("input", renderEtaCalc));
 }
 
 function renderEtaInfo() {
@@ -3453,6 +3541,7 @@ function wireEvents() {
 
   els.etaInfoButton?.addEventListener("click", () => showEtaInfoPanel(true));
   els.etaInfoBackButton?.addEventListener("click", () => showEtaInfoPanel(false));
+  wireEtaCalc();
 
   els.etaCompareSelect?.addEventListener("change", () => {
     eta.compareDays = Number(els.etaCompareSelect.value) || 1;
