@@ -3866,9 +3866,50 @@ function formatCoefficient(value) {
   return Number(value.toFixed(2)).toLocaleString("ko-KR");
 }
 
-// 착용 조건에 적힌 캐릭터가 실제로 쓰는 계열만 남긴다.
+// 아티팩트 분류 표기가 시트와 슬롯표에서 조금씩 달라서 맞춰준다.
+// 예) "마법 베기" -> "마법베기", "마법방어(신성)" -> "신성"
+function normalizeArtifactType(value) {
+  const text = String(value || "").replace(/\s+/g, "");
+  return text.includes("신성") ? "신성" : text;
+}
+
+// 아티팩트는 분류 자체가 계열이다. 착용 조건이 없어도 계열이 하나로 정해진다.
+const ARTIFACT_TYPE_TO_CALC = {
+  찌르기: CALC.STAB,
+  베기: CALC.HACK,
+  마법공격: CALC.MAGIC_ATTACK,
+  신성: CALC.MAGIC_DEFENSE,
+  물리복합: CALC.PHYSICAL_HYBRID,
+  마법베기: CALC.MAGIC_HACK,
+};
+
+// 이 장비의 분류(해머 / 리스트 / 아머 ...)가 해당 캐릭터·계열 조합에서 쓰이는지 본다.
+// 슬롯표에 없는 카테고리(장비 세트 등)는 분류로 좁히지 않는다.
+function slotMatchesRecord(slot, record) {
+  if (!slot) return false;
+  switch (record.category) {
+    case "무기":
+      return slot.weapon === record.type;
+    case "손목":
+      return (slot.wrist || []).includes(record.type);
+    case "갑옷":
+      return (slot.armor || []).includes(record.type);
+    case "아티팩트":
+      return normalizeArtifactType(slot.artifact) === normalizeArtifactType(record.type);
+    default:
+      return true;
+  }
+}
+
+// 착용 조건에 적힌 캐릭터가 이 장비로 실제로 탈 수 있는 계열만 남긴다.
+// 예를 들어 벤야는 베기·마법방어를 쓰지만 해머는 마법방어 전용이라 마법방어만 남는다.
 // 조건이 비어 있으면(공통 방어구) 어느 캐릭터가 입을지 모르므로 전체 계열을 준다.
 function availableCoefTypes(record) {
+  if (record.category === "아티팩트") {
+    const type = ARTIFACT_TYPE_TO_CALC[normalizeArtifactType(record.type)];
+    if (type) return [type];
+  }
+
   const names = String(record.condition || "")
     .split(",")
     .map((name) => name.trim())
@@ -3876,8 +3917,17 @@ function availableCoefTypes(record) {
 
   if (!names.length) return Object.values(CALC);
 
-  const usable = new Set();
-  names.forEach((name) => CHARACTER_CALC_TYPES[name].forEach((type) => usable.add(type)));
+  const byCharacter = new Set();
+  const bySlot = new Set();
+  names.forEach((name) => {
+    CHARACTER_CALC_TYPES[name].forEach((type) => {
+      byCharacter.add(type);
+      if (slotMatchesRecord(CHARACTER_TYPE_SLOT_MAP[`${name}|${type}`], record)) bySlot.add(type);
+    });
+  });
+
+  // 슬롯표에 없는 장비까지 빈 목록이 되지 않도록, 좁혀서 남는 게 없으면 캐릭터 기준으로 되돌린다.
+  const usable = bySlot.size ? bySlot : byCharacter;
   return Object.values(CALC).filter((type) => usable.has(type));
 }
 
