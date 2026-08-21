@@ -113,14 +113,14 @@ const CHARACTER_CALC_TYPES = {
 // 캐릭터·타입별 장비 후보 필터 (CharacterTypeSlotMap)
 // key: "캐릭터|타입", value: { weapon, wrist[], armor[], artifact }
 const CHARACTER_TYPE_SLOT_MAP = {
-  "나야트레이|STAB": { weapon: "단검", wrist: ["리스트"], armor: ["아머", "슈츠"], artifact: "찌르기" },
-  "나야트레이|PHYSICAL_HYBRID": { weapon: "단도", wrist: ["리스트"], armor: ["아머", "슈츠"], artifact: "물리복합" },
-  "나야트레이|HACK": { weapon: "도끼", wrist: ["리스트"], armor: ["아머", "슈츠"], artifact: "베기" },
-  "루시안|STAB": { weapon: "세검", wrist: ["리스트"], armor: ["메일", "아머"], artifact: "찌르기" },
-  "루시안|PHYSICAL_HYBRID": { weapon: "장검", wrist: ["리스트"], armor: ["메일", "아머"], artifact: "물리복합" },
-  "루시안|HACK": { weapon: "평도", wrist: ["리스트"], armor: ["메일", "아머"], artifact: "베기" },
-  "이자크|STAB": { weapon: "클로", wrist: ["리스트"], armor: ["메일", "아머", "슈츠"], artifact: "찌르기" },
-  "이자크|HACK": { weapon: "카라", wrist: ["리스트"], armor: ["메일", "아머", "슈츠"], artifact: "베기" },
+  "나야트레이|STAB": { weapon: "단검", wrist: ["리스트", "밴드"], armor: ["아머", "슈츠"], artifact: "찌르기" },
+  "나야트레이|PHYSICAL_HYBRID": { weapon: "단도", wrist: ["리스트", "밴드"], armor: ["아머", "슈츠"], artifact: "물리복합" },
+  "나야트레이|HACK": { weapon: "도끼", wrist: ["리스트", "밴드"], armor: ["아머", "슈츠"], artifact: "베기" },
+  "루시안|STAB": { weapon: "세검", wrist: ["리스트", "방패"], armor: ["메일", "아머"], artifact: "찌르기" },
+  "루시안|PHYSICAL_HYBRID": { weapon: "장검", wrist: ["리스트", "방패"], armor: ["메일", "아머"], artifact: "물리복합" },
+  "루시안|HACK": { weapon: "평도", wrist: ["리스트", "방패"], armor: ["메일", "아머"], artifact: "베기" },
+  "이자크|STAB": { weapon: "클로", wrist: ["리스트", "밴드"], armor: ["메일", "아머", "슈츠"], artifact: "찌르기" },
+  "이자크|HACK": { weapon: "카라", wrist: ["리스트", "밴드"], armor: ["메일", "아머", "슈츠"], artifact: "베기" },
   "막시민|MAGIC_HACK": { weapon: "대검", wrist: ["리스트"], armor: ["마법갑옷", "메일", "아머"], artifact: "마법베기" },
   "막시민|PHYSICAL_HYBRID": { weapon: "태도", wrist: ["리스트"], armor: ["마법갑옷", "메일", "아머"], artifact: "물리복합" },
   "막시민|HACK": { weapon: "평도", wrist: ["리스트"], armor: ["마법갑옷", "메일", "아머"], artifact: "베기" },
@@ -138,11 +138,11 @@ const CHARACTER_TYPE_SLOT_MAP = {
   "벤야|HACK": { weapon: "사이드", wrist: ["리스트"], armor: ["메일", "아머", "슈츠"], artifact: "베기" },
   "벤야|MAGIC_DEFENSE": { weapon: "해머", wrist: ["수정구"], armor: ["메일", "아머", "슈츠"], artifact: "신성" },
   "리체|HACK": { weapon: "아밍소드", wrist: ["리스트"], armor: ["메일", "아머"], artifact: "베기" },
-  "밀라|HACK": { weapon: "채찍", wrist: ["리스트"], armor: ["아머", "슈츠"], artifact: "베기" },
-  "밀라|PHYSICAL_HYBRID": { weapon: "플레일", wrist: ["리스트"], armor: ["아머", "슈츠"], artifact: "물리복합" },
-  "이스핀|STAB": { weapon: "세검", wrist: ["리스트"], armor: ["메일", "아머"], artifact: "찌르기" },
-  "이스핀|PHYSICAL_HYBRID": { weapon: "장검", wrist: ["리스트"], armor: ["메일", "아머"], artifact: "물리복합" },
-  "이스핀|HACK": { weapon: "평도", wrist: ["리스트"], armor: ["메일", "아머"], artifact: "베기" },
+  "밀라|HACK": { weapon: "채찍", wrist: ["리스트", "밴드"], armor: ["아머", "슈츠"], artifact: "베기" },
+  "밀라|PHYSICAL_HYBRID": { weapon: "플레일", wrist: ["리스트", "밴드"], armor: ["아머", "슈츠"], artifact: "물리복합" },
+  "이스핀|STAB": { weapon: "세검", wrist: ["리스트", "방패"], armor: ["메일", "아머"], artifact: "찌르기" },
+  "이스핀|PHYSICAL_HYBRID": { weapon: "장검", wrist: ["리스트", "방패"], armor: ["메일", "아머"], artifact: "물리복합" },
+  "이스핀|HACK": { weapon: "평도", wrist: ["리스트", "방패"], armor: ["메일", "아머"], artifact: "베기" },
   "녹턴|STAB": { weapon: "핸드런처", wrist: ["리스트"], armor: ["아머", "마법갑옷"], artifact: "찌르기" },
   "조슈아|STAB": { weapon: "스몰소드", wrist: ["리스트"], armor: ["아머", "마법갑옷"], artifact: "찌르기" },
   "조슈아|MAGIC_ATTACK": { weapon: "완드", wrist: ["스펠북"], armor: ["아머", "마법갑옷"], artifact: "마법공격" },
@@ -4037,6 +4037,7 @@ function renderCard() {
   els.equipmentCard.querySelector("#coefTypeSelect")?.addEventListener("change", (event) => {
     state.coefType = event.target.value;
     renderCard();
+    renderCompare(); // 비교 패널의 계수 차이도 같은 계열을 따라가야 한다
   });
   els.equipmentCard.querySelectorAll(".material-icon").forEach((image) => {
     image.addEventListener("error", handleMaterialImageError);
@@ -4106,9 +4107,33 @@ function renderCompare() {
     `;
   }).join("");
 
+  // 계수 차이는 상세 카드에서 보고 있는 계열과 같은 기준으로 낸다.
+  // 비교 목록은 같은 분류끼리만 뜨므로 두 장비의 선택 가능한 계열도 같다.
+  const coefTypes = availableCoefTypes(record);
+  const coefType = coefTypes.includes(state.coefType) ? state.coefType : coefTypes[0];
+  const coefDiffRow = (label, withLimit) => {
+    const diff = equipmentCoefficient(record, coefType, withLimit) - equipmentCoefficient(compare, coefType, withLimit);
+    const rounded = Number(diff.toFixed(2));
+    const diffClass = rounded > 0 ? "positive" : rounded < 0 ? "negative" : "neutral";
+    const text = rounded > 0 ? `+${formatCoefficient(diff)}` : formatCoefficient(diff);
+    return `
+      <div class="diff-row">
+        <span>${label}</span>
+        <strong class="${diffClass}">${text}</strong>
+      </div>
+    `;
+  };
+
   els.compareSummary.innerHTML = `
     <p class="compare-name">${escapeHtml(compare.name)} 대비${state.limitCompare ? " · LIMIT" : ""}</p>
     <div class="diff-grid">${diffs}</div>
+    <div class="compare-coef">
+      <p class="compare-coef-head">계수 차이 · ${escapeHtml(CALC_TYPE_DISPLAY[coefType])}</p>
+      <div class="diff-grid">
+        ${coefDiffRow("MAX", false)}
+        ${coefDiffRow("MAX + 주스탯 한계", true)}
+      </div>
+    </div>
   `;
 }
 
