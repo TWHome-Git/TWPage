@@ -377,6 +377,7 @@ const els = {
   etaCalcFrom: document.querySelector("#etaCalcFrom"),
   etaCalcTo: document.querySelector("#etaCalcTo"),
   etaCalcResult: document.querySelector("#etaCalcResult"),
+  etaCalcSourceList: document.querySelector("#etaCalcSourceList"),
   etaSummaryTable: document.querySelector("#etaSummaryTable"),
   etaLevelTable: document.querySelector("#etaLevelTable"),
   etaMainSections: document.querySelectorAll("#etaView > .toolbar, #etaView > .result-band, #etaView > .eta-workspace"),
@@ -956,6 +957,110 @@ async function loadEtaInfo() {
   }
 }
 
+// 재료 표시 순서. 합계 크기가 아니라 이 순서로 고정한다
+const ETA_SUB_ORDER = [
+  "루이나 라피스",
+  "루이나 젬마",
+  "제네로 젬마",
+  "에오니스 라피스",
+  "레이티아의 시든 꽃",
+  "설계자의 반지",
+];
+
+// 획득처별 하루 획득량. 여기 없는 재료(에오니스 라피스 등)는 정해진 획득처가
+// 없어 일수를 낼 수 없고, 계산에서 빼고 따로 알려준다.
+const ETA_SOURCES = [
+  { key: "will", name: "에타의 의지", daily: { "루이나 라피스": 10, "루이나 젬마": 2, "제네로 젬마": 2 } },
+  { key: "box", name: "에타의 의지 레벨업 상자", daily: { "루이나 라피스": 10, "루이나 젬마": 2, "제네로 젬마": 2 } },
+  { key: "golgoda", name: "골고다의 협곡", daily: { "루이나 젬마": 2, "제네로 젬마": 2 } },
+  { key: "quest", name: "의뢰서", daily: { "루이나 라피스": 10, "루이나 젬마": 2, "제네로 젬마": 2 } },
+  { key: "questTp", name: "의뢰서 TP 교환", daily: { "루이나 라피스": 10, "루이나 젬마": 2, "제네로 젬마": 2 } },
+];
+
+const etaCalcChecked = new Set();
+
+// 표시 순서에 없는 이름은 뒤로 보낸다. 데이터에 새 재료가 생겨도 사라지지 않게
+function etaSubRank(name) {
+  const i = ETA_SUB_ORDER.indexOf(name);
+  return i < 0 ? ETA_SUB_ORDER.length : i;
+}
+
+function renderEtaCalcSources() {
+  if (!els.etaCalcSourceList) return;
+  els.etaCalcSourceList.innerHTML = ETA_SOURCES.map((s) => `
+    <label class="eta-calc-source">
+      <input type="checkbox" data-eta-source="${s.key}"${etaCalcChecked.has(s.key) ? " checked" : ""} />
+      <span>${escapeHtml(s.name)}</span>
+    </label>
+  `).join("");
+}
+
+// 체크한 획득처를 합친 하루 획득량
+function etaDailyTotals() {
+  const daily = new Map();
+  ETA_SOURCES.forEach((s) => {
+    if (!etaCalcChecked.has(s.key)) return;
+    Object.entries(s.daily).forEach(([name, n]) => daily.set(name, (daily.get(name) || 0) + n));
+  });
+  return daily;
+}
+
+// 필요량을 하루 획득량으로 나눠 재료별 소요 일수를 낸다.
+//
+// 재료는 레벨 순서대로 쓰인다(라피스 5~20 → 젬마 21~40 → 제네로 41~99).
+// 앞 재료를 다 모아야 다음 레벨로 넘어가므로 겹치지 않는 구간은 일수를 더한다.
+// 반대로 구간이 겹치는 재료(제네로 41~99와 시든 꽃 81~99)는 같이 모이므로
+// 더하지 않고 더 오래 걸리는 쪽을 쓴다.
+function etaCalcDaysHtml(subs, spans) {
+  if (!etaCalcChecked.size) {
+    return '<p class="eta-calc-hint">획득처를 선택하면 며칠이 걸리는지 함께 보여줍니다.</p>';
+  }
+  const daily = etaDailyTotals();
+  const rows = [];
+  const unknown = [];
+  subs.forEach(([name, need]) => {
+    const per = daily.get(name) || 0;
+    const span = spans.get(name) || { first: 0, last: 0 };
+    if (per > 0) rows.push({ name, need, per, days: Math.ceil(need / per), ...span });
+    else unknown.push(name);
+  });
+
+  if (!rows.length) {
+    return `<p class="eta-calc-hint">이 구간에 필요한 재료는 선택한 획득처에서 나오지 않습니다${unknown.length ? ` (${escapeHtml(unknown.join(", "))})` : ""}.</p>`;
+  }
+
+  // 레벨 순으로 늘어놓고, 구간이 겹치는 것끼리 묶는다
+  const groups = [];
+  rows.slice().sort((a, b) => a.first - b.first || a.last - b.last).forEach((r) => {
+    const g = groups[groups.length - 1];
+    if (g && r.first <= g.last) {
+      g.items.push(r);
+      g.last = Math.max(g.last, r.last);
+      g.days = Math.max(g.days, r.days);
+    } else {
+      groups.push({ items: [r], first: r.first, last: r.last, days: r.days });
+    }
+  });
+
+  const total = groups.reduce((sum, g) => sum + g.days, 0);
+  const parallel = groups.some((g) => g.items.length > 1);
+
+  return `
+    <p class="eta-calc-title">예상 소요 <strong class="eta-calc-days">${etaCalcFmt(total)}일</strong></p>
+    <ul class="eta-calc-days-list">
+      ${groups.map((g) => g.items.map((r, i) => `
+        <li${g.items.length > 1 ? " class=\"is-parallel\"" : ""}>
+          <span>${escapeHtml(r.name)}</span>
+          <em>Lv ${r.first}~${r.last} · ${etaCalcFmt(r.need)}개 ÷ 하루 ${etaCalcFmt(r.per)}개</em>
+          <strong>${etaCalcFmt(r.days)}일${g.items.length > 1 && r.days !== g.days ? '<b class="eta-calc-hidden">(동시)</b>' : ""}</strong>
+        </li>
+      `).join("")).join("")}
+    </ul>
+    ${parallel ? '<p class="eta-calc-hint">레벨 구간이 겹치는 재료는 같이 모이므로 더하지 않고 더 오래 걸리는 쪽만 셉니다.</p>' : ""}
+    ${unknown.length ? `<p class="eta-calc-hint">${escapeHtml(unknown.join(", "))}는 획득처가 등록되지 않아 일수에서 빠졌습니다.</p>` : ""}
+  `;
+}
+
 // ── 에타 레벨 누적 재료 계산 ──
 // levels의 lv N은 "N에서 N+1로 올릴 때" 드는 비용이다. 요약표 11개 구간과
 // 합산 결과가 정확히 일치하는 것을 확인했다. 그래서 현재→목표는 [현재, 목표) 합.
@@ -981,7 +1086,8 @@ function etaCalcSubs(value) {
 
 function etaCalcTotals(from, to) {
   const levels = etaInfo.data?.levels || [];
-  const totals = { exp: 0, seed: 0, water: 0, subs: new Map() };
+  // spans: 재료가 필요한 레벨 범위. 구간이 겹치면 동시에 모이므로 일수를 더하면 안 된다
+  const totals = { exp: 0, seed: 0, water: 0, subs: new Map(), spans: new Map() };
   levels.forEach((row) => {
     if (row.lv < from || row.lv >= to) return;
     totals.exp += etaCalcNum(row.exp);
@@ -989,6 +1095,9 @@ function etaCalcTotals(from, to) {
     totals.water += etaCalcNum(row.water);
     etaCalcSubs(row.sub).forEach(([name, count]) => {
       totals.subs.set(name, (totals.subs.get(name) || 0) + count);
+      const span = totals.spans.get(name);
+      if (span) span.last = row.lv;
+      else totals.spans.set(name, { first: row.lv, last: row.lv });
     });
   });
   return totals;
@@ -1025,19 +1134,31 @@ function renderEtaCalc() {
     ["필요 Seed", `${etaCalcFmt(t.seed)}억`],
     ["경험의 정수", `${etaCalcFmt(t.water)}개`],
   ];
-  const subs = [...t.subs.entries()].sort((a, b) => b[1] - a[1]);
+  const subs = [...t.subs.entries()].sort((a, b) => etaSubRank(a[0]) - etaSubRank(b[0]));
 
+  // 항상 드는 것(경험치·Seed·정수)과 구간마다 달라지는 부재료를 줄로 나눈다
   els.etaCalcResult.innerHTML = `
     <p class="eta-calc-title">${from} → ${to} 누적 재료</p>
-    <div class="eta-calc-grid">
+    <div class="eta-calc-grid is-main-row">
       ${main.map(([k, v]) => `<div class="eta-calc-cell is-main"><span>${escapeHtml(k)}</span><strong>${escapeHtml(v)}</strong></div>`).join("")}
-      ${subs.map(([k, v]) => `<div class="eta-calc-cell"><span>${escapeHtml(k)}</span><strong>${etaCalcFmt(v)}개</strong></div>`).join("")}
     </div>
+    ${subs.length ? `<div class="eta-calc-grid is-sub-row">
+      ${subs.map(([k, v]) => `<div class="eta-calc-cell"><span>${escapeHtml(k)}</span><strong>${etaCalcFmt(v)}개</strong></div>`).join("")}
+    </div>` : ""}
+    ${subs.length ? `<div class="eta-calc-days-box">${etaCalcDaysHtml(subs, t.spans)}</div>` : ""}
   `;
 }
 
 function wireEtaCalc() {
   [els.etaCalcFrom, els.etaCalcTo].forEach((el) => el?.addEventListener("input", renderEtaCalc));
+  renderEtaCalcSources();
+  els.etaCalcSourceList?.addEventListener("change", (event) => {
+    const box = event.target.closest("[data-eta-source]");
+    if (!box) return;
+    if (box.checked) etaCalcChecked.add(box.dataset.etaSource);
+    else etaCalcChecked.delete(box.dataset.etaSource);
+    renderEtaCalc();
+  });
 }
 
 function renderEtaInfo() {

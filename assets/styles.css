@@ -4525,11 +4525,20 @@ img.dmg-chk-icon {
   font-weight: 800;
 }
 
-/* 재료 수가 구간마다 달라서 칸 수를 고정하지 않고 폭에 맞춰 흐르게 둔다 */
 .eta-calc-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
   gap: 8px;
+}
+
+/* 경험치·Seed·정수는 항상 셋이라 한 줄에 고정한다 */
+.eta-calc-grid.is-main-row {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/* 부재료는 구간마다 종류가 달라서(1~6종) 칸 수를 고정하지 않고 폭에 맞춰 흐르게 둔다 */
+.eta-calc-grid.is-sub-row {
+  margin-top: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
 }
 
 .eta-calc-cell {
@@ -4566,4 +4575,116 @@ img.dmg-chk-icon {
   }
 
   .eta-calc-arrow { display: none; }
+}
+
+/* 획득처 체크박스 — 레벨 입력 오른쪽에 붙는다 */
+.eta-calc-sources {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  margin-left: 8px;
+  padding-left: 16px;
+  border-left: 1px solid var(--line);
+}
+
+.eta-calc-sources-label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.eta-calc-source-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+}
+
+.eta-calc-source {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.eta-calc-source input {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 15px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.eta-calc-days-box {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.eta-calc-days {
+  color: var(--accent-strong, #2e8b57);
+  font-size: 16px;
+}
+
+.eta-calc-days-list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* 재료마다 동시에 모으므로 전체 소요는 가장 오래 걸리는 재료가 정한다.
+   그 재료를 굵게 표시해 어디가 발목을 잡는지 바로 보이게 한다 */
+.eta-calc-days-list li {
+  display: grid;
+  grid-template-columns: minmax(120px, auto) 1fr auto;
+  gap: 10px;
+  align-items: baseline;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 13px;
+}
+
+/* 구간이 겹쳐 같이 모이는 재료는 묶여 보이게 한다 */
+.eta-calc-days-list li.is-parallel {
+  background: #f4f8f5;
+}
+
+.eta-calc-hidden {
+  margin-left: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.eta-calc-days-list span { font-weight: 700; }
+
+.eta-calc-days-list em {
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 600;
+}
+
+.eta-calc-days-list strong { font-weight: 800; }
+
+@media (max-width: 720px) {
+  .eta-calc-sources {
+    flex-basis: 100%;
+    margin-left: 0;
+    padding-left: 0;
+    padding-top: 12px;
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .eta-calc-days-list li {
+    grid-template-columns: 1fr auto;
+  }
+
+  .eta-calc-days-list em { grid-column: 1 / -1; }
 }
