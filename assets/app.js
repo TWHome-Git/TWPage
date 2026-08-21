@@ -284,6 +284,7 @@ const state = {
   query: "",
   compareId: "",
   limitCompare: false,
+  coefType: CALC.STAB, // 장비 상세에 표시할 계수의 계열
   source: "loading",
 };
 
@@ -3839,6 +3840,89 @@ function listStatCellHtml(stat) {
   return `<td class="equip-stat"><span class="range">${range}</span>${limit}</td>`;
 }
 
+// 일반 장비 계수 가중치. recalcRow()의 마지막 분기(일반 장비)와 같은 값이다.
+// [주스탯, 주스탯강화, 부스탯, 부스탯강화]
+const COEF_WEIGHTS = {
+  [CALC.STAB]: [23.75, 32.5, 3.75, 18.75],
+  [CALC.HACK]: [23.75, 32.5, 3.75, 18.75],
+  [CALC.MAGIC_ATTACK]: [23.75, 32.5, 2.5, 18.25],
+  [CALC.MAGIC_DEFENSE]: [20.5, 32.5, 2.5, 16.75],
+  [CALC.PHYSICAL_HYBRID]: [14.5, 28.75, 14.5, 28.75],
+  [CALC.MAGIC_HACK]: [14.5, 28.75, 14.5, 28.75],
+};
+
+// 장비 한 개의 계수.
+// withPrimaryLimit=true면 주스탯을 한계치(LIMIT)까지 강화한 상태로 계산한다.
+function equipmentCoefficient(record, type, withPrimaryLimit) {
+  const w = COEF_WEIGHTS[type];
+  if (!w) return 0;
+  const { pMax, sMax, pLimit } = statByType(record, type);
+  const primaryEnchant = withPrimaryLimit ? Math.max(0, pLimit - pMax) : 0;
+  return w[0] * pMax + w[1] * primaryEnchant + w[2] * sMax;
+}
+
+// 소수점이 남을 수 있어 최대 두 자리까지만 보여준다.
+function formatCoefficient(value) {
+  return Number(value.toFixed(2)).toLocaleString("ko-KR");
+}
+
+// 착용 조건에 적힌 캐릭터가 실제로 쓰는 계열만 남긴다.
+// 조건이 비어 있으면(공통 방어구) 어느 캐릭터가 입을지 모르므로 전체 계열을 준다.
+function availableCoefTypes(record) {
+  const names = String(record.condition || "")
+    .split(",")
+    .map((name) => name.trim())
+    .filter((name) => CHARACTER_CALC_TYPES[name]);
+
+  if (!names.length) return Object.values(CALC);
+
+  const usable = new Set();
+  names.forEach((name) => CHARACTER_CALC_TYPES[name].forEach((type) => usable.add(type)));
+  return Object.values(CALC).filter((type) => usable.has(type));
+}
+
+function coefficientBlockHtml(record) {
+  const types = availableCoefTypes(record);
+  // 고른 계열을 이 장비가 못 쓰면 첫 계열로 보여주되, state는 건드리지 않는다.
+  // (쓸 수 있는 장비로 돌아왔을 때 선택이 유지되도록)
+  const type = types.includes(state.coefType) ? state.coefType : types[0];
+
+  const picker = types.length > 1
+    ? `<label class="coef-type-field">
+          <span class="sr-only">계열</span>
+          <select id="coefTypeSelect" aria-label="계수 계열">${types
+            .map((key) => `<option value="${key}"${key === type ? " selected" : ""}>${escapeHtml(CALC_TYPE_DISPLAY[key])}</option>`)
+            .join("")}</select>
+        </label>`
+    : `<span class="coef-type-fixed">${escapeHtml(CALC_TYPE_DISPLAY[type])}</span>`;
+
+  const { pMax, sMax, pLimit } = statByType(record, type);
+  const primaryEnchant = Math.max(0, pLimit - pMax);
+  const base = equipmentCoefficient(record, type, false);
+  const full = equipmentCoefficient(record, type, true);
+
+  return `
+    <div class="coef-block">
+      <div class="coef-head">
+        <span>계수</span>
+        ${picker}
+      </div>
+      <div class="coef-grid">
+        <div class="coef-item">
+          <span class="coef-label">MAX</span>
+          <strong class="coef-value">${formatCoefficient(base)}</strong>
+          <span class="coef-note">주 ${formatNumber(pMax)} · 부 ${formatNumber(sMax)}</span>
+        </div>
+        <div class="coef-item">
+          <span class="coef-label">MAX + 주스탯 한계</span>
+          <strong class="coef-value is-limit">${formatCoefficient(full)}</strong>
+          <span class="coef-note">주 강화 +${formatNumber(primaryEnchant)}</span>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 function renderCard() {
   const record = currentRecord();
   if (!record) {
@@ -3887,6 +3971,8 @@ function renderCard() {
       <tbody>${statRows}</tbody>
     </table>
 
+    ${coefficientBlockHtml(record)}
+
     <div class="materials">
       <span>재료</span>
       <div>
@@ -3897,6 +3983,10 @@ function renderCard() {
 
   els.equipmentCard.querySelector(".item-image img")?.addEventListener("error", (event) => {
     event.currentTarget.hidden = true;
+  });
+  els.equipmentCard.querySelector("#coefTypeSelect")?.addEventListener("change", (event) => {
+    state.coefType = event.target.value;
+    renderCard();
   });
   els.equipmentCard.querySelectorAll(".material-icon").forEach((image) => {
     image.addEventListener("error", handleMaterialImageError);
