@@ -371,16 +371,14 @@ const els = {
   etaCount: document.querySelector("#etaCount"),
   etaUpdatedDate: document.querySelector("#etaUpdatedDate"),
   etaCompareSelect: document.querySelector("#etaCompareSelect"),
-  etaInfoButton: document.querySelector("#etaInfoButton"),
-  etaInfoPanel: document.querySelector("#etaInfoPanel"),
-  etaInfoBackButton: document.querySelector("#etaInfoBackButton"),
+  etaTabButtons: document.querySelectorAll("[data-eta-tab]"),
+  etaPanels: document.querySelectorAll("[data-eta-panel]"),
   etaCalcFrom: document.querySelector("#etaCalcFrom"),
   etaCalcTo: document.querySelector("#etaCalcTo"),
   etaCalcResult: document.querySelector("#etaCalcResult"),
   etaCalcSourceList: document.querySelector("#etaCalcSourceList"),
   etaSummaryTable: document.querySelector("#etaSummaryTable"),
   etaLevelTable: document.querySelector("#etaLevelTable"),
-  etaMainSections: document.querySelectorAll("#etaView > .toolbar, #etaView > .result-band, #etaView > .eta-workspace"),
   etaServerTabs: document.querySelector("#etaServerTabs"),
   etaSidebar: document.querySelector("#etaSidebar"),
   etaCharacterList: document.querySelector("#etaCharacterList"),
@@ -933,12 +931,16 @@ function etaPrevRankMap() {
 const ETA_INFO_URL = "./assets/eta_info.json";
 const etaInfo = { data: null, loading: false };
 
-function showEtaInfoPanel(show) {
-  els.etaInfoPanel.hidden = !show;
-  els.etaMainSections.forEach((section) => {
-    section.hidden = show;
+// DB 탭과 같은 방식. 정보/계산기 둘 다 같은 eta_info.json을 쓰므로
+// 어느 쪽을 처음 열든 그때 한 번만 받아 온다.
+function activateEtaTab(key) {
+  els.etaTabButtons.forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.etaTab === key);
   });
-  if (show && !etaInfo.data && !etaInfo.loading) loadEtaInfo();
+  els.etaPanels.forEach((panel) => {
+    panel.hidden = panel.dataset.etaPanel !== key;
+  });
+  if (key !== "ranking" && !etaInfo.data && !etaInfo.loading) loadEtaInfo();
 }
 
 async function loadEtaInfo() {
@@ -3660,8 +3662,9 @@ function wireEvents() {
     loadEtaRankings(sha ? etaSnapshotUrl(sha) : ETA_RANKING_URL);
   });
 
-  els.etaInfoButton?.addEventListener("click", () => showEtaInfoPanel(true));
-  els.etaInfoBackButton?.addEventListener("click", () => showEtaInfoPanel(false));
+  els.etaTabButtons.forEach((button) => {
+    button.addEventListener("click", () => activateEtaTab(button.dataset.etaTab));
+  });
   wireEtaCalc();
 
   els.etaCompareSelect?.addEventListener("change", () => {

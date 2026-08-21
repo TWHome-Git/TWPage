@@ -6,13 +6,13 @@
     <title>TW DB</title>
     <!-- 이미지 CDN. 첫 이미지 요청 전에 DNS+TLS를 미리 끝내둔다 -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
-    <link rel="stylesheet" href="./assets/styles.css?v=20260820-overlay-ko" />
+    <link rel="stylesheet" href="./assets/styles.css?v=20260820-eta-tabs" />
   </head>
   <body>
     <main class="app-shell">
       <nav class="top-tabs" aria-label="상단 메뉴">
         <button class="tab-button is-active" type="button" data-main-tab="extra" aria-controls="extraView" aria-current="page">테일즈 정보</button>
-        <button class="tab-button" type="button" data-main-tab="eta" aria-controls="etaView">에타 순위</button>
+        <button class="tab-button" type="button" data-main-tab="eta" aria-controls="etaView">에타</button>
         <button class="tab-button" type="button" data-main-tab="equipment" aria-controls="equipmentView">DB 검색</button>
         <button class="tab-button" type="button" data-main-tab="calculator" aria-controls="calculatorView">계산기</button>
         <button class="tab-button" type="button" data-main-tab="simulator" aria-controls="simulatorView">시뮬레이터</button>
@@ -21,10 +21,17 @@
       </nav>
 
       <section id="etaView" class="main-panel" data-main-panel="eta" hidden>
+        <nav class="db-subtabs" aria-label="에타 메뉴">
+          <button class="db-subtab is-active" type="button" data-eta-tab="ranking">에타 순위</button>
+          <button class="db-subtab" type="button" data-eta-tab="info">에타 정보</button>
+          <button class="db-subtab" type="button" data-eta-tab="calc">에타 계산기</button>
+        </nav>
+
+        <div data-eta-panel="ranking">
         <section class="toolbar" aria-label="에타 순위 검색 조건">
           <div class="brand-block">
             <p class="eyebrow">TW DB</p>
-            <h1>에타 순위 <button id="etaInfoButton" class="eta-help-button" type="button" title="에타 정보" aria-label="에타 정보">?</button></h1>
+            <h1>에타 순위</h1>
           </div>
 
           <div class="control-grid eta-control-grid">
@@ -82,11 +89,12 @@
             </table>
           </div>
         </section>
+        </div>
 
-        <section id="etaInfoPanel" class="workspace eta-info" hidden>
+        <div data-eta-panel="calc" hidden>
+        <section class="workspace eta-info">
           <div class="eta-info-head">
-            <button id="etaInfoBackButton" class="back-list-button" type="button">← 에타 순위</button>
-            <h2>에타 정보</h2>
+            <h2>에타 계산기</h2>
           </div>
 
           <section class="eta-calc" aria-label="에타 레벨 누적 재료 계산">
@@ -107,6 +115,14 @@
             </div>
             <div id="etaCalcResult" class="eta-calc-result"></div>
           </section>
+        </section>
+        </div>
+
+        <div data-eta-panel="info" hidden>
+        <section class="workspace eta-info">
+          <div class="eta-info-head">
+            <h2>에타 정보</h2>
+          </div>
 
           <h3>구간 별 필요 재료</h3>
           <div class="eta-info-table-wrap">
@@ -118,6 +134,7 @@
             <table id="etaLevelTable" class="eta-info-table" aria-label="단계별 필요 재료"></table>
           </div>
         </section>
+        </div>
       </section>
 
       <section id="equipmentView" class="main-panel" data-main-panel="equipment" hidden>
@@ -712,7 +729,7 @@
       </div>
     </template>
 
-    <script src="./assets/app.js?v=20260820-overlay-ko" type="module"></script>
+    <script src="./assets/app.js?v=20260820-eta-tabs" type="module"></script>
     <!-- GoatCounter 방문자 분석 (localhost 방문은 count.js가 기본으로 집계 제외) -->
     <script data-goatcounter="https://holedis88.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
   </body>
