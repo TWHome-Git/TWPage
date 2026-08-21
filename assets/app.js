@@ -4111,27 +4111,21 @@ function renderCompare() {
   // 비교 목록은 같은 분류끼리만 뜨므로 두 장비의 선택 가능한 계열도 같다.
   const coefTypes = availableCoefTypes(record);
   const coefType = coefTypes.includes(state.coefType) ? state.coefType : coefTypes[0];
-  const coefDiffRow = (label, withLimit) => {
-    const diff = equipmentCoefficient(record, coefType, withLimit) - equipmentCoefficient(compare, coefType, withLimit);
-    const rounded = Number(diff.toFixed(2));
-    const diffClass = rounded > 0 ? "positive" : rounded < 0 ? "negative" : "neutral";
-    const text = rounded > 0 ? `+${formatCoefficient(diff)}` : formatCoefficient(diff);
-    return `
+  const coefRow = (label, withLimit) => `
       <div class="diff-row">
         <span>${label}</span>
-        <strong class="${diffClass}">${text}</strong>
+        <strong class="neutral">${formatCoefficient(equipmentCoefficient(compare, coefType, withLimit))}</strong>
       </div>
     `;
-  };
 
   els.compareSummary.innerHTML = `
     <p class="compare-name">${escapeHtml(compare.name)} 대비${state.limitCompare ? " · LIMIT" : ""}</p>
     <div class="diff-grid">${diffs}</div>
     <div class="compare-coef">
-      <p class="compare-coef-head">계수 차이 · ${escapeHtml(CALC_TYPE_DISPLAY[coefType])}</p>
+      <p class="compare-coef-head">${escapeHtml(compare.name)} 계수 · ${escapeHtml(CALC_TYPE_DISPLAY[coefType])}</p>
       <div class="diff-grid">
-        ${coefDiffRow("MAX", false)}
-        ${coefDiffRow("MAX + 주스탯 한계", true)}
+        ${coefRow("MAX", false)}
+        ${coefRow("MAX + 주스탯 한계", true)}
       </div>
     </div>
   `;
