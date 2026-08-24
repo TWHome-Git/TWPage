@@ -6,7 +6,7 @@
     <title>TW DB</title>
     <!-- 이미지 CDN. 첫 이미지 요청 전에 DNS+TLS를 미리 끝내둔다 -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
-    <link rel="stylesheet" href="./assets/styles.css?v=20260824-buffs-preset" />
+    <link rel="stylesheet" href="./assets/styles.css?v=20260824-dmg-layout2" />
   </head>
   <body>
     <main class="app-shell">
@@ -419,6 +419,8 @@
               </div>
 
               <div id="dmgResult" class="dmg-result"></div>
+              <p class="dmg-pierce-title">방어 무시 발동 시 <small>한 방 기준 · 펫 강타는 10타 중 1~2타만 발동하므로 총 대미지로 환산하지 않습니다</small></p>
+              <div id="dmgPierceResult" class="dmg-pierce"></div>
 
               <details id="dmgBreakdown" class="dmg-breakdown" data-local-only hidden>
                 <summary>계산 과정 (일반 기준)</summary>
@@ -478,9 +480,16 @@
                     <label class="dmg-row"><span class="dmg-row-label">기타</span><input id="dmgAfEtc" type="number" value="0" /></label>
                   </div>
                 </section>
-
                 <div class="dmg-stack">
-                <section class="dmg-card">
+                  <section class="dmg-card">
+                  <h3>계열 공격력 <span id="dmgSeriesSum" class="dmg-badge">0%</span></h3>
+                  <div class="dmg-rows">
+                    <label class="dmg-row"><span class="dmg-row-label"><img id="dmgArtifactIcon" class="dmg-chk-icon" src="./equipment-images/이클립스의_참력.png" alt="" data-dynamic />아티팩트</span><select id="dmgSeriesArtifact"></select></label>
+                    <label class="dmg-row"><span class="dmg-row-label"><img class="dmg-chk-icon" src="./images/손목부가.png" alt="" />손목 부가</span><select id="dmgSeriesWrist"></select></label>
+                    <label class="dmg-row"><span class="dmg-row-label"><img class="dmg-chk-icon" src="./images/렐릭어빌.png" alt="" />루나리아 부가</span><select id="dmgSeriesLunaria"></select></label>
+                  </div>
+                </section>
+                  <section class="dmg-card">
                   <h3>추가 정보</h3>
                   <div class="dmg-rows">
                     <label class="dmg-row"><span class="dmg-row-label">어빌 - 전설의 스킬 공격력</span><input id="dmgHelmet" type="checkbox" class="dmg-switch" /></label>
@@ -488,31 +497,22 @@
                     <label class="dmg-row"><span class="dmg-row-label">콤보 보너스</span><input id="dmgCombo" type="checkbox" class="dmg-switch" /></label>
                   </div>
                 </section>
-
-                <section class="dmg-card">
-                  <h3>시에나 <span id="dmgSienaSum" class="dmg-badge">0%</span></h3>
-                  <div class="dmg-rows">
-                    <label class="dmg-row"><span class="dmg-row-label">시에나 (%)</span><input id="dmgSiena" type="number" value="0" /></label>
-                  </div>
-                </section>
                 </div>
 
                 <div class="dmg-stack">
-                <section class="dmg-card">
-                  <h3>계열 공격력 <span id="dmgSeriesSum" class="dmg-badge">0%</span></h3>
-                  <div class="dmg-rows">
-                    <label class="dmg-row"><span class="dmg-row-label"><img id="dmgArtifactIcon" class="dmg-chk-icon" src="./equipment-images/이클립스의_참력.png" alt="" data-dynamic />아티팩트</span><select id="dmgSeriesArtifact"></select></label>
-                    <label class="dmg-row"><span class="dmg-row-label"><img class="dmg-chk-icon" src="./images/손목부가.png" alt="" />손목 부가옵션</span><select id="dmgSeriesWrist"></select></label>
-                    <label class="dmg-row"><span class="dmg-row-label"><img class="dmg-chk-icon" src="./images/렐릭어빌.png" alt="" />루나리아 부가옵션</span><select id="dmgSeriesLunaria"></select></label>
-                  </div>
-                </section>
-
-                <section class="dmg-card">
+                  <section class="dmg-card">
                   <h3>추가 피해량 <span id="dmgAddDmgSum" class="dmg-badge">0%</span></h3>
                   <div class="dmg-rows">
                     <label class="dmg-row"><span class="dmg-row-label"><img class="dmg-chk-icon" src="./images/저격연마.png" alt="" />저격 연마</span><select id="dmgAddSniper"></select></label>
-                    <label class="dmg-row"><span class="dmg-row-label"><img class="dmg-chk-icon" src="./images/장비강화석.png" alt="" />장비 강화석 부가옵션</span><select id="dmgAddGem"></select></label>
+                    <label class="dmg-row"><span class="dmg-row-label"><img class="dmg-chk-icon" src="./images/장비강화석.png" alt="" />장비 강화석 부가</span><select id="dmgAddGem"></select></label>
+                    <label class="dmg-row"><span class="dmg-row-label"><img class="dmg-chk-icon" src="./images/무기부가.png" alt="" />일반 보스</span><select id="dmgAddBoss"></select></label>
                     <label class="dmg-row"><span class="dmg-row-label">기타</span><input id="dmgAddWeapon" type="number" value="0" /></label>
+                  </div>
+                </section>
+                  <section class="dmg-card">
+                  <h3>시에나 <span id="dmgSienaSum" class="dmg-badge">0%</span></h3>
+                  <div class="dmg-rows">
+                    <label class="dmg-row"><span class="dmg-row-label">시에나 (%)</span><input id="dmgSiena" type="number" value="0" /></label>
                   </div>
                 </section>
                 </div>
@@ -524,7 +524,7 @@
                 </section>
 
                 <div class="dmg-stack">
-                <section class="dmg-card">
+                  <section class="dmg-card">
                   <h3>치명타 배율 <span id="dmgCritSum" class="dmg-badge">0%</span></h3>
                   <div class="dmg-rows">
                     <label class="dmg-row"><span class="dmg-row-label"><img class="dmg-chk-icon" src="./images/약점간파.png" alt="" />약점 간파 (40%)</span><input id="dmgWeakPoint" type="checkbox" class="dmg-switch" /></label>
@@ -532,8 +532,7 @@
                     <label class="dmg-row"><span class="dmg-row-label"><img class="dmg-chk-icon" src="./images/치배.png" alt="" />에타 - 치명타 배율</span><select id="dmgEtaCrit"></select></label>
                   </div>
                 </section>
-
-                <section class="dmg-card">
+                  <section class="dmg-card">
                   <h3>최종 대미지 <span id="dmgFinalSum" class="dmg-badge">0%</span></h3>
                   <div class="dmg-rows">
                     <label class="dmg-row"><span class="dmg-row-label"><img class="dmg-chk-icon" src="./images/클럽공증.png" alt="" />클럽 공격력 증가 (5%)</span><input id="dmgClubFinal" type="checkbox" class="dmg-switch" /></label>
@@ -734,7 +733,7 @@
       </div>
     </template>
 
-    <script src="./assets/app.js?v=20260824-buffs-preset" type="module"></script>
+    <script src="./assets/app.js?v=20260824-dmg-layout2" type="module"></script>
     <!-- GoatCounter 방문자 분석 (localhost 방문은 count.js가 기본으로 집계 제외) -->
     <script data-goatcounter="https://holedis88.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
   </body>

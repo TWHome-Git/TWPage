@@ -1689,10 +1689,17 @@ select {
   box-shadow: 0 0 0 3px rgba(15, 111, 99, 0.14);
 }
 
+/* 항상 나오는 값: 한 방 / 추가 피해량 / 총합 */
 .dmg-result {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
+}
+
+.dmg-result div b {
+  color: var(--accent-strong, #2e8b57);
+  font-size: 13px;
+  font-weight: 800;
 }
 
 .dmg-result div {
@@ -1724,6 +1731,29 @@ select {
   font-weight: 700;
 }
 
+/* 계산 과정: 단계마다 표를 따로 두고 좌우 2단으로 흐르게 한다 */
+/* 폭이 되는 만큼 한 줄에 늘어놓는다. 5단계가 다 들어가면 한 줄이 된다 */
+#dmgBreakdownBody {
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(auto-fit, minmax(185px, 1fr));
+  gap: 4px 20px;
+  align-items: start;
+}
+
+.dmg-bd-group {
+  min-width: 0;
+  margin-bottom: 10px;
+}
+
+.dmg-bd-group h4 {
+  margin: 8px 0 4px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .dmg-bd-table {
   width: 100%;
   border-collapse: collapse;
@@ -1732,28 +1762,35 @@ select {
 
 .dmg-bd-table th,
 .dmg-bd-table td {
-  padding: 4px 8px;
-  border-bottom: 1px solid var(--line);
+  padding: 3px 6px;
+  border-bottom: 1px solid #eef3f0;
   text-align: left;
+  vertical-align: top;
 }
 
 .dmg-bd-table th {
-  width: 40%;
   color: var(--muted);
   font-weight: 700;
 }
 
-.dmg-bd-table td:first-of-type {
+.dmg-bd-table td {
+  width: 40%;
   font-weight: 800;
+  text-align: right;
+  white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
 
-/* 시트 열 이름. 어느 칸과 맞대볼지 알려주는 용도라 흐리게 */
-.dmg-bd-table td:last-child {
-  width: 18%;
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 700;
+/* 그 단계의 결과 줄 */
+.dmg-bd-table tr.dmg-bd-sum th,
+.dmg-bd-table tr.dmg-bd-sum td {
+  background: #f4f8f5;
+  color: var(--ink);
+  font-weight: 800;
+}
+
+@media (max-width: 560px) {
+  #dmgBreakdownBody { grid-template-columns: 1fr; }
 }
 
 .dmg-breakdown summary {
@@ -1762,10 +1799,10 @@ select {
   font-weight: 700;
 }
 
+/* details 요소다. flex로 두면 안쪽 그리드가 최소 폭으로 줄어든다 */
 .dmg-breakdown {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 20px;
+  display: block;
+  margin-top: 12px;
   padding: 10px 14px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -1838,13 +1875,17 @@ select {
   color: var(--ink);
   font-size: 13px;
   font-weight: 600;
+  /* 이름이 두 줄로 접히면 줄 높이가 들쭉날쭉해진다. 대신 오른쪽 입력칸을 줄인다 */
+  white-space: nowrap;
 }
 
 .dmg-row > input[type="number"],
 .dmg-row > input[type="text"],
 .dmg-row > select {
-  flex: none;
+  /* 이름이 길면 입력칸이 먼저 줄어든다 (92px까지) */
+  flex: 0 1 110px;
   width: 110px;
+  min-width: 92px;
   min-height: 30px;
   border: 1px solid var(--line);
   border-radius: 6px;
@@ -4851,4 +4892,68 @@ img.dmg-chk-icon {
 
 .dmg-row.is-locked .dmg-switch {
   cursor: not-allowed;
+}
+
+/* 방어 무시는 발동해야 걸리므로 아래에 따로 둔다 */
+.dmg-pierce-title {
+  margin: 16px 0 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.dmg-pierce-title small {
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.dmg-pierce {
+  display: grid;
+  gap: 6px;
+}
+
+.dmg-pierce div {
+  display: grid;
+  grid-template-columns: minmax(150px, auto) auto 1fr;
+  gap: 12px;
+  align-items: baseline;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.dmg-pierce span {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.dmg-pierce span em {
+  margin-left: 5px;
+  color: var(--muted);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.dmg-pierce b {
+  justify-self: end;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.dmg-pierce strong {
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 800;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 640px) {
+  .dmg-pierce div { grid-template-columns: 1fr; gap: 2px; }
 }

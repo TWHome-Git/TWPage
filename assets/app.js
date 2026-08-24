@@ -4252,6 +4252,7 @@ let DMG_MONSTERS = [];
 
 const DMG_SNIPER = [0, 5, 10, 15, 20, 25, 28, 31, 34, 37, 40];
 const DMG_GEM = [0, 45, 46, 47, 48]; // 무기 장비 강화석 부가옵션
+const DMG_BOSS = [0, 18, 19, 20, 21]; // 일반 보스 추가 피해량
 const DMG_DEEP_RUNE = [0, 3, 6, 9]; // 심화 룬 LV0~LV3
 // 무기/손목 어빌: 야성 11 / 상실 10 / 심연 9 / 없음 0
 const DMG_ABIL_WEAPON_VALS = [11, 10, 9, 0];
@@ -4546,8 +4547,9 @@ function dmgAttackDamagePercent() {
 function dmgAdditionalDamagePercent() {
   const sniper = DMG_SNIPER[dmgSel("dmgAddSniper")] ?? 0;
   const gem = DMG_GEM[dmgSel("dmgAddGem")] ?? 0;
+  const boss = DMG_BOSS[dmgSel("dmgAddBoss")] ?? 0;
   const weapon = Math.min(100, Math.max(0, dmgV("dmgAddWeapon")));
-  return sniper + gem + weapon + dmg.traitAdditional;
+  return sniper + gem + boss + weapon + dmg.traitAdditional;
 }
 function dmgMonsterAttrFactor(cur, mon) {
   const raw = Math.min(1.5, Math.max(1.0, 1.0 + (cur - mon) * 0.00625));
@@ -4625,7 +4627,8 @@ function renderDmgBreakdown(entry) {
   const critBuf = 1 + dmgCritFactorPercent() / 100.0;
   const combo = dmgChecked("dmgCombo") ? 1.15 : 1.0;
   const attr = dmgMonsterAttrFactor(dmgV("dmgElement"), entry.attribute);
-  const inner = Math.floor(base * skill * crit * critBuf * combo * attr);
+  const skillMul = skill * crit * critBuf * combo * attr;
+  const afterSkill = Math.floor(base * skillMul);
 
   const finalF = 1 + dmgFinalPercent() / 100.0;
   const red = dmgMonsterReductionFactor(entry.reductionRate);
@@ -4635,55 +4638,99 @@ function renderDmgBreakdown(entry) {
   const series = 1 + dmgSeriesPercent() / 100.0;
   const amp = 1 + dmg.traitEnemyTaken / 100.0;
   const weaponAmp = dmgChecked("dmgWeaponAmp") ? 1.1 : 1.0;
-  const tail = special * siena * eta * series * amp * weaponAmp;
-  const mid = Math.floor((inner * finalF * red - entry.fixedReduction) * tail);
+  const boost = special * siena * eta * series * amp * weaponAmp;
+  const afterBoost = Math.floor((afterSkill * finalF * red - entry.fixedReduction) * boost);
   const atk = 1 + dmgAttackDamagePercent() / 100.0;
   const cap = dmgDamageCap();
+  const oneHit = Math.min(cap, Math.max(1, Math.floor(afterBoost * atk)));
+  const bdHits = Math.max(1, dmgV("dmgHitCount"));
+  const bdWeaponAdd = entry.name.includes("키메라") ? 0 : Math.max(0, dmgV("dmgWeaponAdd"));
+  const bdAddF = 1 + dmgAdditionalDamagePercent() / 100.0;
 
-  const num = (v) => (Number.isInteger(v) ? v.toLocaleString("ko-KR") : String(Math.round(v * 10000) / 10000));
-  const rows = [
-    ["최종 계수", num(dmg.finalCoefficient), "E"],
-    ["몬스터 방어", `${num(def)}  (스탯 ${num(entry.statDef)} + 고정 ${num(entry.fixedDef)}, 능깎 ${dmg.traitStatReduction}%)`, "방어"],
-    ["base = 계수 + 1 − 방어", num(base), ""],
-    ["스킬배율 + 투구", num(skill), "H + I/100"],
-    ["크리티컬 배율", num(crit), "J"],
-    ["크리티컬 버프", num(critBuf), "K"],
-    ["콤보", num(combo), "L"],
-    ["속성 배율", num(attr), "속성"],
-    ["→ inner", num(inner), ""],
-    ["최종 대미지", num(finalF), "S"],
-    ["피해율 (1 − 감소율)", num(red), "피해율"],
-    ["고정 피해 감소", num(entry.fixedReduction), "고정감소"],
-    ["특수 피해 감소", num(special), "N"],
-    ["시에나", num(siena), "O"],
-    ["각성 · 에타", num(eta), "P"],
-    ["계통", num(series), "R"],
-    ["디버프", num(amp), "T"],
-    ["무기 증폭", num(weaponAmp), "U"],
-    ["→ 꼬리배율 곱", num(tail), "N·O·P·R·T·U"],
-    ["→ mid", num(mid), ""],
-    ["공격 피해량", num(atk), "M"],
-    ["대미지 상한 (에타)", cap === Infinity ? "없음" : num(cap), "W"],
-    ["→ 최소", num(Math.min(cap, Math.max(1, Math.floor(mid * atk)))), ""],
+  const n = (v) => (Number.isInteger(v) ? v.toLocaleString("ko-KR") : String(Math.round(v * 10000) / 10000));
+  const x = (v) => `\u00d7${n(v)}`;
+
+  const groups = [
+    ["\u2460 방어 관통", [
+      ["최종 계수", n(dmg.finalCoefficient)],
+      ["스탯 방어력", n(entry.statDef)],
+      ["고정 방어력", n(entry.fixedDef)],
+      ["적 능력치 감소", `${dmg.traitStatReduction}%`],
+      ["몬스터 방어", n(def)],
+      ["관통 대미지", n(base)],
+    ]],
+    ["\u2461 스킬 배수", [
+      ["스킬배율 + 투구", x(skill)],
+      ["스킬 크리티컬 배율", x(crit)],
+      ["크리티컬 배율", x(critBuf)],
+      ["콤보", x(combo)],
+      ["속성 배율", x(attr)],
+      ["스킬 적용 대미지", n(afterSkill)],
+    ]],
+    ["\u2462 피해 감소와 증폭", [
+      ["최종 대미지", x(finalF)],
+      ["몬스터 피해율", x(red)],
+      ["고정 피해 감소", `\u2212${n(entry.fixedReduction)}`],
+      ["특수 피해 감소", x(special)],
+      ["시에나", x(siena)],
+      ["각성 \u00b7 에타", x(eta)],
+      ["계열 공격력", x(series)],
+      ["디버프", x(amp)],
+      ["무기 증폭", x(weaponAmp)],
+      ["증폭 후 대미지", n(afterBoost)],
+    ]],
+    ["\u2463 1타 대미지", [
+      ["공격 피해량", x(atk)],
+      ["대미지 상한 (에타)", cap === Infinity ? "없음" : n(cap)],
+      ["1타 대미지 (최소)", n(oneHit)],
+    ]],
+    ["\u2464 총 대미지", [
+      ["타수", x(bdHits)],
+      ["무기 추가 대미지", `+${n(bdWeaponAdd)}`],
+      ["추가 피해량", x(bdAddF)],
+      ["추가 피해량 대미지", n(dmgAddedDamage(oneHit, entry))],
+      ["총 대미지 (최소)", n(dmgTotalDamage(oneHit, entry))],
+    ]],
   ];
-  box.innerHTML = `<table class="dmg-bd-table"><tbody>${rows
-    .map(([k, v, ref]) => `<tr><th>${escapeHtml(k)}</th><td>${escapeHtml(String(v))}</td><td>${escapeHtml(ref)}</td></tr>`)
-    .join("")}</tbody></table>`;
+
+  // 단계마다 표를 따로 만들어 CSS가 좌우 2단으로 나눌 수 있게 한다.
+  // 수식은 항목 아래 작은 글씨로 붙여 줄이 길어지지 않게 한다.
+  box.innerHTML = groups
+    .map(([title, rows]) => {
+      const body = rows
+        .map(([k, v], ri) =>
+          `<tr${ri === rows.length - 1 ? ' class="dmg-bd-sum"' : ""}>` +
+          `<th>${escapeHtml(k)}</th><td>${escapeHtml(String(v))}</td></tr>`)
+        .join("");
+      return `<section class="dmg-bd-group"><h4>${escapeHtml(title)}</h4>` +
+        `<table class="dmg-bd-table"><tbody>${body}</tbody></table></section>`;
+    })
+    .join("");
 }
 
 function dmgAvg(range) {
   return Math.floor((range.min + range.max) / 2.0);
 }
-function dmgCalcDps(range, entry) {
-  const avg = (range.min + range.max) / 2.0;
-  const hitDamage = Math.floor(avg * Math.max(1, dmgV("dmgHitCount")));
-  const addFactor = 1 + dmgAdditionalDamagePercent() / 100.0;
-  let total = hitDamage * addFactor;
-  if (!entry.name.includes("키메라")) {
-    total += Math.max(0, dmgV("dmgWeaponAdd")) * addFactor;
-  }
-  return Math.floor(total);
+// 1타 대미지에 타수와 추가 피해량, 무기 추가 대미지까지 얹은 값.
+//   (1타 x 타수 + 무기추가) x (1 + 추가피해량)
+// 추가 피해량 = 저격 연마 + 장비 강화석 부가 + 기타 + 캐릭터 특성 추가피해량.
+// 무기 추가 대미지는 키메라에게 들어가지 않는다.
+function dmgHitBase(damage, entry) {
+  const hits = Math.max(1, dmgV("dmgHitCount"));
+  const weaponAdd = entry.name.includes("키메라") ? 0 : Math.max(0, dmgV("dmgWeaponAdd"));
+  return damage * hits + weaponAdd;
 }
+
+function dmgTotalDamage(damage, entry) {
+  return Math.floor(dmgHitBase(damage, entry) * (1 + dmgAdditionalDamagePercent() / 100.0));
+}
+
+// 추가 피해량이 실제로 얹어주는 몫만 따로 본다
+function dmgAddedDamage(damage, entry) {
+  return Math.floor(dmgHitBase(damage, entry) * (dmgAdditionalDamagePercent() / 100.0));
+}
+
+const dmgRangeOf = (fn, range, entry) => ({ min: fn(range.min, entry), max: fn(range.max, entry) });
 
 // ── 렌더링 ──
 function dmgFillSelect(id, labels, defaultIndex = 0) {
@@ -4705,6 +4752,7 @@ function dmgPopulateSelects() {
   dmgFillSelect("dmgSeriesLunaria", Array.from({ length: 11 }, (_, i) => `${i}%`));
   dmgFillSelect("dmgAddSniper", DMG_SNIPER.map((v, i) => `LV${i} - ${v}%`));
   dmgFillSelect("dmgAddGem", DMG_GEM.map((v) => `${v}%`));
+  dmgFillSelect("dmgAddBoss", DMG_BOSS.map((v) => `${v}%`));
   dmgFillSelect("dmgEtaFinal", Array.from({ length: 6 }, (_, i) => `LV${i} - ${i * 4}%`));
   dmgFillSelect("dmgJudgement", Array.from({ length: 41 }, (_, i) => `LV${i} - ${(i * 0.75).toFixed(2)}%`));
   dmgFillSelect("dmgEtaCrit", Array.from({ length: 21 }, (_, i) => `LV${i} - ${(i * 1.5).toFixed(1)}%`));
@@ -4836,16 +4884,33 @@ function dmgRefresh() {
 
   // 평균 하나만 보여주면 시트 같은 다른 계산기와 대조하기 어렵다.
   // 실제로 뜨는 값은 최소~최대 사이라 범위를 그대로 보여주고 평균은 아래에 둔다.
-  const resultCard = (label, range) => `
+  const span = (r) => `${dmgNum(r.min)} ~ ${dmgNum(r.max)}`;
+  const card = (label, range, note) => `
     <div>
       <span>${label}</span>
-      <strong>${dmgNum(range.min)} ~ ${dmgNum(range.max)}</strong>
+      <strong>${span(range)}</strong>
+      ${note ? `<em>${note}</em>` : ""}
     </div>`;
 
+  // 위: 조건 없이 항상 나오는 값. 아래: 방어 무시가 발동했을 때.
   dmgEls.dmgResult.innerHTML =
-    resultCard("일반 대미지", normal) +
-    resultCard("강타 대미지", strong) +
-    resultCard("방무 대미지", passive);
+    card("일반 대미지 <b>1타</b>", normal) +
+    card("추가 피해량", dmgRangeOf(dmgAddedDamage, normal, entry)) +
+    card("총 대미지", dmgRangeOf(dmgTotalDamage, normal, entry));
+
+  if (dmgEls.dmgPierceResult) {
+    // 방어 무시는 타수 전부에 걸리지 않는다. 펫 강타는 10타 중 1~2타 정도만
+    // 뜨므로 총 대미지로 환산하면 과대평가가 된다. 1타 값만 보여준다.
+    const pierceRow = (label, range) => `
+      <div>
+        <span>${label}</span>
+        <strong>${span(range)}</strong>
+        <b>일반 대비 +${dmgNum(range.min - normal.min)}</b>
+      </div>`;
+    dmgEls.dmgPierceResult.innerHTML =
+      pierceRow("펫 강타 <em>방어 무시 50%</em>", strong) +
+      pierceRow("캐릭터 스킬 <em>방어 무시 15%</em>", passive);
+  }
 
   renderDmgBreakdown(entry);
 }
