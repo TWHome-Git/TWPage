@@ -4316,15 +4316,21 @@ async function loadDmgBuffs() {
           .map((name) => {
             const d = defs[name] || {};
             const eff = d["효과"] || {};
+            const num = (src, key) => Number((src || {})[key]) || 0;
+            const pick = (src) => ({
+              attackDamage: num(src, "공격피해량"),
+              enemyTaken: num(src, "적받는피해증가"),
+              statReduction: num(src, "적능력치감소"),
+              additional: num(src, "추가피해량"),
+            });
             return {
               name: String(name).trim(),
               icon: d["아이콘"] || null,
-              effects: {
-                attackDamage: Number(eff["공격피해량"]) || 0,
-                enemyTaken: Number(eff["적받는피해증가"]) || 0,
-                statReduction: Number(eff["적능력치감소"]) || 0,
-                additional: Number(eff["추가피해량"]) || 0,
-              },
+              effects: pick(eff),
+              // 꺼도 일부가 붙는 버프가 있다 (클로에 포커스: ON 20% / OFF 10%)
+              offEffects: d["꺼짐효과"] ? pick(d["꺼짐효과"]) : null,
+              // 같은 그룹끼리는 동시에 못 켠다 (클로에 작열 / 풍화)
+              exclusive: Array.isArray(d["배타"]) ? d["배타"] : [],
             };
           })
           .filter((b) => b.name);
@@ -4709,6 +4715,7 @@ function dmgPopulateSelects() {
 function dmgRenderBuffs(skillKey) {
   if (!dmgEls.dmgTraitChecks) return;
   const buffs = DMG_BUFFS[skillKey] || [];
+  const held = dmgBuffHeldGroups();
   dmgEls.dmgTraitChecks.innerHTML = buffs.length
     ? buffs
         .map((b) => {
@@ -4716,8 +4723,9 @@ function dmgRenderBuffs(skillKey) {
             ? `<img class="dmg-chk-icon" src="./images/buff/${encodeURIComponent(b.icon)}" alt="" />`
             : '<span class="dmg-chk-icon"></span>';
           const on = dmg.buffChecked.has(b.name) ? " checked" : "";
-          return `<label class="dmg-row"><span class="dmg-row-label">${icon}${escapeHtml(b.name)}</span>` +
-            `<input type="checkbox" class="dmg-switch" data-dmg-buff="${escapeHtml(b.name)}"${on} /></label>`;
+          const locked = dmgBuffLocked(b, held);
+          return `<label class="dmg-row${locked ? " is-locked" : ""}"><span class="dmg-row-label">${icon}${escapeHtml(b.name)}</span>` +
+            `<input type="checkbox" class="dmg-switch" data-dmg-buff="${escapeHtml(b.name)}"${on}${locked ? " disabled" : ""} /></label>`;
         })
         .join("")
     : '<p class="dmg-note">등록된 버프가 없습니다.</p>';
@@ -4728,14 +4736,30 @@ function dmgRenderBuffs(skillKey) {
 function dmgBuffTotals() {
   const totals = { attackDamage: 0, enemyTaken: 0, statReduction: 0, additional: 0 };
   (DMG_BUFFS[dmg.skillKey] || []).forEach((b) => {
-    if (!dmg.buffChecked.has(b.name)) return;
-    totals.attackDamage += b.effects.attackDamage;
-    totals.enemyTaken += b.effects.enemyTaken;
-    totals.statReduction += b.effects.statReduction;
-    totals.additional += b.effects.additional;
+    const on = dmg.buffChecked.has(b.name);
+    const eff = on ? b.effects : b.offEffects;
+    if (!eff) return;
+    totals.attackDamage += eff.attackDamage;
+    totals.enemyTaken += eff.enemyTaken;
+    totals.statReduction += eff.statReduction;
+    totals.additional += eff.additional;
   });
   return totals;
 }
+
+// 켜 둔 버프가 점유한 배타 그룹 → 그 그룹을 켠 버프 이름
+function dmgBuffHeldGroups() {
+  const held = new Map();
+  (DMG_BUFFS[dmg.skillKey] || []).forEach((b) => {
+    if (!dmg.buffChecked.has(b.name)) return;
+    b.exclusive.forEach((g) => held.set(g, b.name));
+  });
+  return held;
+}
+
+// 자기가 점유한 그룹은 빼고 본다. 안 그러면 켜 둔 버프가 스스로를 잠근다
+const dmgBuffLocked = (b, held) =>
+  b.exclusive.some((g) => held.has(g) && held.get(g) !== b.name);
 // 스킬 프리셋 선택값을 스킬 배율/크리 배율/타수 텍스트박스에 채움
 function dmgApplySkillPreset() {
   const skill = dmg.skillList[dmgSel("dmgSkillSelect")];
@@ -4855,6 +4879,8 @@ function initDamageCalculator() {
     if (!box) return;
     if (box.checked) dmg.buffChecked.add(box.dataset.dmgBuff);
     else dmg.buffChecked.delete(box.dataset.dmgBuff);
+    // 배타 그룹 잠금이 바뀌므로 목록을 다시 그린다
+    dmgRenderBuffs(dmg.skillKey);
   });
 
   panel.addEventListener("input", dmgRefresh);

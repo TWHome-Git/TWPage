@@ -4842,3 +4842,13 @@ img.dmg-chk-icon {
 
   .eta-calc-days-list em { grid-column: 1 / -1; }
 }
+
+/* 배타 그룹 때문에 못 켜는 버프 (클로에 작열 / 풍화) */
+.dmg-row.is-locked {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.dmg-row.is-locked .dmg-switch {
+  cursor: not-allowed;
+}
