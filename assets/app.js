@@ -4416,6 +4416,7 @@ const dmg = {
   traitStatReduction: 0,
   skillKey: "", // "캐릭터::타입" — 스킬 프리셋 콤보 캐시 키
   buffChecked: new Set(), // 켜 둔 캐릭터 버프 이름
+  userEdited: false,      // 사용자가 직접 건드렸는지
   skillList: DMG_SKILL_FALLBACK,
   skillMul: 0,
   critMul: 0,
@@ -4846,6 +4847,11 @@ function dmgRefresh() {
     dmgApplySkillPreset();
   }
 
+  // 몬스터·버프·스킬 목록이 각자 비동기로 도착하면서 셀렉트를 다시 채운다.
+  // 한 번만 되살리면 나중에 도착한 목록이 저장값을 덮어쓰므로,
+  // 사용자가 직접 건드리기 전까지는 갱신될 때마다 되살린다.
+  if (!dmg.userEdited) dmgRestoreState();
+
   // skillKey가 정해지고 버프 목록이 그려진 뒤라야 합이 맞는다
   dmgApplyTraits();
 
@@ -4915,6 +4921,57 @@ function dmgRefresh() {
   renderDmgBreakdown(entry);
 }
 
+// 대미지 계산기 입력값을 이 PC에 남긴다.
+// 셀렉트는 인덱스가 아니라 보이는 글자로 저장한다. 목록이 늘거나 순서가 바뀌어도
+// 같은 항목을 찾아가고, 못 찾으면 그냥 건너뛴다.
+const DMG_SAVE_KEY = "tw-damage-save-v1";
+
+function dmgSaveState() {
+  if (!dmgInited) return;
+  const panel = document.querySelector('[data-calculator-panel="damage"]');
+  if (!panel) return;
+  try {
+    const fields = {};
+    panel.querySelectorAll("input[id], select[id]").forEach((el) => {
+      if (el.type === "checkbox") fields[el.id] = { on: el.checked };
+      else if (el.tagName === "SELECT") fields[el.id] = { text: el.options[el.selectedIndex]?.text ?? "" };
+      else fields[el.id] = { value: el.value };
+    });
+    localStorage.setItem(DMG_SAVE_KEY, JSON.stringify({ fields, buffs: [...dmg.buffChecked] }));
+  } catch {
+    // 저장 공간 부족 등은 무시 (저장은 편의일 뿐)
+  }
+}
+
+function dmgRestoreState() {
+  const panel = document.querySelector('[data-calculator-panel="damage"]');
+  if (!panel) return;
+  let saved = null;
+  try {
+    saved = JSON.parse(localStorage.getItem(DMG_SAVE_KEY) || "null");
+  } catch {
+    return;
+  }
+  if (!saved) return;
+
+  Object.entries(saved.fields || {}).forEach(([id, v]) => {
+    const el = panel.querySelector(`#${CSS.escape(id)}`);
+    if (!el) return;
+    if (el.type === "checkbox") el.checked = !!v.on;
+    else if (el.tagName === "SELECT") {
+      const i = [...el.options].findIndex((o) => o.text === v.text);
+      if (i >= 0) el.selectedIndex = i;
+    } else if (typeof v.value === "string") el.value = v.value;
+  });
+
+  // 버프는 이름으로 되살리되, 배타 규칙에 걸리는 건 버린다
+  (saved.buffs || []).forEach((name) => {
+    const b = (DMG_BUFFS[dmg.skillKey] || []).find((x) => x.name === name);
+    if (b && !dmgBuffLocked(b, dmgBuffHeldGroups())) dmg.buffChecked.add(name);
+  });
+  dmgRenderBuffs(dmg.skillKey);
+}
+
 function initDamageCalculator() {
   if (dmgInited) return;
   const panel = document.querySelector('[data-calculator-panel="damage"]');
@@ -4942,14 +4999,25 @@ function initDamageCalculator() {
   panel.addEventListener("change", (event) => {
     const box = event.target.closest("[data-dmg-buff]");
     if (!box) return;
+    dmg.userEdited = true;
     if (box.checked) dmg.buffChecked.add(box.dataset.dmgBuff);
     else dmg.buffChecked.delete(box.dataset.dmgBuff);
     // 배타 그룹 잠금이 바뀌므로 목록을 다시 그린다
     dmgRenderBuffs(dmg.skillKey);
   });
 
+  // dmgRefresh보다 먼저 등록해야 한다. 뒤에 두면 첫 입력에서 복원이 먼저 돌아
+  // 방금 친 값을 저장값으로 되돌려 버린다.
+  const markEdited = () => {
+    dmg.userEdited = true;
+  };
+  panel.addEventListener("input", markEdited);
+  panel.addEventListener("change", markEdited);
+
   panel.addEventListener("input", dmgRefresh);
   panel.addEventListener("change", dmgRefresh);
+  panel.addEventListener("input", dmgSaveState);
+  panel.addEventListener("change", dmgSaveState);
 
   dmgRefresh();
 }
