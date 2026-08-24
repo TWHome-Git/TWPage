@@ -4272,7 +4272,7 @@ const DMG_MODIFIERS = [
   ["리체", 15, 0, 0, 0, 0],
   ["루시안", 5, 5, 0, 0, 0],
   ["로아미니", 20, 23, 0, 25, 0],
-].map((x) => ({ name: x[0], dmgAmp: x[1], atkPower: x[2], addDmg: x[3], statReduction: x[4], skillDelay: x[5] }));
+].map((x) => ({ name: x[0], dmgAmp: x[1], atkPower: x[2], addDmg: x[3], statReduction: x[4] }));
 
 const DMG_SNIPER = [0, 5, 10, 15, 20, 25, 28, 31, 34, 37, 40];
 const DMG_GEM = [0, 45, 46, 47, 48]; // 무기 장비 강화석 부가옵션
@@ -4348,7 +4348,6 @@ async function loadDmgBuffs() {
                 enemyTaken: Number(eff["적받는피해증가"]) || 0,
                 statReduction: Number(eff["적능력치감소"]) || 0,
                 additional: Number(eff["추가피해량"]) || 0,
-                skillDelay: Number(eff["중딜레이감소"]) || 0,
               },
             };
           })
@@ -4432,9 +4431,9 @@ const dmg = {
   traitEnemyTaken: 0,
   traitAdditional: 0,
   traitStatReduction: 0,
-  traitSkillDelay: 0,
   modifierName: "-",
   skillKey: "", // "캐릭터::타입" — 스킬 프리셋 콤보 캐시 키
+  buffChecked: new Set(), // 켜 둔 캐릭터 버프 이름
   skillList: DMG_SKILL_FALLBACK,
   skillMul: 0,
   critMul: 0,
@@ -4503,7 +4502,6 @@ function dmgApplyModifier(characterName, calcTypeName) {
     dmg.traitEnemyTaken = 0;
     dmg.traitAdditional = 0;
     dmg.traitStatReduction = 0;
-    dmg.traitSkillDelay = 0;
     return;
   }
   dmg.modifierName = m.name;
@@ -4511,7 +4509,6 @@ function dmgApplyModifier(characterName, calcTypeName) {
   dmg.traitAttackDamage = m.atkPower;
   dmg.traitAdditional = m.addDmg;
   dmg.traitStatReduction = m.statReduction;
-  dmg.traitSkillDelay = m.skillDelay;
 }
 
 function dmgApplyEta() {
@@ -4747,7 +4744,7 @@ function dmgPopulateSelects() {
 
 }
 
-// 캐릭터·타입별 버프 토글 렌더 (buffs.json 기반, 효과 수치는 추후 연동)
+// 캐릭터·타입별 버프 토글 렌더 (buffs.json 기반)
 function dmgRenderBuffs(skillKey) {
   if (!dmgEls.dmgTraitChecks) return;
   const buffs = DMG_BUFFS[skillKey] || [];
@@ -4757,10 +4754,26 @@ function dmgRenderBuffs(skillKey) {
           const icon = b.icon
             ? `<img class="dmg-chk-icon" src="./images/buff/${encodeURIComponent(b.icon)}" alt="" />`
             : '<span class="dmg-chk-icon"></span>';
-          return `<label class="dmg-row"><span class="dmg-row-label">${icon}${escapeHtml(b.name)}</span><input type="checkbox" class="dmg-switch" disabled /></label>`;
+          const on = dmg.buffChecked.has(b.name) ? " checked" : "";
+          return `<label class="dmg-row"><span class="dmg-row-label">${icon}${escapeHtml(b.name)}</span>` +
+            `<input type="checkbox" class="dmg-switch" data-dmg-buff="${escapeHtml(b.name)}"${on} /></label>`;
         })
         .join("")
     : '<p class="dmg-note">등록된 버프가 없습니다.</p>';
+}
+
+// 켜 둔 버프들의 효과 합. 캐릭터 특성 위에 더해진다.
+// buffs.json의 수치가 아직 전부 0이라 지금은 켜도 결과가 그대로다.
+function dmgBuffTotals() {
+  const totals = { attackDamage: 0, enemyTaken: 0, statReduction: 0, additional: 0 };
+  (DMG_BUFFS[dmg.skillKey] || []).forEach((b) => {
+    if (!dmg.buffChecked.has(b.name)) return;
+    totals.attackDamage += b.effects.attackDamage;
+    totals.enemyTaken += b.effects.enemyTaken;
+    totals.statReduction += b.effects.statReduction;
+    totals.additional += b.effects.additional;
+  });
+  return totals;
 }
 // 스킬 프리셋 선택값을 스킬 배율/크리 배율/타수 텍스트박스에 채움
 function dmgApplySkillPreset() {
@@ -4789,6 +4802,8 @@ function dmgRefresh() {
   const skillKey = `${s.characterName}::${s.calcType}`;
   if (dmg.skillKey !== skillKey) {
     dmg.skillKey = skillKey;
+    // 캐릭터나 타입이 바뀌면 앞 캐릭터의 버프가 남지 않게 비운다
+    dmg.buffChecked.clear();
     dmgRenderBuffs(skillKey);
     const skills = dmgSkillsFor(s.characterName, s.calcType);
     dmg.skillList = skills;
@@ -4798,6 +4813,13 @@ function dmgRefresh() {
     }
     dmgApplySkillPreset();
   }
+
+  // 캐릭터 특성 위에 켜 둔 버프를 얹는다 (dmgApplyModifier가 특성값을 새로 넣은 뒤에 더해야 한다)
+  const buffTotals = dmgBuffTotals();
+  dmg.traitAttackDamage += buffTotals.attackDamage;
+  dmg.traitEnemyTaken += buffTotals.enemyTaken;
+  dmg.traitStatReduction += buffTotals.statReduction;
+  dmg.traitAdditional += buffTotals.additional;
 
   dmgEls.dmgCharName.textContent = s.characterName;
   dmgEls.dmgCalcType.textContent = s.calcTypeName;
@@ -4825,7 +4847,6 @@ function dmgRefresh() {
     ["적이 받는 피해 증가", `${dmg.traitEnemyTaken}%`],
     ["적 능력치 감소", `${dmg.traitStatReduction}%`],
     ["추가 피해량", `${dmg.traitAdditional}%`],
-    ["중 딜레이 감소", `${dmg.traitSkillDelay}%`],
   ].map(([k, v]) => `<div>${escapeHtml(k)} <strong>${escapeHtml(v)}</strong></div>`).join("");
 
   const entry = DMG_MONSTERS[dmgSel("dmgMonster")];
@@ -4872,6 +4893,14 @@ function initDamageCalculator() {
 
   // 스킬 프리셋 선택 시 스킬 배율/크리/타수 자동 입력 (패널 change보다 먼저 실행되어 값이 반영됨)
   dmgEls.dmgSkillSelect?.addEventListener("change", dmgApplySkillPreset);
+
+  // 버프 토글은 dmgRefresh가 다시 그리므로 체크 상태를 먼저 기록해 둔다
+  panel.addEventListener("change", (event) => {
+    const box = event.target.closest("[data-dmg-buff]");
+    if (!box) return;
+    if (box.checked) dmg.buffChecked.add(box.dataset.dmgBuff);
+    else dmg.buffChecked.delete(box.dataset.dmgBuff);
+  });
 
   panel.addEventListener("input", dmgRefresh);
   panel.addEventListener("change", dmgRefresh);
