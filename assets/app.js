@@ -1764,7 +1764,11 @@ function activateCalculatorTab(key) {
     panel.hidden = !isActive;
     panel.classList.toggle("is-active", isActive);
   });
-  if (key === "damage") dmgRefresh();
+  if (key === "damage") {
+    // 대미지 상한이 에타 정보에 있어 같이 받아 둔다
+    if (!etaInfo.data && !etaInfo.loading) loadEtaInfo().then(dmgRefresh);
+    dmgRefresh();
+  }
 }
 
 function activateSimulatorTab(key) {
@@ -4473,6 +4477,7 @@ function dmgApplySnapshot(s) {
   const statCoefficient = s.statCoefficient;
   const equipmentCoefficient = Math.max(0, s.totalCoefficient - statCoefficient);
   const correction = Math.floor(statCoefficient + s.dexValue * 3.0) / 18.0;
+  // 0.03에 곱하는 5는 연마강화 단계다. 마스터(5단계) 기준으로 고정해 둔다
   const bonus = Math.floor((equipmentCoefficient / 25.0) * (0.05 + 0.03 * 5)) * 25.0;
   const finalCoefficient = Math.floor(statCoefficient + equipmentCoefficient) + bonus;
   dmg.statCoefficient = statCoefficient;
@@ -4581,15 +4586,35 @@ function dmgAdditionalDamagePercent() {
   return sniper + gem + weapon + dmg.traitAdditional;
 }
 function dmgMonsterAttrFactor(cur, mon) {
-  return Math.min(1.5, Math.max(1.0, 1.0 + (cur - mon) * 0.00625));
+  const raw = Math.min(1.5, Math.max(1.0, 1.0 + (cur - mon) * 0.00625));
+  // 게임은 소수 2자리에서 버린다. 1.1875는 1.18로 쓰인다
+  return Math.floor(raw * 100) / 100;
 }
 function dmgMonsterReductionFactor(rate) {
   return Math.min(1, Math.max(0, 1.0 - rate / 100.0));
 }
 
+// 적 능력치 감소는 스탯 방어에만 걸린다. 고정 방어는 깎이지 않는다.
+// 감소분은 올림으로 남기므로(=방어가 덜 깎인다) ceil을 쓴다. 상한 30%.
+function dmgMonsterDefense(entry, defenseMultiplier) {
+  const reduction = Math.min(30, Math.max(0, dmg.traitStatReduction)) / 100;
+  const statDef = Math.ceil(entry.statDef * (1 - reduction));
+  return Math.floor((statDef + entry.fixedDef) * defenseMultiplier);
+}
+
+// 에타 레벨마다 한 방에 들어갈 수 있는 대미지 상한이 있다.
+// 값은 에타 정보(eta_info.json)의 "최대 대미지"를 그대로 쓴다.
+// 아직 안 받아왔으면 상한 없이 둔다 — 없는 상한을 0으로 잡으면 전부 0이 된다.
+function dmgDamageCap() {
+  const lv = Math.min(100, Math.max(1, Math.round(dmgV("dmgEtaLevel"))));
+  const row = (etaInfo.data?.levels || []).find((x) => x.lv === lv);
+  const cap = Number(String(row?.dmg ?? "").replace(/,/g, ""));
+  return Number.isFinite(cap) && cap > 0 ? cap : Infinity;
+}
+
 // ── 핵심 대미지 (CalculateDamageRange) ──
 function dmgCalcRange(entry, defenseMultiplier) {
-  const monsterDefense = (entry.statDef + entry.fixedDef) * defenseMultiplier;
+  const monsterDefense = dmgMonsterDefense(entry, defenseMultiplier);
   const attrFactor = dmgMonsterAttrFactor(dmgV("dmgElement"), entry.attribute);
   const redFactor = dmgMonsterReductionFactor(entry.reductionRate);
 
@@ -4616,9 +4641,11 @@ function dmgCalcRange(entry, defenseMultiplier) {
   const midMin = Math.floor((innerMin * finalFactor * redFactor - entry.fixedReduction) * specialFactor * sienaFactor * etaFactor * seriesFactor * ampFactor * weaponAmpFactor);
   const midMax = Math.floor((innerMax * finalFactor * redFactor - entry.fixedReduction) * specialFactor * sienaFactor * etaFactor * seriesFactor * ampFactor * weaponAmpFactor);
 
+  const cap = dmgDamageCap();
+  const clamp = (v) => Math.min(cap, Math.max(1, Math.floor(v)));
   return {
-    min: Math.max(1, Math.floor(midMin * attackDamageFactor)),
-    max: Math.max(1, Math.floor(midMax * attackDamageFactor)),
+    min: clamp(midMin * attackDamageFactor),
+    max: clamp(midMax * attackDamageFactor),
   };
 }
 // 다른 계산기(공유 엑셀 시트 등)와 대조할 때 어느 배율에서 갈라지는지 보려고
@@ -4627,7 +4654,7 @@ function renderDmgBreakdown(entry) {
   const box = dmgEls.dmgBreakdownBody;
   if (!box || !entry) return;
 
-  const def = entry.statDef + entry.fixedDef;
+  const def = dmgMonsterDefense(entry, 1.0);
   const base = dmg.finalCoefficient + 1 - def;
   const skill = dmgV("dmgSkill") / 100.0 + (dmgChecked("dmgHelmet") ? 0.1 : 0.0);
   const crit = dmgV("dmgCrit") / 100.0;
@@ -4647,11 +4674,12 @@ function renderDmgBreakdown(entry) {
   const tail = special * siena * eta * series * amp * weaponAmp;
   const mid = Math.floor((inner * finalF * red - entry.fixedReduction) * tail);
   const atk = 1 + dmgAttackDamagePercent() / 100.0;
+  const cap = dmgDamageCap();
 
   const num = (v) => (Number.isInteger(v) ? v.toLocaleString("ko-KR") : String(Math.round(v * 10000) / 10000));
   const rows = [
     ["최종 계수", num(dmg.finalCoefficient), "E"],
-    ["몬스터 방어", `${num(def)}  (스탯 ${num(entry.statDef)} + 고정 ${num(entry.fixedDef)})`, "방어"],
+    ["몬스터 방어", `${num(def)}  (스탯 ${num(entry.statDef)} + 고정 ${num(entry.fixedDef)}, 능깎 ${dmg.traitStatReduction}%)`, "방어"],
     ["base = 계수 + 1 − 방어", num(base), ""],
     ["스킬배율 + 투구", num(skill), "H + I/100"],
     ["크리티컬 배율", num(crit), "J"],
@@ -4671,7 +4699,8 @@ function renderDmgBreakdown(entry) {
     ["→ 꼬리배율 곱", num(tail), "N·O·P·R·T·U"],
     ["→ mid", num(mid), ""],
     ["공격 피해량", num(atk), "M"],
-    ["→ 최소", num(Math.max(1, Math.floor(mid * atk))), ""],
+    ["대미지 상한 (에타)", cap === Infinity ? "없음" : num(cap), "W"],
+    ["→ 최소", num(Math.min(cap, Math.max(1, Math.floor(mid * atk)))), ""],
   ];
   box.innerHTML = `<table class="dmg-bd-table"><tbody>${rows
     .map(([k, v, ref]) => `<tr><th>${escapeHtml(k)}</th><td>${escapeHtml(String(v))}</td><td>${escapeHtml(ref)}</td></tr>`)
