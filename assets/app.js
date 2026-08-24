@@ -4249,30 +4249,6 @@ const DMG_ETA_AWAKENING = [
 let DMG_MONSTERS = [];
 
 // 캐릭터 특성: [이름, 적받피증가, 공격피해량, 추가피해량, 능력치감소, 딜레이감소]
-const DMG_MODIFIERS = [
-  ["아나이스 마법", 0, 3, 0, 0, 0],
-  ["아나이스 비호", 20, 23, 0, 0, 5],
-  ["아나이스 파괴", 10, 3, 0, 0, 0],
-  ["예프넨", 10, 0, 0, 0, 0],
-  ["이자크", 5, 5, 0, 0, 0],
-  ["이스핀", 15, 8, 0, 10, 0],
-  ["이솔렛", 0, 20, 0, 20, 5],
-  ["클로에", 10, 7, 30, 10, 0],
-  ["시벨린", 10, 15, 0, 10, 0],
-  ["조슈아", 10, 3, 20, 20, 0],
-  ["티치엘", 0, 20, 0, 0, 0],
-  ["티치엘 타격", 0, 20, 0, 20, 0],
-  ["나야트레이", 5, 0, 0, 10, 0],
-  ["녹턴", 5, 5, 10, 0, 0],
-  ["벤야", 10, 10, 0, 10, 0],
-  ["보리스", 0, 3, 10, 0, 10],
-  ["막시민", 10, 5, 0, 10, 0],
-  ["밀라", 10, 2, 0, 20, 5],
-  ["란지에", 20, 13, 0, 0, 0],
-  ["리체", 15, 0, 0, 0, 0],
-  ["루시안", 5, 5, 0, 0, 0],
-  ["로아미니", 20, 23, 0, 25, 0],
-].map((x) => ({ name: x[0], dmgAmp: x[1], atkPower: x[2], addDmg: x[3], statReduction: x[4] }));
 
 const DMG_SNIPER = [0, 5, 10, 15, 20, 25, 28, 31, 34, 37, 40];
 const DMG_GEM = [0, 45, 46, 47, 48]; // 무기 장비 강화석 부가옵션
@@ -4431,7 +4407,6 @@ const dmg = {
   traitEnemyTaken: 0,
   traitAdditional: 0,
   traitStatReduction: 0,
-  modifierName: "-",
   skillKey: "", // "캐릭터::타입" — 스킬 프리셋 콤보 캐시 키
   buffChecked: new Set(), // 켜 둔 캐릭터 버프 이름
   skillList: DMG_SKILL_FALLBACK,
@@ -4486,29 +4461,15 @@ function dmgApplySnapshot(s) {
 }
 
 // 캐릭터 특성 (ApplyCharacterModifier)
-function dmgApplyModifier(characterName, calcTypeName) {
-  const isAnais = characterName === "아나이스";
-  const isMagicDefense = calcTypeName.includes("마법방어") || calcTypeName.includes("신성");
-
-  let resolved = characterName;
-  if (isAnais) {
-    resolved = isMagicDefense ? "아나이스 비호" : "아나이스 마법";
-  }
-
-  const m = DMG_MODIFIERS.find((x) => x.name === resolved) || null;
-  if (!m) {
-    dmg.modifierName = "특성 값 없음";
-    dmg.traitAttackDamage = 0;
-    dmg.traitEnemyTaken = 0;
-    dmg.traitAdditional = 0;
-    dmg.traitStatReduction = 0;
-    return;
-  }
-  dmg.modifierName = m.name;
-  dmg.traitEnemyTaken = m.dmgAmp;
-  dmg.traitAttackDamage = m.atkPower;
-  dmg.traitAdditional = m.addDmg;
-  dmg.traitStatReduction = m.statReduction;
+// 캐릭터 특성값은 켜 둔 버프의 합이다.
+// 예전에는 캐릭터별 preset 표를 기본값으로 깔고 버프를 그 위에 더했는데,
+// preset이 그 캐릭터 버프 전부를 켠 값이라 다 켜면 두 번 세어졌다.
+function dmgApplyTraits() {
+  const totals = dmgBuffTotals();
+  dmg.traitEnemyTaken = totals.enemyTaken;
+  dmg.traitAttackDamage = totals.attackDamage;
+  dmg.traitAdditional = totals.additional;
+  dmg.traitStatReduction = totals.statReduction;
 }
 
 function dmgApplyEta() {
@@ -4795,7 +4756,6 @@ function dmgRefresh() {
   if (!hasData) return;
 
   dmgApplySnapshot(s);
-  dmgApplyModifier(s.characterName, s.calcTypeName);
   dmgApplyEta();
 
   // 캐릭터·타입별 스킬 프리셋 콤보 (캐릭터나 타입이 바뀔 때만 다시 채우고 텍스트박스에 반영)
@@ -4814,12 +4774,8 @@ function dmgRefresh() {
     dmgApplySkillPreset();
   }
 
-  // 캐릭터 특성 위에 켜 둔 버프를 얹는다 (dmgApplyModifier가 특성값을 새로 넣은 뒤에 더해야 한다)
-  const buffTotals = dmgBuffTotals();
-  dmg.traitAttackDamage += buffTotals.attackDamage;
-  dmg.traitEnemyTaken += buffTotals.enemyTaken;
-  dmg.traitStatReduction += buffTotals.statReduction;
-  dmg.traitAdditional += buffTotals.additional;
+  // skillKey가 정해지고 버프 목록이 그려진 뒤라야 합이 맞는다
+  dmgApplyTraits();
 
   dmgEls.dmgCharName.textContent = s.characterName;
   dmgEls.dmgCalcType.textContent = s.calcTypeName;
@@ -4841,7 +4797,6 @@ function dmgRefresh() {
   dmgEls.dmgCritSum.textContent = `${dmgCritFactorPercent()}%`;
   if (dmgEls.dmgSienaSum) dmgEls.dmgSienaSum.textContent = `${dmgV("dmgSiena")}%`;
 
-  dmgEls.dmgTraitName.textContent = dmg.modifierName;
   dmgEls.dmgTraitList.innerHTML = [
     ["공격 피해량(스킬)", `${dmg.traitAttackDamage}%`],
     ["적이 받는 피해 증가", `${dmg.traitEnemyTaken}%`],
