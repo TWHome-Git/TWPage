@@ -32,6 +32,18 @@ const CHARACTER_IMAGE_BASE = `${CDN_ETC_ROOT}character-images/`;
 // 슬래시가 %2F로 바뀌지 않는다 (CDN은 %2F 경로를 찾지 못함).
 const encodeImagePath = (path) => path.split("/").map(encodeURIComponent).join("/");
 
+// 아직 공개하지 않을 화면은 마크업에 data-local-only hidden으로 두고,
+// 로컬에서 열었을 때만 드러낸다. GitHub Pages로 나가면 자동으로 숨는다.
+// (file://로 열면 hostname이 빈 문자열이다)
+const IS_LOCAL = ["localhost", "127.0.0.1", "::1", ""].includes(location.hostname);
+
+function revealLocalOnly() {
+  if (!IS_LOCAL) return;
+  document.querySelectorAll("[data-local-only]").forEach((el) => {
+    el.hidden = false;
+  });
+}
+
 const STAT_NAMES = [
   "찌르기",
   "베기",
@@ -398,6 +410,7 @@ async function boot() {
   activateCalculatorTab("coefficient");
   activateSimulatorTab("encrypt");
   activateExtraTab("content");
+  revealLocalOnly();
   wireEvents();
   initDamageCalculator();
   initSimulators();
@@ -4608,6 +4621,63 @@ function dmgCalcRange(entry, defenseMultiplier) {
     max: Math.max(1, Math.floor(midMax * attackDamageFactor)),
   };
 }
+// 다른 계산기(공유 엑셀 시트 등)와 대조할 때 어느 배율에서 갈라지는지 보려고
+// dmgCalcRange가 쓰는 값을 같은 순서로 그대로 찍는다. 계산에는 관여하지 않는다.
+function renderDmgBreakdown(entry) {
+  const box = dmgEls.dmgBreakdownBody;
+  if (!box || !entry) return;
+
+  const def = entry.statDef + entry.fixedDef;
+  const base = dmg.finalCoefficient + 1 - def;
+  const skill = dmgV("dmgSkill") / 100.0 + (dmgChecked("dmgHelmet") ? 0.1 : 0.0);
+  const crit = dmgV("dmgCrit") / 100.0;
+  const critBuf = 1 + dmgCritFactorPercent() / 100.0;
+  const combo = dmgChecked("dmgCombo") ? 1.15 : 1.0;
+  const attr = dmgMonsterAttrFactor(dmgV("dmgElement"), entry.attribute);
+  const inner = Math.floor(base * skill * crit * critBuf * combo * attr);
+
+  const finalF = 1 + dmgFinalPercent() / 100.0;
+  const red = dmgMonsterReductionFactor(entry.reductionRate);
+  const special = dmgSpecialFactor();
+  const siena = 1 + dmgV("dmgSiena") / 100.0;
+  const eta = Math.max(0, dmg.etaAwakening);
+  const series = 1 + dmgSeriesPercent() / 100.0;
+  const amp = 1 + dmg.traitEnemyTaken / 100.0;
+  const weaponAmp = dmgChecked("dmgWeaponAmp") ? 1.1 : 1.0;
+  const tail = special * siena * eta * series * amp * weaponAmp;
+  const mid = Math.floor((inner * finalF * red - entry.fixedReduction) * tail);
+  const atk = 1 + dmgAttackDamagePercent() / 100.0;
+
+  const num = (v) => (Number.isInteger(v) ? v.toLocaleString("ko-KR") : String(Math.round(v * 10000) / 10000));
+  const rows = [
+    ["최종 계수", num(dmg.finalCoefficient), "E"],
+    ["몬스터 방어", `${num(def)}  (스탯 ${num(entry.statDef)} + 고정 ${num(entry.fixedDef)})`, "방어"],
+    ["base = 계수 + 1 − 방어", num(base), ""],
+    ["스킬배율 + 투구", num(skill), "H + I/100"],
+    ["크리티컬 배율", num(crit), "J"],
+    ["크리티컬 버프", num(critBuf), "K"],
+    ["콤보", num(combo), "L"],
+    ["속성 배율", num(attr), "속성"],
+    ["→ inner", num(inner), ""],
+    ["최종 대미지", num(finalF), "S"],
+    ["피해율 (1 − 감소율)", num(red), "피해율"],
+    ["고정 피해 감소", num(entry.fixedReduction), "고정감소"],
+    ["특수 피해 감소", num(special), "N"],
+    ["시에나", num(siena), "O"],
+    ["각성 · 에타", num(eta), "P"],
+    ["계통", num(series), "R"],
+    ["디버프", num(amp), "T"],
+    ["무기 증폭", num(weaponAmp), "U"],
+    ["→ 꼬리배율 곱", num(tail), "N·O·P·R·T·U"],
+    ["→ mid", num(mid), ""],
+    ["공격 피해량", num(atk), "M"],
+    ["→ 최소", num(Math.max(1, Math.floor(mid * atk))), ""],
+  ];
+  box.innerHTML = `<table class="dmg-bd-table"><tbody>${rows
+    .map(([k, v, ref]) => `<tr><th>${escapeHtml(k)}</th><td>${escapeHtml(String(v))}</td><td>${escapeHtml(ref)}</td></tr>`)
+    .join("")}</tbody></table>`;
+}
+
 function dmgAvg(range) {
   return Math.floor((range.min + range.max) / 2.0);
 }
@@ -4735,10 +4805,20 @@ function dmgRefresh() {
   const strong = dmgCalcRange(entry, 0.5);
   const passive = dmgCalcRange(entry, 0.85);
 
+  // 평균 하나만 보여주면 시트 같은 다른 계산기와 대조하기 어렵다.
+  // 실제로 뜨는 값은 최소~최대 사이라 범위를 그대로 보여주고 평균은 아래에 둔다.
+  const resultCard = (label, range) => `
+    <div>
+      <span>${label}</span>
+      <strong>${dmgNum(range.min)} ~ ${dmgNum(range.max)}</strong>
+    </div>`;
+
   dmgEls.dmgResult.innerHTML =
-    `<div><span>일반 대미지</span><strong>${dmgNum(dmgAvg(normal))}</strong></div>` +
-    `<div><span>강타 대미지</span><strong>${dmgNum(dmgAvg(strong))}</strong></div>` +
-    `<div><span>방무 대미지</span><strong>${dmgNum(dmgAvg(passive))}</strong></div>`;
+    resultCard("일반 대미지", normal) +
+    resultCard("강타 대미지", strong) +
+    resultCard("방무 대미지", passive);
+
+  renderDmgBreakdown(entry);
 }
 
 function initDamageCalculator() {
