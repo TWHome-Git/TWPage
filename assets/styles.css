@@ -1,6 +1,11 @@
 @import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap");
 
 :root {
+  /* 이 선언이 없으면 크롬 안드로이드가 "다크 대응 안 된 사이트"로 보고
+     페이지를 임의로 어둡게 뒤집는다. 그때 이미지는 반전되지 않아
+     밝은 배경이 그대로 남아 하얗게 튄다. */
+  color-scheme: light;
+
   --ink: #17211f;
   --muted: #65736f;
   --line: #c7d4cd;
