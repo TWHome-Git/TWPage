@@ -174,12 +174,17 @@ const MAIN_SLOTS = [
 const ACCESSORY_SLOTS = ["스탯", "아바타", "커프", "칭호", "코어", "렐릭", "링크"];
 
 // 콘텐츠 가능여부 임계값 (UpdateContentAvailability)
-const CONTENT_THRESHOLDS = [
-  { name: "최후의 결전", impossible: 90000, hard: 93000, possible: 95000, odin: false },
-  { name: "아페 어려움", impossible: 67500, hard: 70000, possible: 72500, odin: false },
-  { name: "이클 토벌전", impossible: 67500, hard: 70000, possible: 72500, odin: false },
-  { name: "이클 6보스", impossible: 45000, hard: 52500, possible: 55000, odin: false },
-  { name: "오딘 전면전", impossible: 47000, hard: 49500, possible: 51000, odin: true },
+// 방어 관통 확인용 콘텐츠. 값은 monsters.json의 (스탯방어 + 고정방어)다.
+// 최후의 결전은 석상, 아페는 노말, 오딘은 랭킹전 기준.
+// noCore: 코어 효과가 안 붙는 곳. 계수에서 코어 몫을 빼고 판단한다.
+const PIERCE_TARGETS = [
+  { name: "최후의 결전", defense: 1500 + 105000 },
+  { name: "아페 어려움", defense: 1500 + 64200 },
+  { name: "이클 토벌전", defense: 1500 + 61200 },
+  { name: "오딘 전면전", defense: 1500 + 51720 },
+  { name: "렐릭 13단", defense: 1500 + 62610, noCore: true },
+  { name: "렐릭 16단", defense: 1500 + 77610, noCore: true },
+  { name: "렐릭 20단", defense: 1500 + 106860, noCore: true },
 ];
 
 const CALC_SAVE_KEY = "tw-coefficient-save-v1";
@@ -348,6 +353,8 @@ const els = {
   overlayReadme: document.querySelector("#overlayReadme"),
   overlayDownload: document.querySelector("#overlayDownload"),
   overlayReleaseMeta: document.querySelector("#overlayReleaseMeta"),
+  overlayBetaDownload: document.querySelector("#overlayBetaDownload"),
+  overlayBetaMeta: document.querySelector("#overlayBetaMeta"),
   characterGrid: document.querySelector("#characterGrid"),
   coefficientSelectView: document.querySelector("#coefficientSelectView"),
   coefficientDetailView: document.querySelector("#coefficientDetailView"),
@@ -360,7 +367,7 @@ const els = {
   coefficientTableBody: document.querySelector("#coefficientTableBody"),
   coefficientSideBody: document.querySelector("#coefficientSideBody"),
   coefficientMainTotal: document.querySelector("#coefficientMainTotal"),
-  coefficientContentSummary: document.querySelector("#coefficientContentSummary"),
+  coefficientPierce: document.querySelector("#coefficientPierce"),
   sideHeadPrimary: document.querySelector("#sideHeadPrimary"),
   sideHeadSecondary: document.querySelector("#sideHeadSecondary"),
   avatarMainEnhance: document.querySelector("#avatarMainEnhance"),
@@ -2085,6 +2092,9 @@ const OVERLAY_REPO_URL = `https://github.com/${OVERLAY_REPO}`;
 const OVERLAY_RAW_BASE = `https://raw.githubusercontent.com/${OVERLAY_REPO}/HEAD/`;
 const OVERLAY_README_API = `https://api.github.com/repos/${OVERLAY_REPO}/readme`;
 const OVERLAY_RELEASE_API = `https://api.github.com/repos/${OVERLAY_REPO}/releases/latest`;
+// 베타는 태그를 직접 지정한다. 새 베타가 나오면 이 값만 바꾸면 된다.
+const OVERLAY_BETA_TAG = "5.0.0";
+const OVERLAY_BETA_API = `https://api.github.com/repos/${OVERLAY_REPO}/releases/tags/${OVERLAY_BETA_TAG}`;
 
 // "idle"일 때만 요청한다. 실패하면 다시 "idle"로 되돌려서 탭을 다시 눌렀을 때 재시도되게 한다.
 const overlay = { readme: "idle", release: "idle" };
@@ -2094,12 +2104,12 @@ function loadOverlayTab() {
   if (overlay.release === "idle") loadOverlayRelease();
 }
 
-async function loadOverlayRelease() {
-  if (!els.overlayDownload || !els.overlayReleaseMeta) return;
-  overlay.release = "loading";
+// 릴리스 하나를 읽어 버튼에 첨부 파일 링크와 버전 정보를 채운다
+async function fillOverlayRelease(apiUrl, link, metaEl, fallbackHref, fallbackText) {
+  if (!link || !metaEl) return true;   // 버튼이 없으면 실패로 치지 않는다
 
   try {
-    const response = await fetch(OVERLAY_RELEASE_API, { headers: { Accept: "application/vnd.github+json" } });
+    const response = await fetch(apiUrl, { headers: { Accept: "application/vnd.github+json" } });
     if (!response.ok) throw new Error(`Release ${response.status}`);
     const release = await response.json();
 
@@ -2107,20 +2117,46 @@ async function loadOverlayRelease() {
     const asset = assets.find((item) => /\.zip$/i.test(item.name || "")) || assets[0];
 
     // 첨부 파일이 있으면 바로 받아지게, 없으면 릴리스 페이지로 보낸다
-    els.overlayDownload.href = asset?.browser_download_url || release.html_url || `${OVERLAY_REPO_URL}/releases/latest`;
+    link.href = asset?.browser_download_url || release.html_url || fallbackHref;
 
     const meta = [];
     if (release.tag_name) meta.push(`v${String(release.tag_name).replace(/^v/i, "")}`);
     if (asset?.size) meta.push(formatOverlaySize(asset.size));
     if (release.published_at) meta.push(String(release.published_at).slice(0, 10));
-    els.overlayReleaseMeta.textContent = meta.join(" · ") || "Latest Release";
+    metaEl.textContent = meta.join(" · ") || fallbackText;
 
-    overlay.release = "loaded";
+    return true;
   } catch (error) {
-    console.warn("TWChatOverlay 릴리스 정보를 불러오지 못했습니다.", error);
-    els.overlayReleaseMeta.textContent = "Latest Release";
-    overlay.release = "idle";
+    console.warn("TWChatOverlay 릴리스 정보를 불러오지 못했습니다.", apiUrl, error);
+    link.href = fallbackHref;
+    metaEl.textContent = fallbackText;
+    return false;
   }
+}
+
+async function loadOverlayRelease() {
+  if (!els.overlayDownload || !els.overlayReleaseMeta) return;
+  overlay.release = "loading";
+
+  const results = await Promise.all([
+    fillOverlayRelease(
+      OVERLAY_RELEASE_API,
+      els.overlayDownload,
+      els.overlayReleaseMeta,
+      `${OVERLAY_REPO_URL}/releases/latest`,
+      "Latest Release"
+    ),
+    fillOverlayRelease(
+      OVERLAY_BETA_API,
+      els.overlayBetaDownload,
+      els.overlayBetaMeta,
+      `${OVERLAY_REPO_URL}/releases/tag/${OVERLAY_BETA_TAG}`,
+      `v${OVERLAY_BETA_TAG}`
+    ),
+  ]);
+
+  // 하나라도 실패하면 탭을 다시 눌렀을 때 재시도한다
+  overlay.release = results.every(Boolean) ? "loaded" : "idle";
 }
 
 function formatOverlaySize(bytes) {
@@ -2729,6 +2765,27 @@ function avatarEnhancementBonus(mainBonus, subBonus) {
   })[calc.type] || 0;
 }
 
+// 계수 계산기의 계수(T)로 최종 계수를 구한다. dmgApplySnapshot과 같은 식이다.
+// 스탯 계수는 장비와 무관하게 고정이라 따로 받는다.
+function calcFinalCoefficient(total, statCoefficient) {
+  const equipment = Math.max(0, total - statCoefficient);
+  const bonus = Math.floor((equipment / 25.0) * (0.05 + 0.03 * 5)) * 25.0;
+  return Math.floor(statCoefficient + equipment) + bonus;
+}
+
+// 방어 관통(최종계수 + 1 - 방어)이 0 이상이 되는 최소 계수.
+// 최종 계수가 계수에 대해 단조 증가라 이분 탐색으로 찾는다.
+function calcPierceRequirement(defense, statCoefficient) {
+  let lo = statCoefficient;
+  let hi = statCoefficient + defense * 2 + 1000;
+  while (lo < hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    if (calcFinalCoefficient(mid, statCoefficient) + 1 - defense >= 0) hi = mid;
+    else lo = mid + 1;
+  }
+  return lo;
+}
+
 function calcTotalMetrics() {
   const avatar = accRow("아바타");
   const cuff = accRow("커프");
@@ -2776,22 +2833,6 @@ function calcTotalMetrics() {
     totalPrimarySum: primaryBaseSum + primaryEnchantSum,
     totalCoefficient,
   };
-}
-
-function evaluateByThreshold(value, t) {
-  if (value <= t.impossible) return "불가능";
-  if (value <= t.hard) return "힘듬";
-  if (value <= t.possible) return "가능";
-  return "원활";
-}
-
-function statusClass(value) {
-  return ({
-    불가능: "status-impossible",
-    힘듬: "status-hard",
-    가능: "status-possible",
-    원활: "status-smooth",
-  })[value] || "";
 }
 
 // 계산 타입 초기화 및 상세 화면 진입 (SelectCharacterAsync)
@@ -3396,7 +3437,6 @@ function renderSideTable() {
 // 파생 값(계수 셀, 합계, 콘텐츠 판정)만 갱신 — 입력 포커스 유지
 function updateDerived() {
   if (!calc.dom) return;
-  const [primary] = typeStatLabels(calc.type);
 
   for (const row of calc.mainRows) {
     const td = calc.dom.rowCoeff.get(row.slotName);
@@ -3409,27 +3449,36 @@ function updateDerived() {
 
   const totals = calcTotalMetrics();
   const [pLabel, sLabel] = typeStatLabels(calc.type);
+  // 주/보조 스탯은 "기본(강화)" 한 칸으로 합쳐 자리를 아끼고,
+  // 맨 왼쪽에 총 주스탯을 둔다 (콘텐츠 요약 줄에서 올라온 값).
+  const withEnchant = (base, enchant) => `${f0(base)}(${f0(enchant)})`;
   els.coefficientMainTotal.innerHTML = [
-    [pLabel, f0(totals.primaryBaseSum)],
-    [`강화 ${pLabel}`, f0(totals.primaryEnchantSum)],
-    [sLabel, f0(totals.secondarySum)],
-    [`강화 ${sLabel}`, f0(totals.secondaryEnchantSum)],
+    [`총 ${pLabel}`, f0(totals.totalPrimarySum)],
+    [pLabel, withEnchant(totals.primaryBaseSum, totals.primaryEnchantSum)],
+    [sLabel, withEnchant(totals.secondarySum, totals.secondaryEnchantSum)],
     ["명중", f0(totals.hitSum)],
     ["계수", f2(totals.totalCoefficient)],
   ]
     .map(([label, value]) => `<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`)
     .join("");
 
-  // 콘텐츠 가능여부
-  const cards = [`<div><span>총 ${escapeHtml(primary)}</span><strong>${escapeHtml(f0(totals.totalPrimarySum))}</strong></div>`];
-  for (const t of CONTENT_THRESHOLDS) {
-    const metric = t.odin ? totals.totalCoefficient - totals.secondaryEnchantSum : totals.totalCoefficient;
-    const status = evaluateByThreshold(metric, t);
-    cards.push(
-      `<div><span>${escapeHtml(t.name)}</span><strong class="${statusClass(status)}">${escapeHtml(status)}</strong></div>`
-    );
+  // 방어 관통: 지금 계수로 그 콘텐츠에 대미지가 들어가는지
+  if (els.coefficientPierce) {
+    const statRow = accRow("스탯");
+    const statCoef = statRow ? statRow.coefficient : 0;
+    const coreCoef = accRow("코어")?.coefficient || 0;
+    els.coefficientPierce.innerHTML = PIERCE_TARGETS.map((t) => {
+      const cur = totals.totalCoefficient - (t.noCore ? coreCoef : 0);
+      const need = calcPierceRequirement(t.defense, statCoef);
+      const gap = Math.round(cur - need);
+      const ok = gap >= 0;
+      return `<div>
+        <span>${escapeHtml(t.name)}</span>
+        <strong class="${ok ? "is-ok" : "is-no"}">${ok ? "가능" : "불가능"}</strong>
+        <em>${gap >= 0 ? "+" : "\u2212"}${f0(Math.abs(gap))}</em>
+      </div>`;
+    }).join("");
   }
-  els.coefficientContentSummary.innerHTML = cards.join("");
 
   // 대미지 계산기 탭이 열려 있으면 계수 변경을 즉시 반영
   const damagePanel = document.querySelector('[data-calculator-panel="damage"]');
@@ -4391,6 +4440,8 @@ async function loadDmgMonsters() {
       reductionRate: Number(m["피감률"]) || 0,
       attribute: Number(m["속성값"]) || 0,
       hp: Number(m["HP"]) || 0,
+      // 렐릭의 성소처럼 코어 효과가 안 붙는 곳
+      noCore: !!m["코어미적용"],
     }));
     // 이미 열려 있으면 몬스터 목록을 다시 채운다
     if (dmgInited) {
@@ -4445,6 +4496,9 @@ function dmgSnapshot() {
     calcType: calc.type,
     calcTypeName: CALC_TYPE_DISPLAY[calc.type] || "",
     statCoefficient: statRow ? statRow.coefficient : 0,
+    coreCoefficient: accRow("코어")?.coefficient || 0,
+    primaryStat: statRow ? statRow.primaryStatValue : 0,
+    secondaryStat: statRow ? statRow.secondaryStatValue : 0,
     totalCoefficient: totals.totalCoefficient,
     dexValue: calc.dex,
     totalPrimarySum: totals.totalPrimarySum,
@@ -4455,9 +4509,11 @@ function dmgSnapshot() {
 }
 
 // 계수 가공 (UpdateCoefficientBreakdown)
-function dmgApplySnapshot(s) {
+// excludeCore: 코어가 안 붙는 지역이면 총 계수에서 코어 몫을 뺀다
+function dmgApplySnapshot(s, excludeCore) {
   const statCoefficient = s.statCoefficient;
-  const equipmentCoefficient = Math.max(0, s.totalCoefficient - statCoefficient);
+  const total = s.totalCoefficient - (excludeCore ? s.coreCoefficient : 0);
+  const equipmentCoefficient = Math.max(0, total - statCoefficient);
   const correction = Math.floor(statCoefficient + s.dexValue * 3.0) / 18.0;
   // 0.03에 곱하는 5는 연마강화 단계다. 마스터(5단계) 기준으로 고정해 둔다
   const bonus = Math.floor((equipmentCoefficient / 25.0) * (0.05 + 0.03 * 5)) * 25.0;
@@ -4478,6 +4534,43 @@ function dmgApplyTraits() {
   dmg.traitAttackDamage = totals.attackDamage;
   dmg.traitAdditional = totals.additional;
   dmg.traitStatReduction = totals.statReduction;
+}
+
+// 스탯 행이 비어 있으면 계수와 DEX 보정이 0이라 대미지가 크게 어긋난다.
+// 계수 계산기에서 넘어오는 값이라 여기서는 알려주기만 한다.
+function dmgRenderStatWarning(s) {
+  const el = dmgEls.dmgStatWarn;
+  if (!el) return;
+  const [pLabel, sLabel] = typeStatLabels(s.calcType);
+  const missing = [
+    [pLabel, s.primaryStat],
+    [sLabel, s.secondaryStat],
+    ["DEX", s.dexValue],
+  ]
+    .filter(([, v]) => !(Number(v) > 0))
+    .map(([label]) => label);
+
+  el.hidden = missing.length === 0;
+  if (missing.length) {
+    el.textContent = `계수 계산기의 스탯 행에 ${missing.join(" · ")} 값이 없습니다. 대미지가 실제보다 낮게 나옵니다.`;
+  }
+}
+
+// 같이 켤 수 없는 체크박스 짝. 하나를 켜면 다른 쪽을 잠근다.
+// 둘 다 끄는 건 된다.
+const DMG_EXCLUSIVE_PAIRS = [["dmgA1Snowman", "dmgA1Illumi"]];
+
+function dmgApplyExclusive() {
+  DMG_EXCLUSIVE_PAIRS.forEach((pair) => {
+    const on = pair.find((id) => dmgChecked(id));
+    pair.forEach((id) => {
+      const el = dmgEls[id];
+      if (!el) return;
+      const locked = !!on && id !== on;
+      el.disabled = locked;
+      el.closest(".dmg-row")?.classList.toggle("is-locked", locked);
+    });
+  });
 }
 
 function dmgApplyEta() {
@@ -4828,8 +4921,12 @@ function dmgRefresh() {
   if (dmgEls.dmgBody) dmgEls.dmgBody.hidden = !hasData;
   if (!hasData) return;
 
-  dmgApplySnapshot(s);
+  // 코어 미적용 지역이면 계수가 달라지므로 몬스터를 먼저 정한다
+  const monster = DMG_MONSTERS[dmgSel("dmgMonster")] || null;
+  dmgApplySnapshot(s, !!monster?.noCore);
   dmgApplyEta();
+  dmgApplyExclusive();
+  dmgRenderStatWarning(s);
 
   // 캐릭터·타입별 스킬 프리셋 콤보 (캐릭터나 타입이 바뀔 때만 다시 채우고 텍스트박스에 반영)
   const skillKey = `${s.characterName}::${s.calcType}`;
@@ -4882,7 +4979,7 @@ function dmgRefresh() {
     ["추가 피해량", `${dmg.traitAdditional}%`],
   ].map(([k, v]) => `<div>${escapeHtml(k)} <strong>${escapeHtml(v)}</strong></div>`).join("");
 
-  const entry = DMG_MONSTERS[dmgSel("dmgMonster")];
+  const entry = monster;
   if (!entry) return;
   const normal = dmgCalcRange(entry, 1.0);
   const strong = dmgCalcRange(entry, 0.5);
@@ -5049,6 +5146,7 @@ function initSimulators() {
   ].forEach((id) => (simEls[id] = q(id)));
 
   wireRateModal();
+  wirePierceHelp();
 
   wireEncryptSim();
   wireCoreSim();
@@ -5738,6 +5836,16 @@ function openRateModal(title, note, html) {
   simEls.rateModal.hidden = false;
 }
 
+function wirePierceHelp() {
+  document.querySelector("#pierceHelpButton")?.addEventListener("click", () =>
+    openRateModal(
+      "방어 관통",
+      "",
+      `<p class="modal-text">가능/불가능은 몹스터에게 입히는 피해가 1을 넘는지를 기준으로 판단합니다.</p>
+       <p class="modal-text">괄호 안 숫자는 그 경계선까지 남은 계수입니다. 가능이면 여유분(+), 불가능이면 부족분(−)을 뜻합니다.</p>`
+    ));
+}
+
 function wireRateModal() {
   simEls.rateModal?.addEventListener("click", (event) => {
     if (event.target.closest("[data-rate-close]")) simEls.rateModal.hidden = true;
@@ -6049,3 +6157,206 @@ function wireBoard() {
 }
 
 wireBoard();
+
+// ══════════════════════════════════════════════════════════════
+//  계수 · 대미지 계산기 JSON 내보내기 / 불러오기
+//  브라우저에 남는 localStorage와 달리, 파일로 빼서 백업하거나 남에게 넘길 수 있다.
+// ══════════════════════════════════════════════════════════════
+const CALC_FILE_VERSION = 1;
+
+function calcDownloadJson(payload, name) {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  a.click();
+  // 링크가 클릭된 뒤에 풀어야 저장이 끊기지 않는다
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function calcPickJson(onLoad) {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = "application/json,.json";
+  input.addEventListener("change", () => {
+    const file = input.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        onLoad(JSON.parse(String(reader.result)));
+      } catch (error) {
+        console.warn("파일을 읽지 못했습니다.", error);
+        alert("JSON 파일을 읽지 못했습니다. 파일이 손상되었을 수 있습니다.");
+      }
+    };
+    reader.readAsText(file);
+  });
+  input.click();
+}
+
+// 지금 화면의 계수 계산기 상태 (행 값 + 덱스 + 아바타 강화)
+function calcCollectState() {
+  const capture = (row) => ({
+    equip: row.selectedEquipment,
+    at: row.abilityType,
+    a: row.attackValue,
+    ae: row.attackEnchant,
+    d: row.defenseValue,
+    de: row.defenseEnchant,
+    hit: row.hitValue,
+    p: row.primaryStatValue,
+    s: row.secondaryStatValue,
+  });
+  const data = {};
+  for (const row of calc.mainRows) data[row.slotName] = capture(row);
+  for (const row of calc.accRows) data[row.slotName] = capture(row);
+  return {
+    character: calc.characterName,
+    type: calc.type,
+    dex: calc.dex,
+    avatarMain: !!els.avatarMainEnhance?.checked,
+    avatarSub: !!els.avatarSubEnhance?.checked,
+    data,
+  };
+}
+
+// 불러온 상태를 화면에 넣는다. 캐릭터·타입이 다르면 먼저 그쪽으로 옮긴다.
+function calcApplyState(state) {
+  if (!state || !state.character || !state.type) {
+    alert("계수 계산기 데이터가 없는 파일입니다.");
+    return false;
+  }
+  if (state.character !== calc.characterName || state.type !== calc.type) {
+    showCoefficientDetail(state.character);
+    if (resolveCalculatorTypes(state.character).includes(state.type)) {
+      calc.type = state.type;
+      if (els.coefficientTypeSelect) els.coefficientTypeSelect.value = state.type;
+    }
+    // 새 타입 기준으로 행을 다시 만든다 (저장 슬롯도 불러오지만 아래에서 덮어쓴다)
+    refreshAllRows();
+  }
+
+  const snap = state.data || {};
+  const apply = (row, isMain) => {
+    const s = snap[row.slotName];
+    if (!s) return;
+    if (isMain) {
+      if (s.at && ABILITY_OPTIONS.includes(s.at)) row.abilityType = s.at;
+      if (s.equip && row.candidates.includes(s.equip)) {
+        row.selectedEquipment = s.equip;
+        applyEquipmentToRow(row);
+      }
+      if (row.selectedEquipment === "수동 입력" || row.isAbility) {
+        row.attackValue = s.a || 0;
+        row.defenseValue = s.d || 0;
+        row.hitValue = s.hit || 0;
+      }
+    } else {
+      row.attackValue = s.a || 0;
+      row.defenseValue = s.d || 0;
+      row.hitValue = s.hit || 0;
+    }
+    row.attackEnchant = s.ae || 0;
+    row.defenseEnchant = s.de || 0;
+    row.primaryStatValue = s.p || 0;
+    row.secondaryStatValue = s.s || 0;
+    recalcRow(row, calc.type);
+  };
+  for (const row of calc.mainRows) apply(row, true);
+  for (const row of calc.accRows) apply(row, false);
+
+  calc.dex = Number(state.dex) || 0;
+  if (els.avatarMainEnhance) els.avatarMainEnhance.checked = !!state.avatarMain;
+  if (els.avatarSubEnhance) els.avatarSubEnhance.checked = !!state.avatarSub;
+
+  renderCalculator();
+  scheduleSave();
+  return true;
+}
+
+// 대미지 계산기 패널의 입력값 (저장 형식은 localStorage와 같다)
+function dmgCollectFields() {
+  const panel = document.querySelector('[data-calculator-panel="damage"]');
+  const fields = {};
+  panel?.querySelectorAll("input[id], select[id]").forEach((el) => {
+    if (el.type === "checkbox") fields[el.id] = { on: el.checked };
+    else if (el.tagName === "SELECT") fields[el.id] = { text: el.options[el.selectedIndex]?.text ?? "" };
+    else fields[el.id] = { value: el.value };
+  });
+  return { fields, buffs: [...dmg.buffChecked] };
+}
+
+function dmgApplyFields(saved) {
+  const panel = document.querySelector('[data-calculator-panel="damage"]');
+  if (!panel || !saved) return;
+  Object.entries(saved.fields || {}).forEach(([id, v]) => {
+    const el = panel.querySelector(`#${CSS.escape(id)}`);
+    if (!el) return;
+    if (el.type === "checkbox") el.checked = !!v.on;
+    else if (el.tagName === "SELECT") {
+      const i = [...el.options].findIndex((o) => o.text === v.text);
+      if (i >= 0) el.selectedIndex = i;
+    } else if (typeof v.value === "string") el.value = v.value;
+  });
+  dmg.buffChecked.clear();
+  (saved.buffs || []).forEach((name) => {
+    const b = (DMG_BUFFS[dmg.skillKey] || []).find((x) => x.name === name);
+    if (b && !dmgBuffLocked(b, dmgBuffHeldGroups())) dmg.buffChecked.add(name);
+  });
+  dmgRenderBuffs(dmg.skillKey);
+}
+
+// 파일명에 쓸 수 없는 글자를 걷어낸다
+const calcSafeName = (s) => String(s || "무제").replace(/[\\/:*?"<>|]/g, "_");
+
+// 저장/불러오기는 두 계산기가 같은 파일 하나를 쓴다.
+// 대미지는 계수 위에 얹히므로 따로 떼면 반쪽짜리가 된다.
+function calcBuildPayload() {
+  const coefficient = calcCollectState();
+  // 대미지 패널을 아직 한 번도 안 열었으면 담을 값이 없다
+  const monster = document.querySelector('[data-calculator-panel="damage"] #dmgMonster');
+  const damage = monster?.options.length ? dmgCollectFields() : null;
+  return {
+    version: CALC_FILE_VERSION,
+    kind: "calculator",
+    savedAt: new Date().toISOString(),
+    coefficient,
+    damage,
+  };
+}
+
+function calcSavePayload() {
+  if (!calc.active) {
+    alert("먼저 캐릭터를 선택하고 계수를 입력하세요.");
+    return;
+  }
+  const payload = calcBuildPayload();
+  const name = calcSafeName(payload.coefficient.character);
+  const type = calcSafeName(CALC_TYPE_DISPLAY[payload.coefficient.type] || payload.coefficient.type);
+  calcDownloadJson(payload, `계산기_${name}_${type}.json`);
+}
+
+function calcLoadPayload(json) {
+  // 계수 전용으로 저장된 옛 파일도 읽는다
+  if (!calcApplyState(json.coefficient || json)) return;
+
+  dmg.userEdited = true;          // 불러온 값을 복원 로직이 덮어쓰지 않게
+  dmgRefresh();                   // 셀렉트를 먼저 채운 뒤
+  if (json.damage) {
+    dmgApplyFields(json.damage);  // 값을 넣고
+    dmgRefresh();                 // 다시 계산한다
+  }
+  dmgSaveState();
+}
+
+function wireCalcJsonIo() {
+  ["#coeffExport", "#dmgExport"].forEach((sel) =>
+    document.querySelector(sel)?.addEventListener("click", calcSavePayload));
+
+  ["#coeffImport", "#dmgImport"].forEach((sel) =>
+    document.querySelector(sel)?.addEventListener("click", () => calcPickJson(calcLoadPayload)));
+}
+
+wireCalcJsonIo();

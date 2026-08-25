@@ -31,10 +31,25 @@ body {
     #eef4ef;
 }
 
+/* 버튼·입력창은 그냥 두면 브라우저 기본 글꼴로 나온다.
+   글꼴은 본문을 따르되 크기·굵기는 주변 UI(13px)에 맞춘다 */
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+button {
+  font-weight: 700;
+}
+
 button,
 input,
 select {
-  font: inherit;
+  font-family: inherit;
 }
 
 .app-shell {
@@ -377,8 +392,8 @@ select {
 
 .coefficient-detail-header {
   display: grid;
-  grid-template-columns: 90px 1fr auto auto 140px;
-  gap: 12px;
+  grid-template-columns: auto minmax(0, 1fr) auto auto auto auto auto;
+  gap: 8px;
   align-items: center;
   min-height: 46px;
   border: 1px solid #253247;
@@ -389,6 +404,8 @@ select {
 
 .ghost-button {
   min-height: 38px;
+  padding: 0 10px;
+  white-space: nowrap;
   border: 1px solid #263242;
   border-radius: 6px;
   color: #fff;
@@ -411,14 +428,16 @@ select {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
+  min-width: 0;
   color: #58a6ff;
-  font-size: 18px;
+  font-size: 15px;
+  white-space: nowrap;
 }
 
 .coefficient-selected img {
-  width: 34px;
-  height: 34px;
+  width: 26px;
+  height: 26px;
   object-fit: contain;
 }
 
@@ -544,45 +563,6 @@ select {
   accent-color: #58a6ff;
 }
 
-.coefficient-summary {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 4px;
-  border: 1px solid #263242;
-  border-radius: 6px;
-  background: #0d1117;
-  padding: 8px;
-}
-
-.coefficient-summary div {
-  display: grid;
-  justify-items: center;
-  gap: 4px;
-  color: #8b949e;
-  font-size: 13px;
-}
-
-.coefficient-summary strong {
-  color: #fff;
-  font-size: 12px;
-}
-
-.coefficient-summary strong.status-impossible {
-  color: var(--danger);
-}
-
-.coefficient-summary strong.status-hard {
-  color: #b7791f;
-}
-
-.coefficient-summary strong.status-possible {
-  color: var(--accent);
-}
-
-.coefficient-summary strong.status-smooth {
-  color: var(--blue);
-}
-
 /* 계수 계산기: 메인 테이블 컬럼 폭
    부위·계수는 고정, 아이템은 최장명 실측폭, 남는 공간은 숫자 입력 컬럼들이 나눠 가져 표를 꽉 채움 */
 .coefficient-table {
@@ -628,9 +608,18 @@ select {
   padding-right: 4px;
 }
 
+/* 강화 열은 "강화 마법방어"처럼 제목이 길어 줄바꿈이 났다.
+   남는 폭은 계수 열에서 가져온다 */
+.coefficient-table th:nth-child(4),
+.coefficient-table td:nth-child(4),
+.coefficient-table th:nth-child(6),
+.coefficient-table td:nth-child(6) {
+  width: 84px;
+}
+
 .coefficient-table th:nth-child(8),
 .coefficient-table td:nth-child(8) {
-  width: 100px;
+  width: 78px;
 }
 
 /* 계수 계산기: 편집 가능한 입력 셀 (밝은 테마, 편집 가능함을 시각적으로 표시) */
@@ -706,7 +695,7 @@ select {
 /* 계수 계산기: 메인 테이블 합계 행 (카드형, 계수 강조) */
 .coefficient-maintotal {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 8px;
   margin-top: 10px;
 }
@@ -907,7 +896,7 @@ select {
 
 .addon-titlebar {
   display: grid;
-  grid-template-columns: 190px minmax(0, 1fr);
+  grid-template-columns: minmax(190px, auto) minmax(0, 1fr);
   gap: 16px;
   align-items: end;
   justify-items: stretch;
@@ -926,6 +915,7 @@ select {
   font-size: clamp(25px, 3vw, 34px);
   line-height: 1;
   letter-spacing: 0;
+  white-space: nowrap;
 }
 
 .addon-window {
@@ -1185,23 +1175,6 @@ select {
 
 .toggle-row input {
   accent-color: var(--accent);
-}
-
-.coefficient-summary {
-  border-color: var(--line);
-  background: var(--panel);
-}
-
-.coefficient-summary div {
-  color: var(--muted);
-}
-
-.coefficient-summary strong {
-  color: var(--danger);
-}
-
-.coefficient-summary div:first-child strong {
-  color: var(--ink);
 }
 
 .dark-card h3 {
@@ -1635,9 +1608,10 @@ select {
 
 .dmg-head {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 300px;
+  /* 정보 | 저장·불러오기 | 몬스터 — 한 줄에 들어가야 한다 */
+  grid-template-columns: minmax(0, 1fr) auto auto;
   gap: 12px;
-  align-items: end;
+  align-items: center;
   padding: 12px 14px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -2438,10 +2412,6 @@ img.dmg-chk-icon {
 
   .coefficient-maintotal div {
     padding: 5px 6px;
-  }
-
-  .coefficient-summary {
-    padding: 6px 8px;
   }
 
   .coefficient-table th,
@@ -3945,7 +3915,7 @@ img.dmg-chk-icon {
   }
 
   .addon-titlebar {
-    grid-template-columns: 170px minmax(0, 1fr);
+    grid-template-columns: minmax(170px, auto) minmax(0, 1fr);
     gap: 12px;
   }
 
@@ -3976,7 +3946,7 @@ img.dmg-chk-icon {
   }
 
   .coefficient-detail-header {
-    grid-template-columns: 90px 1fr auto auto;
+    grid-template-columns: auto minmax(0, 1fr) auto auto auto auto;
   }
 
   .coefficient-detail-header .dark-field {
@@ -4059,6 +4029,10 @@ img.dmg-chk-icon {
     grid-template-columns: 1fr;
   }
 
+  .addon-titlebar .brand-block h1 {
+    white-space: normal;
+  }
+
   .addon-subtabs {
     display: grid;
     grid-auto-flow: row;
@@ -4088,10 +4062,6 @@ img.dmg-chk-icon {
 
   .coefficient-detail-header {
     grid-template-columns: 1fr;
-  }
-
-  .coefficient-summary {
-    grid-template-columns: 1fr 1fr;
   }
 
   .stat-table th,
@@ -4152,6 +4122,19 @@ img.dmg-chk-icon {
   opacity: 0.82;
 }
 
+/* 베타 버전: 정식 다운로드와 구분되게 테두리만 금색으로 */
+.overlay-beta {
+  border-color: var(--gold);
+  background: #fff;
+  color: var(--gold);
+}
+
+.overlay-beta:hover {
+  border-color: var(--gold);
+  background: var(--gold);
+  color: #fff;
+}
+
 .overlay-repo-link {
   display: grid;
   place-items: center;
@@ -4169,6 +4152,31 @@ img.dmg-chk-icon {
 .overlay-repo-link:hover {
   color: var(--ink);
   border-color: var(--accent);
+}
+
+/* 계산기 헤더의 "계산 타입" · "몬스터"는 라벨이 위에 쌓여 줄 높이가 들쭉날쭉했다.
+   라벨을 왼쪽으로 붙여 다른 버튼들과 같은 한 줄 높이로 맞춘다 */
+.coefficient-detail-header .dark-field,
+.dmg-head .dmg-monster {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.coefficient-detail-header .dark-field > span,
+.dmg-head .dmg-monster > span {
+  white-space: nowrap;
+}
+
+.coefficient-detail-header .dark-field select,
+.dmg-head .dmg-monster select {
+  width: auto;
+  min-width: 132px;
+  min-height: 38px;
+}
+
+.dmg-head .dmg-monster select {
+  min-width: 220px;
 }
 
 .overlay-panel {
@@ -4956,4 +4964,96 @@ img.dmg-chk-icon {
 
 @media (max-width: 640px) {
   .dmg-pierce div { grid-template-columns: 1fr; gap: 2px; }
+}
+
+/* 계수 계산기 스탯이 비어 있을 때 */
+.dmg-warn {
+  margin: 0 0 10px;
+  padding: 9px 12px;
+  border: 1px solid #f0c9c7;
+  border-radius: 8px;
+  background: #fdecec;
+  color: #b3413f;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* 방어 관통: 지금 계수로 그 콘텐츠에 대미지가 들어가는지 */
+.coefficient-pierce-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 14px 0 8px;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.coefficient-pierce {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.coefficient-pierce div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.coefficient-pierce span {
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.coefficient-pierce strong {
+  font-size: 14px;
+}
+
+.coefficient-pierce strong.is-ok { color: #2563c9; }
+.coefficient-pierce strong.is-no { color: #c62828; }
+
+/* 남은/모자란 계수. 판정보다 덜 중요해 작게 */
+.coefficient-pierce em {
+  color: var(--muted);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 900px) {
+  .coefficient-pierce { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+@media (max-width: 560px) {
+  .coefficient-pierce { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* 도움말 모달 본문 문단 */
+.modal-text {
+  margin: 0 0 8px;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.7;
+}
+
+.modal-text:last-child { margin-bottom: 0; }
+
+/* 대미지 계산기 JSON 저장/불러오기 */
+.dmg-io {
+  display: flex;
+  gap: 6px;
 }

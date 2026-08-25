@@ -6,7 +6,7 @@
     <title>TW DB</title>
     <!-- 이미지 CDN. 첫 이미지 요청 전에 DNS+TLS를 미리 끝내둔다 -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
-    <link rel="stylesheet" href="./assets/styles.css?v=20260824-dmg-save3" />
+    <link rel="stylesheet" href="./assets/styles.css?v=20260825-cols" />
   </head>
   <body>
     <main class="app-shell">
@@ -357,6 +357,8 @@
                   <button class="preset-button" type="button" data-preset="3">3</button>
                 </div>
                 <button id="coefficientResetButton" class="ghost-button reset-button" type="button">↺ 초기화</button>
+                <button id="coeffExport" class="ghost-button" type="button" title="JSON 파일로 내려받기">↓ 저장</button>
+                <button id="coeffImport" class="ghost-button" type="button" title="JSON 파일에서 불러오기">↑ 불러오기</button>
                 <label class="dark-field">
                   <span>계산 타입</span>
                   <select id="coefficientTypeSelect"></select>
@@ -398,7 +400,8 @@
                 </aside>
               </div>
 
-              <div id="coefficientContentSummary" class="coefficient-summary"></div>
+              <p class="coefficient-pierce-title">방어 관통 <button id="pierceHelpButton" class="eta-help-button" type="button" title="방어 관통 안내" aria-label="방어 관통 안내">?</button></p>
+              <div id="coefficientPierce" class="coefficient-pierce"></div>
             </div>
           </section>
 
@@ -409,11 +412,16 @@
             </div>
 
             <div id="dmgBody" class="dmg-body" hidden>
+              <p id="dmgStatWarn" class="dmg-warn" hidden></p>
               <div class="dmg-head">
                 <div class="dmg-head-info">
                   <span>캐릭터 <strong id="dmgCharName">-</strong></span>
                   <span>계산타입 <strong id="dmgCalcType">-</strong></span>
                   <span>최종 계수 <strong id="dmgFinalCoeff">0</strong></span>
+                </div>
+                <div class="dmg-io">
+                  <button id="dmgExport" class="ghost-button" type="button" title="계수까지 함께 JSON으로 내려받기">↓ 저장</button>
+                  <button id="dmgImport" class="ghost-button" type="button" title="JSON 파일에서 불러오기">↑ 불러오기</button>
                 </div>
                 <label class="field dmg-monster"><span>몬스터</span><select id="dmgMonster"></select></label>
               </div>
@@ -644,6 +652,10 @@
           <div class="addon-tab-field overlay-actions-field">
             <span>다운로드</span>
             <div class="overlay-actions">
+              <a id="overlayBetaDownload" class="overlay-download overlay-beta" href="https://github.com/TWHome-Git/TWChatOverlay/releases/tag/5.0.0" target="_blank" rel="noopener noreferrer">
+                <strong>베타 버전 다운로드</strong>
+                <small id="overlayBetaMeta">v5.0.0</small>
+              </a>
               <a id="overlayDownload" class="overlay-download" href="https://github.com/TWHome-Git/TWChatOverlay/releases/latest" target="_blank" rel="noopener noreferrer">
                 <strong>최신 버전 다운로드</strong>
                 <small id="overlayReleaseMeta">Latest Release</small>
@@ -733,7 +745,7 @@
       </div>
     </template>
 
-    <script src="./assets/app.js?v=20260824-dmg-save3" type="module"></script>
+    <script src="./assets/app.js?v=20260825-cols" type="module"></script>
     <!-- GoatCounter 방문자 분석 (localhost 방문은 count.js가 기본으로 집계 제외) -->
     <script data-goatcounter="https://holedis88.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
   </body>
