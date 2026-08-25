@@ -1412,10 +1412,27 @@ select {
   line-height: 1.6;
 }
 
+/* 한 줄이 길어 좁은 화면에서 숫자 중간이 끊겼다.
+   토막(번째 / 단계 / 비용 / 기대값)을 통째로 넘긴다. */
 .sim-log .log-entry {
-  padding: 2px 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 10px;
+  padding: 3px 0;
   border-bottom: 1px solid #eef3f0;
-  overflow-wrap: anywhere;
+}
+
+.sim-log .log-entry > span {
+  white-space: nowrap;
+}
+
+.sim-log .log-seq {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.sim-log .log-seq::before {
+  content: "• ";
 }
 
 .sim-log .log-cumulative {
@@ -1424,7 +1441,20 @@ select {
   border: 1px solid var(--line);
   border-radius: 6px;
   background: var(--panel);
-  white-space: pre-line;
+}
+
+/* 제목과 기대값 차이는 제 줄을 갖고, 누적 비용 둘은 넓을 때만 한 줄에 묶인다 */
+.log-cumulative .cum-head,
+.log-cumulative .cum-diff {
+  display: block;
+}
+
+.log-cumulative .cum-cost {
+  margin-right: 14px;
+}
+
+.mobile-unsupported {
+  display: none;
 }
 
 .sim-pos {
@@ -1763,9 +1793,6 @@ select {
   font-weight: 800;
 }
 
-@media (max-width: 560px) {
-  #dmgBreakdownBody { grid-template-columns: 1fr; }
-}
 
 .dmg-breakdown summary {
   cursor: pointer;
@@ -2037,11 +2064,6 @@ img.dmg-chk-icon {
   }
 }
 
-@media (max-width: 620px) {
-  .dmg-grid {
-    grid-template-columns: 1fr;
-  }
-}
 
 /* 준비중 플레이스홀더 (추가 메뉴) */
 /* ── 버프 아이템 (경험치 / 레어) ────────────────────── */
@@ -2337,24 +2359,6 @@ img.dmg-chk-icon {
   }
 }
 
-@media (max-width: 640px) {
-  .buff-grid,
-  .buff-top {
-    grid-template-columns: 1fr;
-  }
-
-  .buff-subtabs,
-  .buff-body {
-    padding-left: 12px;
-    padding-right: 12px;
-  }
-
-  .buff-base,
-  .buff-result {
-    margin-left: 12px;
-    margin-right: 12px;
-  }
-}
 
 .coming-soon {
   display: grid;
@@ -3548,7 +3552,7 @@ img.dmg-chk-icon {
   max-height: max(400px, calc(100vh - 235px));
 }
 
-.eta-list {
+.equip-list.eta-list {
   min-width: 0;
 }
 
@@ -3676,16 +3680,6 @@ img.dmg-chk-icon {
   }
 }
 
-@media (max-width: 560px) {
-  #etaView .eta-workspace {
-    grid-template-columns: 110px minmax(0, 1fr);
-    gap: 8px;
-  }
-
-  .eta-sidebar {
-    padding: 8px 6px;
-  }
-}
 
 /* ── 장비 목록(리스트 뷰) ───────────────────────────── */
 
@@ -3976,104 +3970,6 @@ img.dmg-chk-icon {
   }
 }
 
-@media (max-width: 560px) {
-  .app-shell {
-    width: min(100vw - 18px, 1180px);
-    padding-top: 10px;
-  }
-
-  .toolbar,
-  .workspace {
-    padding: 12px;
-  }
-
-  .workspace {
-    grid-template-columns: 1fr;
-  }
-
-  .control-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .top-tabs {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .board-open-button {
-    grid-column: 1 / -1;
-  }
-
-  .search-field {
-    grid-column: auto;
-  }
-
-  .result-band {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .compare-panel {
-    order: -1;
-  }
-
-  .item-hero {
-    grid-template-columns: 1fr;
-  }
-
-  .addon-view,
-  .placeholder-view {
-    padding: 8px;
-  }
-
-  .addon-titlebar {
-    grid-template-columns: 1fr;
-  }
-
-  .addon-titlebar .brand-block h1 {
-    white-space: normal;
-  }
-
-  .addon-subtabs {
-    display: grid;
-    grid-auto-flow: row;
-    grid-auto-columns: auto;
-    grid-template-columns: 1fr;
-  }
-
-  .addon-tab {
-    min-width: 0;
-  }
-
-  .character-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 10px;
-    padding: 10px;
-  }
-
-  .character-portrait {
-    width: 90px;
-    height: 90px;
-  }
-
-  .character-portrait img {
-    width: 88px;
-    height: 88px;
-  }
-
-  .coefficient-detail-header {
-    grid-template-columns: 1fr;
-  }
-
-  .stat-table th,
-  .stat-table td {
-    padding: 6px 4px;
-    font-size: 11px;
-  }
-
-  .materials div {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
 
 /* ── TWChatOverlay 탭 ─────────────────────────────────────── */
 
@@ -4156,6 +4052,11 @@ img.dmg-chk-icon {
 
 /* 계산기 헤더의 "계산 타입" · "몬스터"는 라벨이 위에 쌓여 줄 높이가 들쭉날쭉했다.
    라벨을 왼쪽으로 붙여 다른 버튼들과 같은 한 줄 높이로 맞춘다 */
+.coefficient-detail-header > *,
+.dmg-head > * {
+  min-width: 0;
+}
+
 .coefficient-detail-header .dark-field,
 .dmg-head .dmg-monster {
   display: flex;
@@ -4170,13 +4071,21 @@ img.dmg-chk-icon {
 
 .coefficient-detail-header .dark-field select,
 .dmg-head .dmg-monster select {
-  width: auto;
-  min-width: 132px;
+  width: 0;
+  flex: 1 1 auto;
+  min-width: 0;
   min-height: 38px;
 }
 
-.dmg-head .dmg-monster select {
-  min-width: 220px;
+/* 넓은 화면에서만 넉넉한 최소 폭을 준다. 좁은 화면에선 폭을 밀어내기 때문 */
+@media (min-width: 1025px) {
+  .coefficient-detail-header .dark-field select {
+    min-width: 132px;
+  }
+
+  .dmg-head .dmg-monster select {
+    min-width: 220px;
+  }
 }
 
 .overlay-panel {
@@ -4346,24 +4255,6 @@ img.dmg-chk-icon {
   text-align: left;
 }
 
-@media (max-width: 720px) {
-  .overlay-actions-field {
-    justify-items: stretch;
-  }
-
-  .overlay-actions-field > span {
-    justify-self: start;
-  }
-
-  .overlay-actions {
-    display: grid;
-    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
-  }
-
-  .overlay-panel {
-    padding: 14px 12px 20px;
-  }
-}
 
 /* ── 문의 · 건의 게시판 ── */
 
@@ -4652,19 +4543,6 @@ img.dmg-chk-icon {
   font-weight: 600;
 }
 
-@media (max-width: 640px) {
-  .board-item {
-    grid-template-columns: auto 1fr;
-  }
-
-  .board-item-meta {
-    grid-column: 1 / -1;
-  }
-
-  .board-form {
-    grid-template-columns: 1fr;
-  }
-}
 
 /* ── 에타 레벨 누적 재료 계산 ── */
 .eta-calc {
@@ -4771,14 +4649,6 @@ img.dmg-chk-icon {
   font-weight: 800;
 }
 
-@media (max-width: 560px) {
-  .eta-calc-field,
-  .eta-calc-field input {
-    width: 100%;
-  }
-
-  .eta-calc-arrow { display: none; }
-}
 
 /* 획득처 체크박스 — 레벨 입력 오른쪽에 붙는다 */
 .eta-calc-sources {
@@ -4875,22 +4745,6 @@ img.dmg-chk-icon {
 
 .eta-calc-days-list strong { font-weight: 800; }
 
-@media (max-width: 720px) {
-  .eta-calc-sources {
-    flex-basis: 100%;
-    margin-left: 0;
-    padding-left: 0;
-    padding-top: 12px;
-    border-left: 0;
-    border-top: 1px solid var(--line);
-  }
-
-  .eta-calc-days-list li {
-    grid-template-columns: 1fr auto;
-  }
-
-  .eta-calc-days-list em { grid-column: 1 / -1; }
-}
 
 /* 배타 그룹 때문에 못 켜는 버프 (클로에 작열 / 풍화) */
 .dmg-row.is-locked {
@@ -4962,9 +4816,6 @@ img.dmg-chk-icon {
   font-variant-numeric: tabular-nums;
 }
 
-@media (max-width: 640px) {
-  .dmg-pierce div { grid-template-columns: 1fr; gap: 2px; }
-}
 
 /* 계수 계산기 스탯이 비어 있을 때 */
 .dmg-warn {
@@ -5037,9 +4888,6 @@ img.dmg-chk-icon {
   .coefficient-pierce { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 
-@media (max-width: 560px) {
-  .coefficient-pierce { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
 
 /* 도움말 모달 본문 문단 */
 .modal-text {

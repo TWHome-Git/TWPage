@@ -1,0 +1,755 @@
+/* ══════════════════════════════════════════════════════════════
+   모바일 전용 스타일 (720px 이하)
+   index.html에서 media="(max-width: 720px)"로 붙는다.
+   styles.css 뒤에 오므로 같은 특이도면 이 파일이 이긴다.
+   ══════════════════════════════════════════════════════════════ */
+
+@media (max-width: 560px) {
+  #dmgBreakdownBody { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 620px) {
+  .dmg-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .buff-grid,
+  .buff-top {
+    grid-template-columns: 1fr;
+  }
+
+  .buff-subtabs,
+  .buff-body {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .buff-base,
+  .buff-result {
+    margin-left: 12px;
+    margin-right: 12px;
+  }
+}
+
+/* 폰 폭에서는 사이드바를 옆에 두면 표가 200px밖에 못 쓴다. 표 위로 올린다. */
+@media (max-width: 560px) {
+  #etaView .eta-workspace {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .eta-sidebar {
+    padding: 8px;
+  }
+
+  /* 캐릭터 목록이 세로로 길게 늘어지지 않게 칩처럼 깐다 */
+  .eta-cat-group > div {
+    grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+    gap: 4px;
+  }
+
+  .eta-subcat {
+    padding-left: 0;
+    text-align: center;
+  }
+
+  .eta-list-wrap {
+    max-height: max(360px, calc(100vh - 330px));
+  }
+
+  /* 폰에서는 정수 열을 접는다. 5열은 폰 폭에 들어가지 않는다 */
+  .eta-list thead th:nth-child(5),
+  .eta-list .eta-essence {
+    display: none;
+  }
+
+  /* 남은 4열을 폰 폭에 밀어넣는다. 순위 칸과 좌우 여백을 줄인다 */
+  .eta-list thead th.eta-rank-head {
+    width: 44px;
+  }
+
+  .eta-list thead th,
+  .eta-row td {
+    padding-left: 4px;
+    padding-right: 4px;
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 560px) {
+  .app-shell {
+    width: min(100vw - 18px, 1180px);
+    padding-top: 10px;
+  }
+
+  .toolbar,
+  .workspace {
+    padding: 12px;
+  }
+
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .control-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .top-tabs {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .board-open-button {
+    grid-column: 1 / -1;
+  }
+
+  .search-field {
+    grid-column: auto;
+  }
+
+  .result-band {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .item-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .addon-view,
+  .placeholder-view {
+    padding: 8px;
+  }
+
+  .addon-titlebar {
+    grid-template-columns: 1fr;
+  }
+
+  .addon-titlebar .brand-block h1 {
+    white-space: normal;
+  }
+
+  .addon-subtabs {
+    display: grid;
+    grid-auto-flow: row;
+    grid-auto-columns: auto;
+    grid-template-columns: 1fr;
+  }
+
+  .addon-tab {
+    min-width: 0;
+  }
+
+  .character-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    padding: 10px;
+  }
+
+  .character-portrait {
+    width: 90px;
+    height: 90px;
+  }
+
+  .character-portrait img {
+    width: 88px;
+    height: 88px;
+  }
+
+  .coefficient-detail-header {
+    grid-template-columns: 1fr;
+  }
+
+  .stat-table th,
+  .stat-table td {
+    padding: 6px 4px;
+    font-size: 11px;
+  }
+
+  .materials div {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .overlay-actions-field {
+    justify-items: stretch;
+  }
+
+  .overlay-actions-field > span {
+    justify-self: start;
+  }
+
+  .overlay-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  }
+
+  .overlay-download {
+    padding: 6px 10px;
+  }
+
+  .overlay-panel {
+    padding: 14px 12px 20px;
+  }
+}
+
+@media (max-width: 640px) {
+  .board-item {
+    grid-template-columns: auto 1fr;
+  }
+
+  .board-item-meta {
+    grid-column: 1 / -1;
+  }
+
+  .board-form {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .eta-calc-field,
+  .eta-calc-field input {
+    width: 100%;
+  }
+
+  .eta-calc-arrow { display: none; }
+}
+
+@media (max-width: 720px) {
+  .eta-calc-sources {
+    flex-basis: 100%;
+    margin-left: 0;
+    padding-left: 0;
+    padding-top: 12px;
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .eta-calc-days-list li {
+    grid-template-columns: 1fr auto;
+  }
+
+  .eta-calc-days-list em { grid-column: 1 / -1; }
+}
+
+@media (max-width: 640px) {
+  .dmg-pierce div { grid-template-columns: 1fr; gap: 2px; }
+}
+
+@media (max-width: 560px) {
+  .coefficient-pierce { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* 폰 폭에서는 다운로드 버튼을 나란히 두면 글자가 접힌다. 세로로 쌓는다. */
+@media (max-width: 560px) {
+  .overlay-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ── 폰 폭 공통 가드 ──────────────────────────────────────────
+   그리드/플렉스 칸은 기본값이 min-width: auto라, 안에 넓은 것이 하나만
+   있어도 패널 전체가 그만큼 늘어나 페이지가 옆으로 밀린다.
+   칸이 내용보다 좁아질 수 있게 풀어두고, 넓은 내용은 각자
+   제 컨테이너 안에서 스크롤하게 한다. */
+@media (max-width: 720px) {
+  .main-panel,
+  .main-panel > *,
+  .addon-window,
+  .addon-content,
+  .workspace,
+  .workspace > * {
+    min-width: 0;
+  }
+
+  /* 입력창은 그냥 두면 20자 남짓 폭을 주장한다 */
+  input,
+  select {
+    min-width: 0;
+  }
+}
+
+/* ── 시뮬레이터 ─────────────────────────────────────────────── */
+@media (max-width: 720px) {
+  /* 운 분포 막대그래프는 줄바꿈이 안 되므로 제 칸 안에서만 스크롤시킨다 */
+  .sim-graph {
+    overflow-x: auto;
+  }
+
+  .sim-status,
+  .sim-controls {
+    min-width: 0;
+  }
+}
+
+/* ── DB 검색 장비 목록 ───────────────────────────────────────
+   10열은 폰에 들어가지 않는다. 한 줄을 카드로 펴고,
+   값이 없는 능력치는 접어 실제로 붙은 것만 보여준다. */
+@media (max-width: 560px) {
+  #listWorkspace .equip-list {
+    min-width: 0;
+    display: block;
+  }
+
+  #listWorkspace .equip-list thead {
+    display: none;
+  }
+
+  #listWorkspace .equip-list tbody,
+  #listWorkspace .equip-list tbody tr {
+    display: block;
+  }
+
+  #listWorkspace .equip-list tbody tr {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  #listWorkspace .equip-list td {
+    display: block;
+    border: 0;
+    padding: 0;
+    text-align: left;
+  }
+
+  #listWorkspace .equip-list td.equip-info-cell {
+    margin-bottom: 6px;
+  }
+
+  #listWorkspace .equip-list td.equip-stat.is-zero {
+    display: none;
+  }
+
+  #listWorkspace .equip-list td.equip-stat {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 3px;
+    margin: 0 3px 3px 0;
+    border-radius: 6px;
+    padding: 1px 6px;
+    background: var(--panel-strong);
+    font-size: 11px;
+  }
+
+  /* 표 머리가 없으니 능력치 이름을 칩에 직접 붙인다 (열 순서 고정) */
+  #listWorkspace .equip-list td.equip-stat::before {
+    color: var(--muted);
+    font-weight: 700;
+  }
+
+  /* 칸 안에서는 위아래로 쌓여 있던 수치·한계작을 한 줄로 붙인다 */
+  #listWorkspace .equip-list td.equip-stat .range,
+  #listWorkspace .equip-list td.equip-stat .limit {
+    display: inline;
+    margin: 0;
+    font-size: 11px;
+  }
+
+  #listWorkspace .equip-list td.equip-stat .limit::before {
+    content: "/";
+    color: var(--muted);
+  }
+
+  /* 한 줄에 3개는 들어가야 하므로 긴 이름은 줄여 쓴다 */
+  #listWorkspace .equip-list td.equip-stat:nth-child(2)::before { content: "찌르"; }
+  #listWorkspace .equip-list td.equip-stat:nth-child(3)::before { content: "베기"; }
+  #listWorkspace .equip-list td.equip-stat:nth-child(4)::before { content: "물방"; }
+  #listWorkspace .equip-list td.equip-stat:nth-child(5)::before { content: "마공"; }
+  #listWorkspace .equip-list td.equip-stat:nth-child(6)::before { content: "마방"; }
+  #listWorkspace .equip-list td.equip-stat:nth-child(7)::before { content: "명중"; }
+  #listWorkspace .equip-list td.equip-stat:nth-child(8)::before { content: "회피"; }
+  #listWorkspace .equip-list td.equip-stat:nth-child(9)::before { content: "민첩"; }
+  #listWorkspace .equip-list td.equip-stat:nth-child(10)::before { content: "크리"; }
+}
+
+/* ── 어빌리티 · 아바타 목록 ───────────────────────────────────
+   3열뿐인데 장비 목록의 min-width: 900px에 끌려가 옆으로 밀렸다. */
+@media (max-width: 720px) {
+  .equip-list.ability-list,
+  .equip-list.avatar-list {
+    min-width: 0;
+  }
+
+  .ability-list th,
+  .ability-list td,
+  .avatar-list th,
+  .avatar-list td {
+    padding-left: 6px;
+    padding-right: 6px;
+  }
+}
+
+/* 3열이어도 효과·획득처가 길어 폰 폭을 넘는다. 장비 목록과 같이 카드로 편다. */
+@media (max-width: 560px) {
+  .ability-list,
+  .avatar-list {
+    display: block;
+  }
+
+  .ability-list thead,
+  .avatar-list thead {
+    display: none;
+  }
+
+  .ability-list tbody,
+  .avatar-list tbody,
+  .ability-list tbody tr,
+  .avatar-list tbody tr {
+    display: block;
+  }
+
+  .ability-list tbody tr,
+  .avatar-list tbody tr {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .ability-list td,
+  .avatar-list td {
+    display: block;
+    border: 0;
+    padding: 0;
+    text-align: left;
+  }
+
+  .ability-list .equip-info-cell,
+  .avatar-list .equip-info-cell,
+  .ability-list .ability-prob,
+  .avatar-list .avatar-slot {
+    margin-bottom: 4px;
+  }
+
+  .ability-list .ability-prob,
+  .avatar-list .avatar-slot {
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  /* 불사·안식의 추가 효과는 데스크톱에서 5개씩 깔지만 폰에서는 2개씩 */
+  .ability-row.is-sub .ability-chips {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .avatar-list .avatar-source,
+  .ability-list .ability-effects {
+    font-size: 12px;
+    overflow-wrap: anywhere;
+  }
+
+  /* 긴 이름이 칸 폭을 밀지 않게 */
+  .equip-info-cell .equip-name-block strong,
+  .equip-info-cell .equip-name-block small {
+    overflow-wrap: anywhere;
+  }
+}
+
+/* ── 폰에서 표를 카드로 펴는 공통 규칙 ────────────────────────
+   열이 6개를 넘으면 폰 폭에 절대 안 들어간다. 한 줄을 카드로 눕히고
+   셀마다 data-label을 이름표로 붙인다 (머리글이 안 보이므로). */
+@media (max-width: 560px) {
+  .sim-table,
+  .eta-info-table {
+    display: block;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .sim-table thead,
+  .eta-info-table thead {
+    display: none;
+  }
+
+  .sim-table tbody,
+  .sim-table tbody tr,
+  .eta-info-table tbody,
+  .eta-info-table tbody tr {
+    display: block;
+  }
+
+  .sim-table tbody tr,
+  .eta-info-table tbody tr {
+    margin-bottom: 6px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 6px 8px;
+    background: #fff;
+  }
+
+  /* 첫 칸(단계·레벨)은 카드 제목 */
+  .sim-table tbody td:first-child,
+  .sim-table tbody th,
+  .eta-info-table tbody th {
+    display: block;
+    margin-bottom: 4px;
+    border: 0;
+    padding: 0;
+    color: var(--accent-strong);
+    font-size: 13px;
+    font-weight: 700;
+    text-align: left;
+  }
+
+  .sim-table tbody td,
+  .eta-info-table tbody td {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 4px;
+    margin: 0 4px 3px 0;
+    border: 0;
+    border-radius: 6px;
+    padding: 1px 6px;
+    background: var(--panel-strong);
+    font-size: 11px;
+    text-align: left;
+    white-space: normal;
+  }
+
+  .sim-table tbody td:first-child {
+    background: none;
+    padding: 0;
+  }
+
+  .sim-table tbody td::before,
+  .eta-info-table tbody td::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-weight: 700;
+  }
+
+  .sim-table tbody td:first-child::before {
+    content: none;
+  }
+
+  /* 값이 비어 있는 칸은 접는다 (렐릭 표는 단계마다 쓰는 재료가 다르다) */
+  .sim-table tbody td:empty,
+  .eta-info-table tbody td:empty {
+    display: none;
+  }
+
+  .sim-table-wrap,
+  .eta-info-table-wrap {
+    overflow-x: visible;
+  }
+}
+
+/* ── 인크립트 운 분포 그래프 ──────────────────────────────────
+   막대 문자열이라 줄바꿈이 안 된다. 자간을 없애고, 막대 개수 자체도
+   encLuckGraph()에서 폰이면 21개로 줄인다. */
+@media (max-width: 560px) {
+  .sim-status .sim-graph {
+    overflow-x: auto;
+    letter-spacing: 0;
+  }
+}
+
+/* ── 인크립트 로그 ────────────────────────────────────────────
+   폰에서는 토막이 어디서 끊길지 모르면 읽기 힘들다. 항상 3줄로 고정한다.
+   1줄: N번째 · 인크 단계 / 2줄: 비용 / 3줄: 기대값 */
+@media (max-width: 560px) {
+  .sim-log .log-entry {
+    display: block;
+  }
+
+  .sim-log .log-seq {
+    margin-right: 8px;
+  }
+
+  .sim-log .log-cost,
+  .sim-log .log-exp {
+    display: block;
+  }
+
+  /* 누적 합산도 한 줄에 하나씩 */
+  .log-cumulative .cum-cost,
+  .log-cumulative .cum-exp {
+    display: block;
+    margin-right: 0;
+  }
+}
+
+/* ── 계수 계산기 표 ───────────────────────────────────────────
+   8열은 폰에 들어가지 않는다. 부위 하나를 카드로 펴고
+   수치 입력은 2열로 깐다. 이름표는 셀의 data-label에서 가져온다. */
+@media (max-width: 560px) {
+  .coefficient-table {
+    display: block;
+    width: 100%;
+  }
+
+  .coefficient-table thead {
+    display: none;
+  }
+
+  .coefficient-table tbody {
+    display: block;
+  }
+
+  .coefficient-table tbody tr {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 6px;
+    margin-bottom: 6px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 7px 9px;
+    background: #fff;
+  }
+
+  /* 부위 이름과 아이템 콤보는 한 줄 전체 */
+  .coefficient-table tbody th,
+  .coefficient-table tbody td[data-label="아이템"],
+  .coefficient-table tbody td[data-label="능력 타입"],
+  .coefficient-table tbody td.ability-inline-cell,
+  .coefficient-table tbody td.coeff-cell {
+    grid-column: 1 / -1;
+  }
+
+  .coefficient-table tbody th {
+    padding: 0;
+    border: 0;
+    color: var(--accent-strong);
+    font-size: 13px;
+    font-weight: 700;
+    text-align: left;
+  }
+
+  .coefficient-table tbody td {
+    display: block;
+    padding: 0;
+    border: 0;
+    text-align: left;
+  }
+
+  .coefficient-table tbody td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 1px;
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 700;
+  }
+
+  .coefficient-table tbody td[data-label="아이템"]::before {
+    display: none;
+  }
+
+  .coefficient-table select {
+    width: 100%;
+    min-width: 0;
+  }
+
+  /* 계수는 카드 아래에 결과처럼 */
+  .coefficient-table tbody td.coeff-cell {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-top: 2px;
+    border-top: 1px solid var(--line);
+    padding-top: 4px;
+  }
+
+  .coefficient-table tbody td.coeff-cell::before {
+    margin-bottom: 0;
+  }
+
+  /* 어빌리티 행: "어빌리티 / 시에나" 두 칸을 나란히 두면 넘친다 */
+  .coefficient-table td.ability-inline-cell {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    padding-left: 0;
+    white-space: normal;
+  }
+
+  .ability-field {
+    display: grid;
+    gap: 1px;
+    min-width: 0;
+    margin-right: 0;
+  }
+
+  .ability-field > span {
+    color: var(--muted);
+    font-size: 10px;
+  }
+
+  .coefficient-table td.ability-inline-cell input {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .coefficient-table-card {
+    overflow-x: visible;
+    padding: 8px;
+  }
+
+  /* 합계 5칸을 한 줄에 두면 이름이 잘린다. 2줄로 나눈다. */
+  .coefficient-maintotal {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 5px;
+  }
+
+  .coefficient-maintotal div {
+    padding: 6px 4px;
+    font-size: 11px;
+  }
+}
+
+/* ── 재료 칩 ──────────────────────────────────────────────────
+   2열이면 칸이 105px뿐이라 "프시키의 파편 - 파괴(4)" 같은 긴 이름이
+   말줄임으로 잘린다. 폰에서는 잘라내는 대신 줄을 바꾼다. */
+@media (max-width: 560px) {
+  .material-chip span {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+  }
+
+  .material-chip {
+    align-items: flex-start;
+    line-height: 1.3;
+  }
+}
+
+/* ── 모달 ────────────────────────────────────────────────────
+   place-items: center로 놓인 패널이 min-width: auto라, 안의 20x20
+   확률표만큼 통째로 넓어져 화면 밖으로 나갔다.
+   패널은 화면에 맞추고 표만 안에서 스크롤시킨다. */
+@media (max-width: 720px) {
+  .modal {
+    padding: 10px;
+  }
+
+  .modal-panel {
+    min-width: 0;
+    width: 100%;
+    max-height: min(90vh, 100%);
+  }
+
+  .modal-head {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .modal-body {
+    padding: 0 12px 12px;
+    overflow: auto;
+  }
+}
+
+/* ── 문의 게시판 ──────────────────────────────────────────────
+   제목 한 줄에 말줄임이라 폰에서는 대부분 잘린다. 두 줄까지 편다. */
+@media (max-width: 560px) {
+  .board-item-title {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    white-space: normal;
+    line-height: 1.35;
+  }
+}

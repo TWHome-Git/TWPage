@@ -1191,8 +1191,8 @@ function renderEtaInfo() {
       ${summaryRows.map((row) => `
         <tr>
           <th>${escapeHtml(row[0])}</th>
-          ${row.slice(1, 10).map((cell) => `<td>${escapeHtml(cell || "-")}</td>`).join("")}
-          <td class="eta-info-note">${row[10] ? `<img class="eta-note-icon" src="./images/${encodeURIComponent("경험의 정수.png")}" alt="경험의 정수" title="누적 경험의 정수" decoding="async" /> - ${escapeHtml(row[10])}` : ""}</td>
+          ${row.slice(1, 10).map((cell, i) => `<td data-label="${escapeHtml(summaryHead[i + 1] || "")}">${escapeHtml(cell || "-")}</td>`).join("")}
+          <td class="eta-info-note" data-label="${escapeHtml(summaryHead[10] || "")}">${row[10] ? `<img class="eta-note-icon" src="./images/${encodeURIComponent("경험의 정수.png")}" alt="경험의 정수" title="누적 경험의 정수" decoding="async" /> - ${escapeHtml(row[10])}` : ""}</td>
         </tr>
       `).join("")}
     </tbody>
@@ -1209,15 +1209,15 @@ function renderEtaInfo() {
       ${levels.map((row) => `
         <tr>
           <th>${row.lv}</th>
-          <td>${escapeHtml(row.exp)}</td>
-          <td>${escapeHtml(row.seed)}</td>
-          <td class="eta-info-sub">${escapeHtml(row.sub || "")}</td>
-          <td>${escapeHtml(row.water)}</td>
-          <td>${escapeHtml(row.dmg)}</td>
-          <td>${escapeHtml(row.hp)}</td>
-          <td>${escapeHtml(row.def)}</td>
-          <td>${escapeHtml(row.stat)}</td>
-          <td>${escapeHtml(row.awaken)}</td>
+          <td data-label="필요 경험치">${escapeHtml(row.exp)}</td>
+          <td data-label="필요 SEED">${escapeHtml(row.seed)}</td>
+          <td class="eta-info-sub" data-label="부재료">${escapeHtml(row.sub || "")}</td>
+          <td data-label="경험의 정수">${escapeHtml(row.water)}</td>
+          <td data-label="최대 대미지">${escapeHtml(row.dmg)}</td>
+          <td data-label="최대 HP">${escapeHtml(row.hp)}</td>
+          <td data-label="최대 방어력">${escapeHtml(row.def)}</td>
+          <td data-label="최대 스탯">${escapeHtml(row.stat)}</td>
+          <td data-label="각성 대미지">${escapeHtml(row.awaken)}</td>
         </tr>
       `).join("")}
     </tbody>
@@ -3191,9 +3191,11 @@ function makeNumberInput(row, field, onCommit) {
   return input;
 }
 
-function cellWith(node, className) {
+// label: 폰에서 표를 카드로 펼 때 값 앞에 붙일 이름 (머리글이 안 보인다)
+function cellWith(node, className, label) {
   const td = document.createElement("td");
   if (className) td.className = className;
+  if (label) td.dataset.label = label;
   if (node instanceof Node) td.appendChild(node);
   else td.textContent = node;
   return td;
@@ -3247,7 +3249,7 @@ function renderCalculator() {
       typeSelect.addEventListener("change", () => {
         row.abilityType = typeSelect.value;
       });
-      tr.appendChild(cellWith(typeSelect));
+      tr.appendChild(cellWith(typeSelect, null, "능력 타입"));
 
       // 콤보 오른쪽: 어빌리티 / 시에나 입력
       const cell = document.createElement("td");
@@ -3270,7 +3272,7 @@ function renderCalculator() {
       }
       tr.appendChild(cell);
 
-      const coeff = cellWith(f0(row.coefficient), "coeff-cell");
+      const coeff = cellWith(f0(row.coefficient), "coeff-cell", "계수");
       calc.dom.rowCoeff.set(row.slotName, coeff);
       tr.appendChild(coeff);
 
@@ -3289,15 +3291,15 @@ function renderCalculator() {
       if (row.slotName === "무기") updateStatLimitHintsFromWeapon();
       renderCalculator();
     });
-    tr.appendChild(cellWith(select));
+    tr.appendChild(cellWith(select, null, "아이템"));
 
-    tr.appendChild(cellWith(makeNumberInput(row, "attackValue")));
-    tr.appendChild(cellWith(makeNumberInput(row, "attackEnchant")));
-    tr.appendChild(cellWith(makeNumberInput(row, "defenseValue")));
-    tr.appendChild(cellWith(makeNumberInput(row, "defenseEnchant")));
-    tr.appendChild(cellWith(makeNumberInput(row, "hitValue")));
+    tr.appendChild(cellWith(makeNumberInput(row, "attackValue"), null, primary));
+    tr.appendChild(cellWith(makeNumberInput(row, "attackEnchant"), null, `강화 ${primary}`));
+    tr.appendChild(cellWith(makeNumberInput(row, "defenseValue"), null, secondary));
+    tr.appendChild(cellWith(makeNumberInput(row, "defenseEnchant"), null, `강화 ${secondary}`));
+    tr.appendChild(cellWith(makeNumberInput(row, "hitValue"), null, "명중"));
 
-    const coeff = cellWith(f0(row.coefficient), "coeff-cell");
+    const coeff = cellWith(f0(row.coefficient), "coeff-cell", "계수");
     calc.dom.rowCoeff.set(row.slotName, coeff);
     tr.appendChild(coeff);
 
@@ -5227,7 +5229,8 @@ function encLuckStats() {
 }
 function encLuckGraph(z) {
   const levels = "▁▂▃▄▅▆▇█";
-  const n = 33;
+  // 막대는 줄바꿈이 안 되므로 폰에서는 개수를 줄여 폭을 맞춘다
+  const n = window.matchMedia("(max-width: 560px)").matches ? 19 : 33;
   const chars = [];
   for (let i = 0; i < n; i++) {
     const x = -3 + (6 * i) / (n - 1);
@@ -5274,15 +5277,19 @@ function encRemoveCumulative() {
 }
 function encAppendLog(e) {
   const expectedCost = e.rate > 0 ? e.unit * (100 / e.rate) : null;
-  let html = `• [ ${e.attempts.toLocaleString("ko-KR")}번째 | ${e.inkBefore}→${e.inkAfter} 인크 | 비용 ${encFmtCost(e.cost)}`;
+  // 토막마다 span으로 감싼다. 좁은 화면에서 숫자 중간이 아니라
+  // 토막 단위로 줄이 바뀌어야 읽을 수 있다.
+  let html =
+    `<span class="log-seq">${e.attempts.toLocaleString("ko-KR")}번째</span>` +
+    `<span class="log-step">${e.inkBefore}→${e.inkAfter} 인크</span>` +
+    `<span class="log-cost">비용 ${encFmtCost(e.cost)}</span>`;
   if (expectedCost != null) {
     const diff = expectedCost - e.cost;
     encSim.totalExpectedCost += expectedCost;
-    html += ` | 기대값 <span class="${diff >= 0 ? "sim-pos" : "sim-neg"}">${encFmtSigned(diff)}</span>`;
+    html += `<span class="log-exp">기대값 <span class="${diff >= 0 ? "sim-pos" : "sim-neg"}">${encFmtSigned(diff)}</span></span>`;
   } else {
-    html += " | 기대값 N/A";
+    html += '<span class="log-exp">기대값 N/A</span>';
   }
-  html += " ]";
   const div = document.createElement("div");
   div.className = "log-entry";
   div.innerHTML = html;
@@ -5302,9 +5309,10 @@ function encUpdateCumulative() {
   div.className = "log-cumulative";
   div.id = "encCumulative";
   div.innerHTML =
-    `▼ 누적 합산 (${encSim.totalAttempts.toLocaleString("ko-KR")}회 시도)\n` +
-    `누적 비용: ${encFmtCost(encSim.totalCost)}  |  누적 기대 비용: ${encFmtCost(displayExpected)}\n` +
-    `기대값 차이: <span class="${diff >= 0 ? "sim-pos" : "sim-neg"}">${encFmtSigned(diff)}</span>`;
+    `<span class="cum-head">▼ 누적 합산 (${encSim.totalAttempts.toLocaleString("ko-KR")}회 시도)</span>` +
+    `<span class="cum-cost">누적 비용: ${encFmtCost(encSim.totalCost)}</span>` +
+    `<span class="cum-exp">누적 기대 비용: ${encFmtCost(displayExpected)}</span>` +
+    `<span class="cum-diff">기대값 차이: <span class="${diff >= 0 ? "sim-pos" : "sim-neg"}">${encFmtSigned(diff)}</span></span>`;
   simEls.encLog.appendChild(div);
   simEls.encLog.scrollTop = simEls.encLog.scrollHeight;
 }
@@ -5573,10 +5581,12 @@ function coreRenderTable(rows) {
     `${simIcon("시드.png")}강화 비용`,
     `${simIcon("시드.png")}총 기대비용`,
   ];
+  // 폰에서는 표를 카드로 펴므로 셀마다 이름을 달아둔다 (머리글이 안 보인다)
+  const labels = ["단계", "확률", "시도", "가루", "결정", "강화 비용", "총 기대비용"];
   const body = rows
     .map((r) => {
       const cells = [r.step.display, `${r.step.ratePct}%`, coreFmtCount(r.expected), r.dustExp.toLocaleString("ko-KR"), r.crystalExp.toLocaleString("ko-KR"), `${coreFmtEok(r.seedExp)}억`, `${coreFmtEok(r.stepCost)}억`];
-      return "<tr>" + cells.map((c, i) => `<td${i === cells.length - 1 ? ' class="sim-cost"' : ""}>${escapeHtml(c)}</td>`).join("") + "</tr>";
+      return "<tr>" + cells.map((c, i) => `<td data-label="${escapeHtml(labels[i])}"${i === cells.length - 1 ? ' class="sim-cost"' : ""}>${escapeHtml(c)}</td>`).join("") + "</tr>";
     })
     .join("");
   simEls.coreTable.innerHTML = `<thead><tr>${head.map((h) => `<th><span class="sim-th">${h}</span></th>`).join("")}</tr></thead><tbody>${body}</tbody>`;
@@ -5743,6 +5753,8 @@ function relicRenderTable(rows) {
     `${simIcon("달의파편.png")}달의 파편`,
     `${simIcon("월광석.png")}월광석`,
   ];
+  // 카드로 펼 때 쓸 이름 (머리글의 아이콘을 뺀 글자만)
+  const labels = ["단계", "확률", "시도", "신조의 가루", "신조의 정수", "달의 파편", "월광석"];
   const body = rows
     .map((r) => {
       const isShinjo = r.isShinjo;
@@ -5755,7 +5767,7 @@ function relicRenderTable(rows) {
         isShinjo ? "" : relicFmtNum(r.moonPiece),
         r.moonStone != null ? relicFmtNum(r.moonStone) : "",
       ];
-      return "<tr>" + cells.map((c) => `<td>${escapeHtml(c)}</td>`).join("") + "</tr>";
+      return "<tr>" + cells.map((c, i) => `<td data-label="${escapeHtml(labels[i])}">${escapeHtml(c)}</td>`).join("") + "</tr>";
     })
     .join("");
   simEls.relicTable.innerHTML = `<thead><tr>${head.map((h) => `<th><span class="sim-th">${h}</span></th>`).join("")}</tr></thead><tbody>${body}</tbody>`;
