@@ -21,7 +21,7 @@ const SNAPSHOT_URL = "./data/equipment-snapshot.json";
 // 기존 태그를 옮기면 안 된다. 캐시가 immutable이라 옛 이미지가 1년간 그대로 나간다.
 //   git tag v3.0.1 && git push origin v3.0.1
 const CDN_ROOT = "https://cdn.jsdelivr.net/gh/TWHome-Git/TWPage@";
-const CDN_AVATAR_ROOT = `${CDN_ROOT}v1.0.4/`;
+const CDN_AVATAR_ROOT = `${CDN_ROOT}v1.0.5/`;
 const CDN_EQUIP_ROOT = `${CDN_ROOT}v2.0.3/`;
 const CDN_ETC_ROOT = `${CDN_ROOT}v3.0.0/`;
 
