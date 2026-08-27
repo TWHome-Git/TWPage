@@ -337,6 +337,7 @@ const els = {
   avatarListWorkspace: document.querySelector("#avatarListWorkspace"),
   avatarDetailWorkspace: document.querySelector("#avatarDetailWorkspace"),
   avatarListBody: document.querySelector("#avatarListBody"),
+  avatarViewTabs: document.querySelector("#avatarViewTabs"),
   avatarListWrap: document.querySelector(".avatar-list-wrap"),
   avatarDetailCard: document.querySelector("#avatarDetailCard"),
   calculatorTabButtons: document.querySelectorAll("[data-calculator-tab]"),
@@ -576,6 +577,7 @@ async function boot() {
   activateExtraTab("content");
   revealLocalOnly();
   wireEvents();
+  setAvatarImageMode(avatar.imageMode); // 저장된 선택을 버튼에 반영
   wireRoute();
   routeApply(initialRoute);
   initDamageCalculator();
@@ -1597,10 +1599,14 @@ function avatarSlotPath(file, slot) {
   return file && slot ? `${slot}/${file}` : file;
 }
 
+const AVATAR_VIEW_KEY = "tw-avatar-list-view";
+
 const avatar = {
   records: [],
   filtered: [],
   view: "list", // "list" | "detail"
+  // 목록 썸네일을 아이콘(55px)으로 볼지 착용 이미지로 볼지
+  imageMode: etaReadCache(AVATAR_VIEW_KEY) === "detail" ? "detail" : "icon",
   detailIndex: 0,
   listScroll: 0,
   query: "",
@@ -1762,18 +1768,42 @@ function avatarSourceSummary(record) {
   return rest > 0 ? `${label} <em class="avatar-more">외 ${rest}곳</em>` : label;
 }
 
+// 착용 이미지는 아바타마다 크기·비율이 제각각이라 세로만 맞추고 가로는 흐르게 둔다.
+// 착용 이미지가 없는 아바타는 아이콘으로 되돌린다.
+function avatarListImageHtml(record, detailMode) {
+  const detail = record.detailImages[0];
+  const [base, file] = detailMode && detail
+    ? [AVATAR_DETAIL_BASE, detail]
+    : [AVATAR_ICON_BASE, record.listImage];
+  if (!file) return "";
+  return `<img src="${base}${encodeImagePath(file)}" alt="" loading="lazy" decoding="async" />`;
+}
+
+function setAvatarImageMode(mode) {
+  avatar.imageMode = mode === "detail" ? "detail" : "icon";
+  etaWriteCache(AVATAR_VIEW_KEY, avatar.imageMode);
+  els.avatarViewTabs?.querySelectorAll("[data-avatar-view]").forEach((button) => {
+    const on = button.dataset.avatarView === avatar.imageMode;
+    button.classList.toggle("is-active", on);
+    button.setAttribute("aria-checked", String(on));
+  });
+  renderAvatarList();
+}
+
 function renderAvatarList() {
   if (!avatar.filtered.length) {
     els.avatarListBody.innerHTML = listPlaceholderRow(3, avatar.loaded, "검색 결과가 없습니다", "조건을 조금 넓혀보세요.");
     return;
   }
 
+  const detailMode = avatar.imageMode === "detail";
+
   els.avatarListBody.innerHTML = avatar.filtered.map((record, index) => `
     <tr class="equip-row avatar-row" data-index="${index}">
       <td class="equip-info-cell">
         <div class="equip-info">
-          <span class="equip-thumb ability-thumb">
-            ${record.listImage ? `<img src="${AVATAR_ICON_BASE}${encodeImagePath(record.listImage)}" alt="" loading="lazy" decoding="async" />` : ""}
+          <span class="equip-thumb ability-thumb${detailMode ? " is-wide" : ""}">
+            ${avatarListImageHtml(record, detailMode)}
           </span>
           <span class="equip-name-block">
             <strong>${escapeHtml(record.displayName)}</strong>
@@ -3736,6 +3766,11 @@ function wireEvents() {
     avatar.view = "detail";
     renderAvatar();
     routeWrite();
+  });
+
+  els.avatarViewTabs?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-avatar-view]");
+    if (button) setAvatarImageMode(button.dataset.avatarView);
   });
 
   els.avatarBackButton?.addEventListener("click", () => {

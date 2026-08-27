@@ -3488,6 +3488,22 @@ img.dmg-chk-icon {
   background: var(--panel-strong);
 }
 
+/* 아바타 목록을 착용 이미지로 볼 때. 아바타마다 비율이 달라
+   세로만 맞추고 가로는 내용에 맡긴다. */
+.equip-thumb.is-wide {
+  width: auto;
+  min-width: 72px;
+  max-width: 132px;
+  height: 84px;
+}
+
+.equip-thumb.is-wide img {
+  width: auto;
+  max-width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
 .eta-server-tab.is-active {
   border-color: var(--accent);
   color: #fff;
