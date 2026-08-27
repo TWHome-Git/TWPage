@@ -2615,8 +2615,18 @@ img.dmg-chk-icon {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.coef-grid[data-steps="3"] .coef-value {
+/* 물리복합·마법베기는 보조스탯 한계까지 붙어 네 칸이 된다 */
+.coef-grid[data-steps="4"] {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.coef-grid[data-steps="3"] .coef-value,
+.coef-grid[data-steps="4"] .coef-value {
   font-size: 17px;
+}
+
+.coef-grid[data-steps="4"] .coef-value {
+  font-size: 16px;
 }
 
 .coef-item {

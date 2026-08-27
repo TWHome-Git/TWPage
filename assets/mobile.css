@@ -753,3 +753,17 @@
     line-height: 1.35;
   }
 }
+
+/* ── 장비 상세 계수 칸 ────────────────────────────────────────
+   폰에서 네 칸을 한 줄에 두면 숫자가 잘린다. 두 줄로 나눈다. */
+@media (max-width: 560px) {
+  .coef-grid[data-steps="3"],
+  .coef-grid[data-steps="4"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .coef-grid[data-steps="3"] .coef-value,
+  .coef-grid[data-steps="4"] .coef-value {
+    font-size: 16px;
+  }
+}

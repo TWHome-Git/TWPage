@@ -3919,19 +3919,32 @@ const COEF_WEIGHTS = {
   [CALC.MAGIC_HACK]: [14.5, 28.75, 14.5, 28.75],
 };
 
-// 장비 한 개의 계수.
-// withPrimaryLimit=true면 주스탯을 한계치(LIMIT)까지 강화한 상태로 계산한다.
-function equipmentCoefficient(record, type, primaryEnchant = 0) {
+// 장비 한 개의 계수. 강화는 주스탯·보조스탯 중 한쪽에만 붙는다.
+function equipmentCoefficient(record, type, primaryEnchant = 0, secondaryEnchant = 0) {
   const w = COEF_WEIGHTS[type];
   if (!w) return 0;
   const { pMax, sMax } = statByType(record, type);
-  return w[0] * pMax + w[1] * Math.max(0, primaryEnchant) + w[2] * sMax;
+  return w[0] * pMax + w[1] * Math.max(0, primaryEnchant)
+       + w[2] * sMax + w[3] * Math.max(0, secondaryEnchant);
 }
 
 // 주스탯을 한계치까지 올렸을 때의 강화량 (= 스탯표의 "한계" 값)
 function primaryEnchantCap(record, type) {
   const { pMax, pLimit } = statByType(record, type);
   return Math.max(0, pLimit - pMax);
+}
+
+function secondaryEnchantCap(record, type) {
+  const { sMax, sLimit } = statByType(record, type);
+  return Math.max(0, sLimit - sMax);
+}
+
+// 물리복합·마법베기는 두 스탯의 계수 가중치가 같아서(14.5 / 28.75) 어느 쪽을
+// 강화해도 값어치가 같다. 그래서 한계치가 큰 쪽을 고르는 문제가 된다.
+// 나머지 계열은 주스탯 강화가 확실히 유리해 보조스탯 강화를 따로 보여주지 않는다.
+function hasTwoEnchantChoices(type) {
+  const w = COEF_WEIGHTS[type];
+  return !!w && w[1] === w[3];
 }
 
 // 이클립스부터가 상위 등급이다. 앞의 改-는 개조 표기라 등급 판단에서 무시한다.
@@ -3963,12 +3976,19 @@ const COEF_STAT_NAMES = {
 // 계수 칸 목록. [라벨, 강화량] 순으로 기본 → 중간 → 한계.
 function coefficientSteps(record, type) {
   const cap = primaryEnchantCap(record, type);
-  const [primaryName] = COEF_STAT_NAMES[type] || ["주스탯", "부스탯"];
-  const steps = [["기본", 0]];
+  const [primaryName, secondaryName] = COEF_STAT_NAMES[type] || ["주스탯", "부스탯"];
+  const steps = [{ label: "기본", p: 0, s: 0 }];
   const mid = midEnchantStep(record);
   // 한계보다 큰 강화는 불가능하므로 그런 경우엔 중간 단계를 건너뛴다.
-  if (mid > 0 && mid < cap) steps.push([`+${mid} ${primaryName}`, mid]);
-  steps.push([`+${formatNumber(cap)} ${primaryName}`, cap]);
+  if (mid > 0 && mid < cap) steps.push({ label: `+${mid} ${primaryName}`, p: mid, s: 0, limit: false });
+  steps.push({ label: `+${formatNumber(cap)} ${primaryName}`, p: cap, s: 0, limit: true });
+
+  // 두 스탯 중 어느 쪽을 강화해도 값어치가 같은 계열이면, 보조스탯 쪽 한계도 낸다.
+  // 중간 단계(+28)는 가중치가 같아 양쪽 값이 똑같으므로 따로 내지 않는다.
+  if (hasTwoEnchantChoices(type)) {
+    const sCap = secondaryEnchantCap(record, type);
+    if (sCap > 0) steps.push({ label: `+${formatNumber(sCap)} ${secondaryName}`, p: 0, s: sCap, limit: true });
+  }
   return steps;
 }
 
@@ -4069,15 +4089,16 @@ function coefficientBlockHtml(record) {
   const { pMax, sMax } = statByType(record, type);
   const [primaryName, secondaryName] = COEF_STAT_NAMES[type] || ["주스탯", "부스탯"];
   const steps = coefficientSteps(record, type);
-  const items = steps.map(([label, enchant], index) => {
-    const isLast = index === steps.length - 1;
+  const items = steps.map((step, index) => {
     const note = index === 0
       ? `${primaryName} ${formatNumber(pMax)} · ${secondaryName} ${formatNumber(sMax)}`
-      : `${primaryName} ${formatNumber(pMax + enchant)}`;
+      : step.s > 0
+        ? `${secondaryName} ${formatNumber(sMax + step.s)}`
+        : `${primaryName} ${formatNumber(pMax + step.p)}`;
     return `
         <div class="coef-item">
-          <span class="coef-label">${escapeHtml(label)}</span>
-          <strong class="coef-value${isLast ? " is-limit" : ""}">${formatCoefficient(equipmentCoefficient(record, type, enchant))}</strong>
+          <span class="coef-label">${escapeHtml(step.label)}</span>
+          <strong class="coef-value${step.limit ? " is-limit" : ""}">${formatCoefficient(equipmentCoefficient(record, type, step.p, step.s))}</strong>
           <span class="coef-note">${note}</span>
         </div>
     `;
@@ -4236,10 +4257,10 @@ function renderCompare() {
     ? `
     <div class="compare-coef">
       <p class="compare-coef-head">${escapeHtml(compare.name)} 계수 · ${escapeHtml(CALC_TYPE_DISPLAY[coefType])}</p>
-      <div class="diff-grid">${coefficientSteps(compare, coefType).map(([label, enchant]) => `
+      <div class="diff-grid">${coefficientSteps(compare, coefType).map((step) => `
         <div class="diff-row">
-          <span>${escapeHtml(label)}</span>
-          <strong class="neutral">${formatCoefficient(equipmentCoefficient(compare, coefType, enchant))}</strong>
+          <span>${escapeHtml(step.label)}</span>
+          <strong class="neutral">${formatCoefficient(equipmentCoefficient(compare, coefType, step.p, step.s))}</strong>
         </div>
       `).join("")}</div>
     </div>`
