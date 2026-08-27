@@ -6,9 +6,9 @@
     <title>TW DB</title>
     <!-- 이미지 CDN. 첫 이미지 요청 전에 DNS+TLS를 미리 끝내둔다 -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
-    <link rel="stylesheet" href="./assets/styles.css?v=20260827-avview" />
+    <link rel="stylesheet" href="./assets/styles.css?v=20260827-gallery" />
     <!-- 모바일 전용. media 속성 덕에 넓은 화면에서는 렌더링을 막지 않는다 -->
-    <link rel="stylesheet" href="./assets/mobile.css?v=20260827-avview" media="(max-width: 720px)" />
+    <link rel="stylesheet" href="./assets/mobile.css?v=20260827-gallery" media="(max-width: 720px)" />
   </head>
   <body>
     <main class="app-shell">
@@ -300,15 +300,16 @@
               <strong id="avatarCount">0개</strong>
               <span id="avatarStatus">데이터 준비 중</span>
             </div>
-            <div id="avatarViewTabs" class="eta-server-tabs" role="radiogroup" aria-label="목록 이미지 종류">
-              <button class="eta-server-tab is-active" type="button" role="radio" aria-checked="true" data-avatar-view="icon">아이콘</button>
-              <button class="eta-server-tab" type="button" role="radio" aria-checked="false" data-avatar-view="detail">착용 이미지</button>
+            <div id="avatarViewTabs" class="eta-server-tabs" role="radiogroup" aria-label="목록 보기 방식">
+              <button class="eta-server-tab is-active" type="button" role="radio" aria-checked="true" data-avatar-view="list">리스트 형</button>
+              <button class="eta-server-tab" type="button" role="radio" aria-checked="false" data-avatar-view="gallery">갤러리 형</button>
             </div>
             <button id="avatarBackButton" type="button" class="back-list-button" hidden>← 목록</button>
           </section>
 
           <section id="avatarListWorkspace" class="workspace list-workspace">
-            <div class="equip-list-wrap avatar-list-wrap">
+            <div id="avatarGallery" class="avatar-gallery" aria-label="아바타 목록 (갤러리)" hidden></div>
+            <div id="avatarListTableWrap" class="equip-list-wrap avatar-list-wrap">
               <table class="equip-list avatar-list" aria-label="아바타 목록">
                 <thead>
                   <tr>
@@ -764,7 +765,7 @@
       </div>
     </template>
 
-    <script src="./assets/app.js?v=20260827-avview" type="module"></script>
+    <script src="./assets/app.js?v=20260827-gallery" type="module"></script>
     <!-- GoatCounter 방문자 분석 (localhost 방문은 count.js가 기본으로 집계 제외) -->
     <script data-goatcounter="https://holedis88.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
   </body>

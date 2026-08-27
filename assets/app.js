@@ -338,6 +338,8 @@ const els = {
   avatarDetailWorkspace: document.querySelector("#avatarDetailWorkspace"),
   avatarListBody: document.querySelector("#avatarListBody"),
   avatarViewTabs: document.querySelector("#avatarViewTabs"),
+  avatarGallery: document.querySelector("#avatarGallery"),
+  avatarListTableWrap: document.querySelector("#avatarListTableWrap"),
   avatarListWrap: document.querySelector(".avatar-list-wrap"),
   avatarDetailCard: document.querySelector("#avatarDetailCard"),
   calculatorTabButtons: document.querySelectorAll("[data-calculator-tab]"),
@@ -577,7 +579,7 @@ async function boot() {
   activateExtraTab("content");
   revealLocalOnly();
   wireEvents();
-  setAvatarImageMode(avatar.imageMode); // 저장된 선택을 버튼에 반영
+  setAvatarViewMode(avatar.viewMode); // 저장된 선택을 버튼에 반영
   wireRoute();
   routeApply(initialRoute);
   initDamageCalculator();
@@ -1599,14 +1601,14 @@ function avatarSlotPath(file, slot) {
   return file && slot ? `${slot}/${file}` : file;
 }
 
+// 목록을 표로 볼지(리스트 형) 카드 격자로 볼지(갤러리 형)
 const AVATAR_VIEW_KEY = "tw-avatar-list-view";
 
 const avatar = {
   records: [],
   filtered: [],
   view: "list", // "list" | "detail"
-  // 목록 썸네일을 아이콘(55px)으로 볼지 착용 이미지로 볼지
-  imageMode: etaReadCache(AVATAR_VIEW_KEY) === "detail" ? "detail" : "icon",
+  viewMode: etaReadCache(AVATAR_VIEW_KEY) === "gallery" ? "gallery" : "list",
   detailIndex: 0,
   listScroll: 0,
   query: "",
@@ -1768,42 +1770,61 @@ function avatarSourceSummary(record) {
   return rest > 0 ? `${label} <em class="avatar-more">외 ${rest}곳</em>` : label;
 }
 
-// 착용 이미지는 아바타마다 크기·비율이 제각각이라 세로만 맞추고 가로는 흐르게 둔다.
-// 착용 이미지가 없는 아바타는 아이콘으로 되돌린다.
-function avatarListImageHtml(record, detailMode) {
-  const detail = record.detailImages[0];
-  const [base, file] = detailMode && detail
-    ? [AVATAR_DETAIL_BASE, detail]
-    : [AVATAR_ICON_BASE, record.listImage];
-  if (!file) return "";
-  return `<img src="${base}${encodeImagePath(file)}" alt="" loading="lazy" decoding="async" />`;
-}
-
-function setAvatarImageMode(mode) {
-  avatar.imageMode = mode === "detail" ? "detail" : "icon";
-  etaWriteCache(AVATAR_VIEW_KEY, avatar.imageMode);
+function setAvatarViewMode(mode) {
+  avatar.viewMode = mode === "gallery" ? "gallery" : "list";
+  etaWriteCache(AVATAR_VIEW_KEY, avatar.viewMode);
   els.avatarViewTabs?.querySelectorAll("[data-avatar-view]").forEach((button) => {
-    const on = button.dataset.avatarView === avatar.imageMode;
+    const on = button.dataset.avatarView === avatar.viewMode;
     button.classList.toggle("is-active", on);
     button.setAttribute("aria-checked", String(on));
   });
   renderAvatarList();
 }
 
+// 갤러리 카드 한 장. 착용 이미지를 앞세우고 이름·분류·획득처를 아래에 붙인다.
+// 착용 이미지가 없으면 아이콘으로 되돌린다.
+function avatarCardHtml(record, index) {
+  const detail = record.detailImages[0];
+  const [base, file] = detail ? [AVATAR_DETAIL_BASE, detail] : [AVATAR_ICON_BASE, record.listImage];
+  const img = file
+    ? `<img src="${base}${encodeImagePath(file)}" alt="" loading="lazy" decoding="async" />`
+    : "";
+  return `
+    <button class="avatar-card" type="button" data-index="${index}">
+      <span class="avatar-card-image">${img}</span>
+      <span class="avatar-card-head">
+        <strong>${escapeHtml(record.displayName)}</strong>
+        <em>${escapeHtml(record.slots.join(", ") || "-")}</em>
+      </span>
+      <span class="avatar-card-source">${avatarSourceSummary(record)}</span>
+    </button>
+  `;
+}
+
 function renderAvatarList() {
+  const gallery = avatar.viewMode === "gallery";
+  if (els.avatarGallery) els.avatarGallery.hidden = !gallery;
+  if (els.avatarListTableWrap) els.avatarListTableWrap.hidden = gallery;
+
   if (!avatar.filtered.length) {
     els.avatarListBody.innerHTML = listPlaceholderRow(3, avatar.loaded, "검색 결과가 없습니다", "조건을 조금 넓혀보세요.");
+    if (els.avatarGallery) {
+      els.avatarGallery.innerHTML = `<p class="avatar-gallery-empty">${avatar.loaded ? "검색 결과가 없습니다" : "데이터 로딩 중"}</p>`;
+    }
     return;
   }
 
-  const detailMode = avatar.imageMode === "detail";
+  if (gallery) {
+    els.avatarGallery.innerHTML = avatar.filtered.map(avatarCardHtml).join("");
+    return;
+  }
 
   els.avatarListBody.innerHTML = avatar.filtered.map((record, index) => `
     <tr class="equip-row avatar-row" data-index="${index}">
       <td class="equip-info-cell">
         <div class="equip-info">
-          <span class="equip-thumb ability-thumb${detailMode ? " is-wide" : ""}">
-            ${avatarListImageHtml(record, detailMode)}
+          <span class="equip-thumb ability-thumb">
+            ${record.listImage ? `<img src="${AVATAR_ICON_BASE}${encodeImagePath(record.listImage)}" alt="" loading="lazy" decoding="async" />` : ""}
           </span>
           <span class="equip-name-block">
             <strong>${escapeHtml(record.displayName)}</strong>
@@ -3770,7 +3791,17 @@ function wireEvents() {
 
   els.avatarViewTabs?.addEventListener("click", (event) => {
     const button = event.target.closest("[data-avatar-view]");
-    if (button) setAvatarImageMode(button.dataset.avatarView);
+    if (button) setAvatarViewMode(button.dataset.avatarView);
+  });
+
+  // 갤러리 카드도 표의 줄과 같게 눌러 상세로 들어간다
+  els.avatarGallery?.addEventListener("click", (event) => {
+    const card = event.target.closest("[data-index]");
+    if (!card) return;
+    avatar.detailIndex = Number(card.dataset.index);
+    avatar.view = "detail";
+    renderAvatar();
+    routeWrite();
   });
 
   els.avatarBackButton?.addEventListener("click", () => {
