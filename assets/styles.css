@@ -3544,11 +3544,13 @@ img.dmg-chk-icon {
   object-fit: contain;
 }
 
+/* 분류를 오른쪽 끝까지 밀면 이름과 따로 노는 것처럼 보인다.
+   이름 바로 뒤에 붙이고, 자리가 모자라면 아랫줄로 내린다. */
 .avatar-card-head {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 3px 6px;
 }
 
 .avatar-card-head strong {
@@ -3559,8 +3561,11 @@ img.dmg-chk-icon {
 }
 
 .avatar-card-head em {
+  border-radius: 999px;
+  padding: 1px 7px;
+  background: var(--panel-strong);
   color: var(--muted);
-  font-size: 12px;
+  font-size: 11px;
   font-style: normal;
   font-weight: 700;
   white-space: nowrap;
@@ -3572,6 +3577,11 @@ img.dmg-chk-icon {
   color: var(--muted);
   font-size: 12px;
   line-height: 1.45;
+}
+
+/* 확률만 따로 아랫줄에 떨어지지 않게 앞말과 붙여 둔다 */
+.avatar-card-source .avatar-prob {
+  white-space: nowrap;
 }
 
 .eta-server-tab.is-active {
