@@ -413,7 +413,161 @@ const els = {
   emptyTemplate: document.querySelector("#emptyTemplate"),
 };
 
+
+// ══════════════════════════════════════════════════════════════
+//  주소 공유 — 지금 보고 있는 화면을 주소에 적어 링크로 나눌 수 있게 한다.
+//
+//  GitHub Pages는 정적 호스팅이라 talesdb.xyz/db/equipment/... 같은 진짜
+//  경로를 쓰면 새로고침에서 404가 난다. 서버가 그 경로의 파일을 찾기 때문이다.
+//  해시(#) 뒤는 서버로 가지 않고 브라우저 안에서만 처리돼서 그 문제가 없다.
+//
+//    #/db/equipment/아퀼루스 블레이드
+//    #/eta/info
+//    #/calc/coefficient          (계산기는 첫 화면까지만. 캐릭터는 담지 않는다)
+// ══════════════════════════════════════════════════════════════
+
+// 메인 탭별 기본 하위 탭. 하위 탭이 기본값이면 주소에서 뺀다.
+const ROUTE_DEFAULT_SUB = {
+  extra: "content",
+  eta: "ranking",
+  equipment: "equipment",
+  calculator: "coefficient",
+  simulator: "encrypt",
+  overlay: "",
+};
+
+// 하위 탭을 어느 버튼 묶음에서 읽고 어느 함수로 여는지
+const ROUTE_SUB = {
+  extra: { attr: "extraTab", open: (k) => activateExtraTab(k) },
+  eta: { attr: "etaTab", open: (k) => activateEtaTab(k) },
+  equipment: { attr: "dbTab", open: (k) => activateDbTab(k) },
+  calculator: { attr: "calculatorTab", open: (k) => activateCalculatorTab(k) },
+  simulator: { attr: "simulatorTab", open: (k) => activateSimulatorTab(k) },
+};
+
+// 아바타 이름 앞에 붙는 ♣ 같은 표시용 기호는 주소에서 뺀다. 링크가 읽기 쉬워진다.
+// 이름을 맞출 때도 같은 기준으로 다듬어, 기호가 있든 없든 찾아진다.
+const routeNameOut = (name) => String(name || "").replace(/^[♠♣♥♦★☆◆■]+\s*/, "").trim();
+const routeNameKey = (name) => routeNameOut(name).replace(/\s+/g, " ").toLowerCase();
+
+const route = {
+  applying: false, // 주소를 화면에 반영하는 중 — 이때는 주소를 다시 쓰지 않는다
+  pending: null,   // 데이터가 아직 안 와서 못 연 항목 { sub, item }
+};
+
+function routeActiveKey(attr) {
+  const el = document.querySelector(`[data-${attr.replace(/[A-Z]/g, (c) => "-" + c.toLowerCase())}].is-active`);
+  return el ? el.dataset[attr] : "";
+}
+
+// 화면 상태 → 주소 조각
+function routeCurrent() {
+  const main = routeActiveKey("mainTab");
+  if (!main) return null;
+  const sub = ROUTE_SUB[main] ? routeActiveKey(ROUTE_SUB[main].attr) : "";
+
+  let item = "";
+  if (main === "equipment") {
+    if (sub === "equipment" && state.view === "detail") item = routeNameOut(currentRecord()?.name);
+    else if (sub === "avatar" && avatar.view === "detail") item = routeNameOut(avatar.filtered[avatar.detailIndex]?.name);
+    else if (sub === "ability") item = els.abilitySearchInput?.value.trim() || "";
+  }
+  return { main, sub, item };
+}
+
+function routeToHash(r) {
+  if (!r) return "";
+  const parts = [r.main];
+  const needSub = r.item || (r.sub && r.sub !== ROUTE_DEFAULT_SUB[r.main]);
+  if (needSub) parts.push(r.sub);
+  if (r.item) parts.push(r.item);
+  return "#/" + parts.map(encodeURIComponent).join("/");
+}
+
+// 주소를 지금 화면에 맞춘다. 뒤로가기 이력을 늘리지 않도록 replaceState를 쓴다.
+function routeWrite() {
+  if (route.applying) return;
+  const hash = routeToHash(routeCurrent());
+  if (!hash || hash === location.hash) return;
+  history.replaceState(null, "", location.pathname + location.search + hash);
+}
+
+function routeParse() {
+  const raw = location.hash.replace(/^#\/?/, "");
+  if (!raw) return null;
+  const parts = raw.split("/").map((x) => {
+    try { return decodeURIComponent(x); } catch { return x; }
+  });
+  const main = parts[0] || "";
+  if (!document.querySelector(`[data-main-tab="${CSS.escape(main)}"]`)) return null;
+  return { main, sub: parts[1] || ROUTE_DEFAULT_SUB[main] || "", item: parts.slice(2).join("/") };
+}
+
+// 주소 → 화면. 항목은 데이터가 와야 열 수 있으므로 못 찾으면 미뤄 둔다.
+function routeApply(r) {
+  if (!r) return;
+  route.applying = true;
+  try {
+    activateMainTab(r.main);
+    const sub = ROUTE_SUB[r.main];
+    if (sub && r.sub && document.querySelector(`[data-${sub.attr.replace(/[A-Z]/g, (c) => "-" + c.toLowerCase())}="${CSS.escape(r.sub)}"]`)) {
+      sub.open(r.sub);
+    }
+    route.pending = r.item ? { sub: r.sub, item: r.item } : null;
+    routeResolvePending();
+  } finally {
+    route.applying = false;
+  }
+}
+
+// 데이터가 준비된 뒤 미뤄 둔 항목을 연다. 각 DB 로딩이 끝날 때마다 불린다.
+function routeResolvePending() {
+  const p = route.pending;
+  if (!p) return;
+
+  if (p.sub === "equipment") {
+    const key = routeNameKey(p.item);
+    const idx = state.filtered.findIndex((x) => routeNameKey(x.name) === key);
+    if (idx < 0) return;             // 아직 목록이 없거나 이름이 안 맞는다
+    route.pending = null;
+    openEquipmentDetail(idx);
+    return;
+  }
+
+  if (p.sub === "avatar") {
+    const key = routeNameKey(p.item);
+    const idx = avatar.filtered.findIndex((x) => routeNameKey(x.name) === key);
+    if (idx < 0) return;
+    route.pending = null;
+    avatar.detailIndex = idx;
+    avatar.view = "detail";
+    renderAvatar();
+    return;
+  }
+
+  if (p.sub === "ability") {
+    // 어빌리티는 상세 화면이 없어서 검색어로 좁혀 준다
+    if (!ability.records.length) return;
+    route.pending = null;
+    if (els.abilitySearchInput) {
+      els.abilitySearchInput.value = p.item;
+      ability.query = p.item.toLowerCase();
+      renderAbilityList();
+    }
+  }
+}
+
+function wireRoute() {
+  addEventListener("hashchange", () => {
+    if (route.applying) return;
+    routeApply(routeParse());
+  });
+}
+
 async function boot() {
+  // 기본 탭을 켜면 그 과정에서 주소가 덮어써지므로, 들어온 주소를 먼저 읽어 둔다
+  const initialRoute = routeParse();
+
   resetControls();
   renderCharacterGrid();
   activateMainTab("extra");
@@ -422,6 +576,8 @@ async function boot() {
   activateExtraTab("content");
   revealLocalOnly();
   wireEvents();
+  wireRoute();
+  routeApply(initialRoute);
   initDamageCalculator();
   initSimulators();
 
@@ -795,6 +951,8 @@ function activateMainTab(key) {
   if (key === "overlay") {
     loadOverlayTab();
   }
+
+  routeWrite();
 }
 
 // ── 에타 순위 ──────────────────────────────────────────
@@ -965,6 +1123,8 @@ function activateEtaTab(key) {
     panel.hidden = panel.dataset.etaPanel !== key;
   });
   if (key !== "ranking" && !etaInfo.data && !etaInfo.loading) loadEtaInfo();
+
+  routeWrite();
 }
 
 async function loadEtaInfo() {
@@ -1325,6 +1485,8 @@ function activateDbTab(key) {
   if (key === "avatar" && !avatar.loaded && !avatar.loading) {
     loadAvatarDb();
   }
+
+  routeWrite();
 }
 
 // ── 어빌리티 DB ──
@@ -1392,6 +1554,7 @@ async function loadAbilityDb() {
   } finally {
     ability.loading = false;
     renderAbilityList();
+    routeResolvePending();
   }
 }
 
@@ -1520,6 +1683,7 @@ async function loadAvatarDb() {
   } finally {
     avatar.loading = false;
     renderAvatar();
+    routeResolvePending();
   }
 }
 
@@ -1779,6 +1943,8 @@ function activateCalculatorTab(key) {
     if (!etaInfo.data && !etaInfo.loading) loadEtaInfo().then(dmgRefresh);
     dmgRefresh();
   }
+
+  routeWrite();
 }
 
 function activateSimulatorTab(key) {
@@ -1790,6 +1956,8 @@ function activateSimulatorTab(key) {
     panel.hidden = !isActive;
     panel.classList.toggle("is-active", isActive);
   });
+
+  routeWrite();
 }
 
 function activateExtraTab(key) {
@@ -1803,6 +1971,8 @@ function activateExtraTab(key) {
   });
   // 버프 탭은 처음 열릴 때 기본 하위 탭(경험치)을 그린다
   if (key === "buff") loadExpBuffs();
+
+  routeWrite();
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -3534,6 +3704,7 @@ function wireEvents() {
     abilitySearchTimer = setTimeout(() => {
       ability.query = els.abilitySearchInput.value.trim().toLowerCase();
       renderAbilityList();
+      routeWrite();
     }, 200);
   });
 
@@ -3564,11 +3735,13 @@ function wireEvents() {
     avatar.detailIndex = Number(row.dataset.index);
     avatar.view = "detail";
     renderAvatar();
+    routeWrite();
   });
 
   els.avatarBackButton?.addEventListener("click", () => {
     avatar.view = "list";
     renderAvatar();
+    routeWrite();
   });
 
   // 아바타 아이콘 로드 실패 시 임시 X 표시
@@ -3793,6 +3966,7 @@ function wireEvents() {
   els.backToListButton?.addEventListener("click", () => {
     state.view = "list";
     render();
+    routeWrite();
   });
 
   els.prevButton.addEventListener("click", () => {
@@ -3826,6 +4000,7 @@ function applyFilters() {
 
   state.page = clamp(state.page, 0, Math.max(0, state.filtered.length - 1));
   render();
+  routeResolvePending();
 }
 
 function populateCompareSelect() {
@@ -3875,6 +4050,7 @@ function openEquipmentDetail(index) {
   state.page = clamp(index, 0, Math.max(0, state.filtered.length - 1));
   state.view = "detail";
   render();
+  routeWrite();
 }
 
 function renderList() {
