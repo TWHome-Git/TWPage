@@ -512,6 +512,11 @@ select {
   table-layout: fixed;
 }
 
+/* 스탯·덱스만 따로 뗀 표. 아래 표와 사이를 띄운다 */
+.side-stat-table {
+  margin-bottom: 12px;
+}
+
 .side-score-table th,
 .side-score-table td {
   padding: 3px 3px;

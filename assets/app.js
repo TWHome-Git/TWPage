@@ -370,6 +370,9 @@ const els = {
   coefficientPierce: document.querySelector("#coefficientPierce"),
   sideHeadPrimary: document.querySelector("#sideHeadPrimary"),
   sideHeadSecondary: document.querySelector("#sideHeadSecondary"),
+  coefficientStatBody: document.querySelector("#coefficientStatBody"),
+  statHeadPrimary: document.querySelector("#statHeadPrimary"),
+  statHeadSecondary: document.querySelector("#statHeadSecondary"),
   avatarMainEnhance: document.querySelector("#avatarMainEnhance"),
   avatarSubEnhance: document.querySelector("#avatarSubEnhance"),
   categorySelect: document.querySelector("#categorySelect"),
@@ -2512,6 +2515,14 @@ function recalcRow(row, type) {
   })[type] || 0;
 }
 
+// 스탯 창에 뜨는 표기. 게임과 같은 말로 적어야 옮겨 적기 쉽다.
+const STAT_ABBR = {
+  찌르기: "Stab",
+  베기: "Hack",
+  마법공격: "Int",
+  마법방어: "MR",
+};
+
 // 타입별 주/보조 스탯 컬럼 라벨
 function typeStatLabels(type) {
   return ({
@@ -3221,9 +3232,11 @@ function renderCalculator() {
     .map((h) => `<th>${escapeHtml(h)}</th>`)
     .join("");
 
-  // 사이드 헤더
+  // 사이드 헤더. 스탯 표는 게임 안 표기(Stab/Hack/Int/MR)를 그대로 쓴다.
   els.sideHeadPrimary.textContent = primary;
   els.sideHeadSecondary.textContent = secondary;
+  if (els.statHeadPrimary) els.statHeadPrimary.textContent = STAT_ABBR[primary] || primary;
+  if (els.statHeadSecondary) els.statHeadSecondary.textContent = STAT_ABBR[secondary] || secondary;
 
   // 메인 테이블 본문 (어빌리티는 해당 장비 바로 아래에 인라인 행으로)
   els.coefficientTableBody.replaceChildren();
@@ -3346,16 +3359,18 @@ function sizeItemColumn() {
 
 function renderSideTable() {
   els.coefficientSideBody.replaceChildren();
+  els.coefficientStatBody?.replaceChildren();
 
   const addAccCoeff = (name, td) => calc.dom.accCoeff.set(name, td);
 
-  const buildRow = (label, cells) => {
+  // 스탯·덱스는 캐릭터 창에서 그대로 옮겨 적는 값이라 위쪽 표로 떼어 놓는다.
+  const buildRow = (label, cells, body = els.coefficientSideBody) => {
     const tr = document.createElement("tr");
     const th = document.createElement("th");
     th.textContent = label;
     tr.appendChild(th);
     for (const c of cells) tr.appendChild(c);
-    els.coefficientSideBody.appendChild(tr);
+    body.appendChild(tr);
   };
 
   const stat = accRow("스탯");
@@ -3374,7 +3389,7 @@ function renderSideTable() {
     cellWith(makeNumberInput(stat, "primaryStatValue")),
     cellWith(makeNumberInput(stat, "secondaryStatValue")),
     statCoeff,
-  ]);
+  ], els.coefficientStatBody || els.coefficientSideBody);
 
   // 덱스: 4칸 병합 입력
   const dexInput = document.createElement("input");
@@ -3391,7 +3406,7 @@ function renderSideTable() {
   dexTh.textContent = "덱스";
   dexTr.appendChild(dexTh);
   dexTr.appendChild(dexCell);
-  els.coefficientSideBody.appendChild(dexTr);
+  (els.coefficientStatBody || els.coefficientSideBody).appendChild(dexTr);
 
   // 아바타 / 커프 / 렐릭: 명중, 주스탯(값1), 부스탯(값2), 계수
   for (const [label, row] of [["아바타", avatar], ["커프", cuff], ["렐릭", relic]]) {
