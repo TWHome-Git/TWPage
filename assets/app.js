@@ -22,7 +22,7 @@ const SNAPSHOT_URL = "./data/equipment-snapshot.json";
 //   git tag v3.0.1 && git push origin v3.0.1
 const CDN_ROOT = "https://cdn.jsdelivr.net/gh/TWHome-Git/TWPage@";
 const CDN_AVATAR_ROOT = `${CDN_ROOT}v1.0.10/`;
-const CDN_EQUIP_ROOT = `${CDN_ROOT}v2.0.3/`;
+const CDN_EQUIP_ROOT = `${CDN_ROOT}v2.0.4/`;
 const CDN_ETC_ROOT = `${CDN_ROOT}v3.0.0/`;
 
 const IMAGE_BASE = `${CDN_EQUIP_ROOT}equipment-images/`;
