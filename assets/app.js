@@ -356,8 +356,6 @@ const els = {
   overlayReadme: document.querySelector("#overlayReadme"),
   overlayDownload: document.querySelector("#overlayDownload"),
   overlayReleaseMeta: document.querySelector("#overlayReleaseMeta"),
-  overlayBetaDownload: document.querySelector("#overlayBetaDownload"),
-  overlayBetaMeta: document.querySelector("#overlayBetaMeta"),
   characterGrid: document.querySelector("#characterGrid"),
   coefficientSelectView: document.querySelector("#coefficientSelectView"),
   coefficientDetailView: document.querySelector("#coefficientDetailView"),
@@ -2316,9 +2314,6 @@ const OVERLAY_REPO_URL = `https://github.com/${OVERLAY_REPO}`;
 const OVERLAY_RAW_BASE = `https://raw.githubusercontent.com/${OVERLAY_REPO}/HEAD/`;
 const OVERLAY_README_API = `https://api.github.com/repos/${OVERLAY_REPO}/readme`;
 const OVERLAY_RELEASE_API = `https://api.github.com/repos/${OVERLAY_REPO}/releases/latest`;
-// 베타는 태그를 직접 지정한다. 새 베타가 나오면 이 값만 바꾸면 된다.
-const OVERLAY_BETA_TAG = "5.0.0";
-const OVERLAY_BETA_API = `https://api.github.com/repos/${OVERLAY_REPO}/releases/tags/${OVERLAY_BETA_TAG}`;
 
 // "idle"일 때만 요청한다. 실패하면 다시 "idle"로 되돌려서 탭을 다시 눌렀을 때 재시도되게 한다.
 const overlay = { readme: "idle", release: "idle" };
@@ -2362,25 +2357,16 @@ async function loadOverlayRelease() {
   if (!els.overlayDownload || !els.overlayReleaseMeta) return;
   overlay.release = "loading";
 
-  const results = await Promise.all([
-    fillOverlayRelease(
-      OVERLAY_RELEASE_API,
-      els.overlayDownload,
-      els.overlayReleaseMeta,
-      `${OVERLAY_REPO_URL}/releases/latest`,
-      "Latest Release"
-    ),
-    fillOverlayRelease(
-      OVERLAY_BETA_API,
-      els.overlayBetaDownload,
-      els.overlayBetaMeta,
-      `${OVERLAY_REPO_URL}/releases/tag/${OVERLAY_BETA_TAG}`,
-      `v${OVERLAY_BETA_TAG}`
-    ),
-  ]);
+  const loaded = await fillOverlayRelease(
+    OVERLAY_RELEASE_API,
+    els.overlayDownload,
+    els.overlayReleaseMeta,
+    `${OVERLAY_REPO_URL}/releases/latest`,
+    "Latest Release"
+  );
 
-  // 하나라도 실패하면 탭을 다시 눌렀을 때 재시도한다
-  overlay.release = results.every(Boolean) ? "loaded" : "idle";
+  // 실패하면 탭을 다시 눌렀을 때 재시도한다
+  overlay.release = loaded ? "loaded" : "idle";
 }
 
 function formatOverlaySize(bytes) {

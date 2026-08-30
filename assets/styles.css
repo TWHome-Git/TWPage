@@ -4134,19 +4134,6 @@ img.dmg-chk-icon {
   opacity: 0.82;
 }
 
-/* 베타 버전: 정식 다운로드와 구분되게 테두리만 금색으로 */
-.overlay-beta {
-  border-color: var(--gold);
-  background: #fff;
-  color: var(--gold);
-}
-
-.overlay-beta:hover {
-  border-color: var(--gold);
-  background: var(--gold);
-  color: #fff;
-}
-
 .overlay-repo-link {
   display: grid;
   place-items: center;
