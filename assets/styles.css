@@ -2726,6 +2726,23 @@ img.dmg-chk-icon {
   padding-left: 8px;
 }
 
+/* 재료가 곧 다른 장비인 칩. 눌러서 넘어갈 수 있다는 걸 색으로 알린다 */
+.material-chip.is-equipment {
+  border-color: var(--accent);
+  color: var(--accent);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.material-chip.is-equipment:hover,
+.material-chip.is-equipment:focus-visible {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
 .compare-panel {
   display: grid;
   align-content: start;

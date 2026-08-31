@@ -4097,6 +4097,27 @@ function render() {
   renderCompare();
 }
 
+// 재료 칩에서 넘어올 때 쓴다. 지금 걸린 필터에 그 장비가 없으면 필터를 풀고 찾아간다.
+function openEquipmentById(id) {
+  if (!id) return;
+
+  let index = state.filtered.findIndex((record) => record.id === id);
+  if (index < 0) {
+    if (!state.records.some((record) => record.id === id)) return;
+    state.category = "all";
+    state.type = "all";
+    state.query = "";
+    els.searchInput.value = "";
+    populateCategorySelect(); // 분류 목록도 카테고리를 따라가야 한다
+    applyFilters();
+    index = state.filtered.findIndex((record) => record.id === id);
+    if (index < 0) return;
+  }
+
+  state.compareId = ""; // 분류가 달라지면 이전 비교 대상은 의미가 없다
+  openEquipmentDetail(index);
+}
+
 function openEquipmentDetail(index) {
   state.listScroll = els.equipListWrap?.scrollTop || 0;
   state.page = clamp(index, 0, Math.max(0, state.filtered.length - 1));
@@ -4427,6 +4448,16 @@ function renderCard() {
   els.equipmentCard.querySelectorAll(".material-icon").forEach((image) => {
     image.addEventListener("error", handleMaterialImageError);
   });
+  els.equipmentCard.querySelectorAll("[data-material-target]").forEach((chip) => {
+    chip.addEventListener("click", () => openEquipmentById(chip.dataset.materialTarget));
+  });
+}
+
+// 재료 이름이 장비 이름과 같으면(이전 단계 무기·방어구·아티팩트) 그 장비 레코드를 돌려준다
+function equipmentByMaterialName(material) {
+  const key = routeNameKey(stripTrailingQuantity(clean(material)));
+  if (!key) return null;
+  return state.records.find((record) => routeNameKey(record.name) === key) || null;
 }
 
 function materialChipHtml(item) {
@@ -4435,11 +4466,21 @@ function materialChipHtml(item) {
   const image = src
     ? `<img class="material-icon" src="${src}" alt="" loading="lazy" decoding="async" data-fallbacks="${escapeHtml(JSON.stringify(fallbacks))}" />`
     : "";
+  const inner = `${image}<span>${escapeHtml(item)}</span>`;
+  const target = equipmentByMaterialName(item);
+
+  // 재료가 곧 다른 장비면 눌러서 그 장비 정보로 넘어갈 수 있게 한다
+  if (target) {
+    return `
+      <button class="material-chip is-equipment" type="button" data-material-target="${escapeHtml(target.id)}" title="${escapeHtml(target.name)} 정보 보기">
+        ${inner}
+      </button>
+    `;
+  }
 
   return `
     <b class="material-chip">
-      ${image}
-      <span>${escapeHtml(item)}</span>
+      ${inner}
     </b>
   `;
 }
