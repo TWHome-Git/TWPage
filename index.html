@@ -564,8 +564,10 @@
                   <h3>최종 대미지 <span id="dmgFinalSum" class="dmg-badge">0%</span></h3>
                   <div class="dmg-rows">
                     <label class="dmg-row"><span class="dmg-row-label"><img class="dmg-chk-icon" src="./images/클럽공증.png" alt="" />클럽 공격력 증가 (5%)</span><input id="dmgClubFinal" type="checkbox" class="dmg-switch" /></label>
-                    <label class="dmg-row"><span class="dmg-row-label"><img class="dmg-chk-icon" src="./images/코어.png" alt="" />코어 세트 (0~20)</span><input id="dmgCoreSet" type="number" value="0" /></label>
+                    <label class="dmg-row"><span class="dmg-row-label"><img class="dmg-chk-icon" src="./images/코어.png" alt="" />코어 세트 (0~20)</span><input id="dmgCoreSet" type="number" value="0" min="0" max="20" /></label>
                     <label class="dmg-row"><span class="dmg-row-label"><img class="dmg-chk-icon" src="./images/최종.png" alt="" />에타 - 최종 대미지</span><select id="dmgEtaFinal"></select></label>
+                    <label class="dmg-row"><span class="dmg-row-label"><img class="dmg-chk-icon" src="./images/회랑.png" alt="" />회랑 - 최종 대미지</span><select id="dmgCorridorFinal"></select></label>
+                    <label class="dmg-row"><span class="dmg-row-label">기타</span><input id="dmgFinalEtc" type="number" value="0" /></label>
                   </div>
                 </section>
                 </div>

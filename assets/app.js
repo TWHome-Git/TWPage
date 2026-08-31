@@ -4579,6 +4579,10 @@ const DMG_SERIES_ARTIFACT = [15, 20, 30, 35];
 const DMG_SERIES_ART_LABELS = ["프시키 (15%)", "아크론 (20%)", "이클립스 (30%)", "에테르 (35%)"];
 const DMG_SERIES_WRIST = [25, 26, 27, 28];
 
+// 합계 상한 (넘어가도 이 값으로 고정)
+const DMG_SERIES_CAP = 73;
+const DMG_FINAL_CAP = 45;
+
 // 계산 타입(계열)별 이클립스 아티팩트 아이콘 (equipment-images 폴더)
 const DMG_ECLIPSE_ARTIFACT = {
   [CALC.STAB]: "이클립스의_자력.png",
@@ -4854,9 +4858,10 @@ function dmgCritFactorPercent() {
 }
 function dmgFinalPercent() {
   const club = dmgChecked("dmgClubFinal") ? 5 : 0;
-  const core = dmgV("dmgCoreSet");
+  const core = Math.min(20, Math.max(0, dmgV("dmgCoreSet")));
   const etaFinal = Math.min(5, dmgSel("dmgEtaFinal")) * 4;
-  return club + core + etaFinal;
+  const corridor = Math.min(5, dmgSel("dmgCorridorFinal"));
+  return Math.min(DMG_FINAL_CAP, club + core + etaFinal + corridor + dmgV("dmgFinalEtc"));
 }
 function dmgSpecialFactor() {
   const r = Math.min(50, Math.max(0, dmgV("dmgSpecialReduction")));
@@ -4866,7 +4871,7 @@ function dmgSeriesPercent() {
   const art = DMG_SERIES_ARTIFACT[dmgSel("dmgSeriesArtifact")] ?? 15;
   const wrist = DMG_SERIES_WRIST[dmgSel("dmgSeriesWrist")] ?? 25;
   const lunaria = dmgSel("dmgSeriesLunaria"); // 0~10 콤보 (index=값)
-  return art + wrist + lunaria;
+  return Math.min(DMG_SERIES_CAP, art + wrist + lunaria);
 }
 function dmgAtk1Percent() {
   let v = 0;
@@ -5114,6 +5119,7 @@ function dmgPopulateSelects() {
   dmgFillSelect("dmgAddGem", DMG_GEM.map((v) => `${v}%`));
   dmgFillSelect("dmgAddBoss", DMG_BOSS.map((v) => `${v}%`));
   dmgFillSelect("dmgEtaFinal", Array.from({ length: 6 }, (_, i) => `LV${i} - ${i * 4}%`));
+  dmgFillSelect("dmgCorridorFinal", Array.from({ length: 6 }, (_, i) => `LV${i} - ${i}%`));
   dmgFillSelect("dmgJudgement", Array.from({ length: 41 }, (_, i) => `LV${i} - ${(i * 0.75).toFixed(2)}%`));
   dmgFillSelect("dmgEtaCrit", Array.from({ length: 21 }, (_, i) => `LV${i} - ${(i * 1.5).toFixed(1)}%`));
 
@@ -5232,9 +5238,9 @@ function dmgRefresh() {
   dmgEls.dmgAtk1Sum.textContent = `${dmgAtk1Percent()}% / 50%`;
   dmgEls.dmgAtk2Sum.textContent = `${dmgAtk2Percent()}% / 30%`;
   dmgEls.dmgAtk4Sum.textContent = `${dmgAtk4Percent()}% / 80%`;
-  dmgEls.dmgSeriesSum.textContent = `${dmgSeriesPercent()}%`;
+  dmgEls.dmgSeriesSum.textContent = `${dmgSeriesPercent()}% / ${DMG_SERIES_CAP}%`;
   dmgEls.dmgAddDmgSum.textContent = `${dmgAdditionalDamagePercent()}%`;
-  dmgEls.dmgFinalSum.textContent = `${dmgFinalPercent()}%`;
+  dmgEls.dmgFinalSum.textContent = `${dmgFinalPercent()}% / ${DMG_FINAL_CAP}%`;
   dmgEls.dmgCritSum.textContent = `${dmgCritFactorPercent()}%`;
   if (dmgEls.dmgSienaSum) dmgEls.dmgSienaSum.textContent = `${dmgV("dmgSiena")}%`;
 
@@ -5376,6 +5382,22 @@ function initDamageCalculator() {
   };
   panel.addEventListener("input", markEdited);
   panel.addEventListener("change", markEdited);
+
+  // min/max가 붙은 숫자 칸은 범위를 벗어나면 값 자체를 잘라낸다.
+  // dmgRefresh/dmgSaveState보다 먼저 등록해야 잘라낸 값이 계산·저장에 쓰인다.
+  const clampRange = (event) => {
+    const el = event.target;
+    if (!(el instanceof HTMLInputElement) || el.type !== "number") return;
+    if (el.value === "" || el.value === "-") return;
+    const n = Number(el.value);
+    if (!Number.isFinite(n)) return;
+    const min = el.min === "" ? -Infinity : Number(el.min);
+    const max = el.max === "" ? Infinity : Number(el.max);
+    const clamped = Math.min(max, Math.max(min, n));
+    if (clamped !== n) el.value = String(clamped);
+  };
+  panel.addEventListener("input", clampRange);
+  panel.addEventListener("change", clampRange);
 
   panel.addEventListener("input", dmgRefresh);
   panel.addEventListener("change", dmgRefresh);
