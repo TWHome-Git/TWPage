@@ -3789,6 +3789,75 @@ img.dmg-chk-icon {
   color: #a7b0ad;
 }
 
+/* ── 신규 진입 탭 ─────────────────────────────────────────── */
+.eta-newcomer-control-grid {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+/* .workspace는 목록+사이드 2단이 기본이다. 여기는 한 단으로 쓴다 */
+.eta-newcomer-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+}
+
+.eta-newcomer-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.eta-newcomer-groups {
+  display: grid;
+  gap: 16px;
+}
+
+.eta-newcomer-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.eta-newcomer-group-head h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.eta-newcomer-group-head strong {
+  color: var(--brand);
+  font-size: 14px;
+}
+
+.eta-newcomer-hint {
+  margin: 4px 0 8px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* 목록이 길어도 페이지가 통째로 늘어나지 않게 각자 스크롤한다 */
+.eta-newcomer-list-wrap {
+  max-height: 340px;
+}
+
+.eta-newcomer-list {
+  min-width: 0;
+}
+
+.eta-newcomer-list .eta-newcomer-id {
+  font-weight: 700;
+}
+
+.eta-newcomer-empty,
+.eta-newcomer-empty-state {
+  padding: 14px;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+
 .eta-new {
   display: inline-block;
   margin-left: 6px;

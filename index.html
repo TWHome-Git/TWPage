@@ -6,9 +6,9 @@
     <title>TW DB</title>
     <!-- 이미지 CDN. 첫 이미지 요청 전에 DNS+TLS를 미리 끝내둔다 -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
-    <link rel="stylesheet" href="./assets/styles.css?v=20260901-wear-lv" />
+    <link rel="stylesheet" href="./assets/styles.css?v=20260901-eta-inout2" />
     <!-- 모바일 전용. media 속성 덕에 넓은 화면에서는 렌더링을 막지 않는다 -->
-    <link rel="stylesheet" href="./assets/mobile.css?v=20260901-wear-lv" media="(max-width: 720px)" />
+    <link rel="stylesheet" href="./assets/mobile.css?v=20260901-eta-inout2" media="(max-width: 720px)" />
   </head>
   <body>
     <main class="app-shell">
@@ -25,6 +25,7 @@
       <section id="etaView" class="main-panel" data-main-panel="eta" hidden>
         <nav class="db-subtabs" aria-label="에타 메뉴">
           <button class="db-subtab is-active" type="button" data-eta-tab="ranking">에타 순위</button>
+          <button class="db-subtab" type="button" data-eta-tab="newcomers">진입 · 이탈</button>
           <button class="db-subtab" type="button" data-eta-tab="info">에타 정보</button>
           <button class="db-subtab" type="button" data-eta-tab="calc">에타 계산기</button>
         </nav>
@@ -90,6 +91,38 @@
               <tbody id="etaRankingBody"></tbody>
             </table>
           </div>
+        </section>
+        </div>
+
+        <div data-eta-panel="newcomers" hidden>
+        <section class="toolbar" aria-label="진입 이탈 조건">
+          <div class="brand-block">
+            <p class="eyebrow">TW DB</p>
+            <h1>진입 · 이탈</h1>
+          </div>
+
+          <div class="control-grid eta-newcomer-control-grid">
+            <label class="field">
+              <span>기준 날짜</span>
+              <select id="etaNewDateSelect" disabled>
+                <option value="">최신</option>
+              </select>
+            </label>
+          </div>
+        </section>
+
+        <section class="result-band" aria-live="polite">
+          <div class="result-meta">
+            <div id="etaNewServerTabs" class="eta-server-tabs" role="radiogroup" aria-label="서버 선택"></div>
+            <span id="etaNewRange">비교 기간: -</span>
+          </div>
+        </section>
+
+        <section class="workspace eta-newcomer-workspace">
+          <p class="eta-newcomer-note">
+            기준 날짜의 에타 순위를 그 전날과 비교해, 진입한 아이디와 이탈한 아이디를 보여줍니다.
+          </p>
+          <div id="etaNewGroups" class="eta-newcomer-groups"></div>
         </section>
         </div>
 
@@ -764,7 +797,7 @@
       </div>
     </template>
 
-    <script src="./assets/app.js?v=20260901-wear-lv" type="module"></script>
+    <script src="./assets/app.js?v=20260901-eta-inout2" type="module"></script>
     <!-- GoatCounter 방문자 분석 (localhost 방문은 count.js가 기본으로 집계 제외) -->
     <script data-goatcounter="https://holedis88.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
   </body>

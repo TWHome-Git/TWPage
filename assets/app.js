@@ -407,6 +407,10 @@ const els = {
   etaSidebar: document.querySelector("#etaSidebar"),
   etaCharacterList: document.querySelector("#etaCharacterList"),
   etaRankingBody: document.querySelector("#etaRankingBody"),
+  etaNewDateSelect: document.querySelector("#etaNewDateSelect"),
+  etaNewServerTabs: document.querySelector("#etaNewServerTabs"),
+  etaNewRange: document.querySelector("#etaNewRange"),
+  etaNewGroups: document.querySelector("#etaNewGroups"),
   etaListWrap: document.querySelector(".eta-list-wrap"),
   compareSelect: document.querySelector("#compareSelect"),
   limitCompareToggle: document.querySelector("#limitCompareToggle"),
@@ -1169,6 +1173,194 @@ function etaPrevRankMap() {
   return map;
 }
 
+// ── 진입 · 이탈 페이지 ──
+// 랭킹은 한 아이디당 한 행만 나온다(중복 없음). 그래서 캐릭터 코드가 아니라
+// 아이디를 키로 잡아야 캐릭터를 바꿔 랭크된 사람이 진입으로 잘못 잡히지 않는다.
+//
+// 이 탭은 순위 탭과 따로 논다. 순위 탭은 1일/1주/1달을 고를 수 있지만
+// 여기는 "고른 날짜"와 "그 바로 앞 날짜" 딱 두 개만 본다.
+const etaNew = {
+  date: "",        // "" = 가장 최근 날짜
+  baseDate: null,  // 실제로 비교에 쓴 기준일
+  prevDate: null,
+  base: null,      // 기준일 서버별 행
+  prev: null,      // 직전일 서버별 행
+  loading: false,
+  seq: 0,
+  cache: new Map(), // 날짜 → 서버별 행. 날짜를 오가며 볼 때 재다운로드를 막는다
+};
+
+const ETA_NEW_CACHE_LIMIT = 6;
+
+async function etaNewSnapshot(date) {
+  if (etaNew.cache.has(date)) return etaNew.cache.get(date);
+  const sha = eta.index?.[date];
+  if (!sha) return null;
+  // 순위 탭과 캐시 슬롯을 공유하면 서로 덮어쓰므로 여기서는 슬롯을 쓰지 않는다
+  const payload = await fetchEtaPayload(etaSnapshotUrl(sha));
+  const servers = parseEtaServers(payload);
+  etaNew.cache.set(date, servers);
+  while (etaNew.cache.size > ETA_NEW_CACHE_LIMIT) {
+    etaNew.cache.delete(etaNew.cache.keys().next().value);
+  }
+  return servers;
+}
+
+async function loadEtaNewcomerData() {
+  const seq = ++etaNew.seq;
+  etaNew.loading = true;
+  renderEtaNewcomers();
+
+  try {
+    await loadEtaIndex();
+    const dates = eta.index ? Object.keys(eta.index).sort() : [];
+    if (!dates.length) return;
+
+    renderEtaNewDateSelect(dates);
+
+    const baseDate = etaNew.date || dates[dates.length - 1];
+    const index = dates.indexOf(baseDate);
+    const prevDate = index > 0 ? dates[index - 1] : null;
+
+    // 수집이 하루 빠진 날도 있어 "어제 날짜"가 아니라 "인덱스상 바로 앞 날짜"를 쓴다
+    const [base, prev] = await Promise.all([
+      etaNewSnapshot(baseDate),
+      prevDate ? etaNewSnapshot(prevDate) : Promise.resolve(null),
+    ]);
+    if (seq !== etaNew.seq) return;
+
+    etaNew.baseDate = baseDate;
+    etaNew.prevDate = prevDate;
+    etaNew.base = base;
+    etaNew.prev = prev;
+  } catch (error) {
+    console.warn("신규 진입 데이터 로딩 실패", error);
+  } finally {
+    if (seq === etaNew.seq) {
+      etaNew.loading = false;
+      renderEtaNewcomers();
+    }
+  }
+}
+
+function renderEtaNewDateSelect(dates) {
+  if (!els.etaNewDateSelect) return;
+  const ordered = [...dates].reverse();
+  els.etaNewDateSelect.innerHTML = ordered
+    .map((d, i) => {
+      const label = i === 0 ? `${d} (최신)` : d;
+      return `<option value="${d}"${d === etaNew.date ? " selected" : ""}>${label}</option>`;
+    })
+    .join("");
+  if (!etaNew.date && ordered.length) els.etaNewDateSelect.value = ordered[0];
+  els.etaNewDateSelect.disabled = !ordered.length;
+}
+
+function etaNewcomerGroups() {
+  const current = etaNew.base?.[eta.server] || [];
+  const previous = etaNew.prev?.[eta.server];
+  if (!current.length || !previous || !previous.length) return null;
+
+  // 수집이 캐릭터 단위로 통째로 빠진 날이 있다(루시안이 16일치 비었다).
+  // 그런 날과 비교하면 그 캐릭터 전원이 신규나 사라짐으로 잡히므로 아예 뺀다.
+  // 날짜를 박아두지 않고 "한쪽에만 있는 캐릭터"로 판별해 앞으로 생길 누락도 걸린다.
+  const codesOf = (rows) => new Set(rows.map((row) => row.code));
+  const currentCodes = codesOf(current);
+  const previousCodes = codesOf(previous);
+
+  const skippedCodes = new Set();
+  for (const code of new Set([...currentCodes, ...previousCodes])) {
+    if (currentCodes.has(code) !== previousCodes.has(code)) skippedCodes.add(code);
+  }
+
+  const kept = (row) => !skippedCodes.has(row.code);
+  const prevIds = new Set(previous.map((row) => row.userId));
+  const currentIds = new Set(current.map((row) => row.userId));
+  const entered = current.filter((row) => kept(row) && !prevIds.has(row.userId));
+  const left = previous.filter((row) => kept(row) && !currentIds.has(row.userId));
+
+  const byRank = (a, b) => b.level - a.level || b.essence - a.essence;
+
+  return {
+    entered: entered.sort(byRank),
+    left: left.sort(byRank),
+  };
+}
+
+function etaNewGroupHtml(title, hint, rows) {
+  const body = rows.length
+    ? rows.map((row) => `
+      <tr>
+        <td class="eta-newcomer-id">${escapeHtml(row.userId)}</td>
+        <td>${escapeHtml(row.characterName)}</td>
+        <td>${formatNumber(row.level)}</td>
+        <td>${formatNumber(row.essence)}</td>
+      </tr>
+    `).join("")
+    : `<tr><td colspan="4" class="eta-newcomer-empty">해당하는 아이디가 없습니다</td></tr>`;
+
+  return `
+    <section class="eta-newcomer-group">
+      <div class="eta-newcomer-group-head">
+        <h3>${escapeHtml(title)}</h3>
+        <strong>${formatNumber(rows.length)}명</strong>
+      </div>
+      <p class="eta-newcomer-hint">${escapeHtml(hint)}</p>
+      <div class="equip-list-wrap eta-newcomer-list-wrap">
+        <table class="equip-list eta-newcomer-list">
+          <thead><tr><th>아이디</th><th>캐릭터</th><th>에타레벨</th><th>정수</th></tr></thead>
+          <tbody>${body}</tbody>
+        </table>
+      </div>
+    </section>
+  `;
+}
+
+function renderEtaNewcomers() {
+  if (!els.etaNewGroups) return;
+
+  renderEtaNewServerTabs();
+
+  els.etaNewRange.textContent = etaNew.baseDate
+    ? (etaNew.prevDate
+        ? `${etaNew.prevDate} → ${etaNew.baseDate} (하루 차이)`
+        : `${etaNew.baseDate} (이전 날짜 없음)`)
+    : "날짜를 불러오는 중입니다";
+
+  const groups = etaNewcomerGroups();
+  if (!groups) {
+    els.etaNewGroups.innerHTML = `<p class="eta-newcomer-empty-state">${
+      etaNew.loading
+        ? "데이터를 불러오는 중입니다."
+        : etaNew.baseDate && !etaNew.prevDate
+          ? "가장 오래된 날짜라 비교할 이전 데이터가 없습니다."
+          : "비교할 데이터를 불러오지 못했습니다."
+    }</p>`;
+    return;
+  }
+
+  els.etaNewGroups.innerHTML = [
+    etaNewGroupHtml(
+      "순위 진입",
+      "전날 순위에 없다가 진입한 아이디입니다. 처음 시작한 사람, 돌아온 사람, 아이디를 바꾼 사람이 섞여 있습니다.",
+      groups.entered,
+    ),
+    etaNewGroupHtml(
+      "순위 이탈",
+      "전날 순위에 있다가 이탈한 아이디입니다. 그만둔 사람, 아이디를 바꾼 사람이 섞여 있습니다.",
+      groups.left,
+    ),
+  ].join("");
+}
+
+function renderEtaNewServerTabs() {
+  if (!els.etaNewServerTabs) return;
+  const names = Object.keys(etaNew.base || eta.servers);
+  els.etaNewServerTabs.innerHTML = names.map((name) => `
+    <button class="eta-server-tab${name === eta.server ? " is-active" : ""}" type="button" role="radio" aria-checked="${name === eta.server}" data-eta-server="${escapeHtml(name)}">${escapeHtml(name)}</button>
+  `).join("");
+}
+
 // ── 에타 정보 페이지 ([?] 버튼 → 조견표·레벨별 상세) ──
 const ETA_INFO_URL = "./assets/eta_info.json";
 const etaInfo = { data: null, loading: false };
@@ -1182,7 +1374,10 @@ function activateEtaTab(key) {
   els.etaPanels.forEach((panel) => {
     panel.hidden = panel.dataset.etaPanel !== key;
   });
-  if (key !== "ranking" && !etaInfo.data && !etaInfo.loading) loadEtaInfo();
+  if (key === "newcomers") {
+    if (etaNew.base) renderEtaNewcomers();
+    else loadEtaNewcomerData();
+  } else if (key !== "ranking" && !etaInfo.data && !etaInfo.loading) loadEtaInfo();
 
   routeWrite();
 }
@@ -4036,6 +4231,22 @@ function wireEvents() {
     loadEtaPreviousRankings(etaLoadSeq);
   });
 
+  els.etaNewDateSelect?.addEventListener("change", () => {
+    etaNew.date = els.etaNewDateSelect.value;
+    loadEtaNewcomerData();
+  });
+
+  els.etaNewServerTabs?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-eta-server]");
+    if (!button || button.dataset.etaServer === eta.server) return;
+    eta.server = button.dataset.etaServer;
+    eta.category = "전체";
+    renderEtaServerTabs();
+    renderEtaSidebar();
+    renderEtaRanking();
+    renderEtaNewcomers();
+  });
+
   els.etaServerTabs?.addEventListener("click", (event) => {
     const button = event.target.closest("[data-eta-server]");
     if (!button || button.dataset.etaServer === eta.server) return;
@@ -4045,6 +4256,7 @@ function wireEvents() {
     renderEtaServerTabs();
     renderEtaSidebar();
     renderEtaRanking();
+    renderEtaNewcomers();
   });
 
   els.etaSidebar?.addEventListener("click", (event) => {
