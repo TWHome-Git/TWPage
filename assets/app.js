@@ -4221,9 +4221,16 @@ function renderList() {
   if (els.equipListWrap) els.equipListWrap.scrollTop = state.listScroll;
 }
 
+// 시트에는 숫자만 들어 있다. 정렬·필터 여지를 남기려고 그대로 두고, 레벨이라는 건
+// 화면에서 붙여 알린다. 이미 "Lv 300"처럼 적힌 시트도 있어 그때는 손대지 않는다.
+function formatWearLevel(value) {
+  const text = clean(value);
+  return /^\d+$/.test(text) ? `Lv ${text}` : text;
+}
+
 // 착용 조건 칸. 시트에 아직 안 채운 장비가 많아 값이 있는 것만 줄로 쌓는다.
 function listWearCellHtml(record) {
-  const lines = [record.wearLevel, record.wearStat].filter(Boolean);
+  const lines = [formatWearLevel(record.wearLevel), record.wearStat].filter(Boolean);
   if (!lines.length) return `<td class="equip-wear is-zero">-</td>`;
   return `<td class="equip-wear">${lines.map((line) => `<span>${escapeHtml(line)}</span>`).join("")}</td>`;
 }
@@ -4449,7 +4456,7 @@ function coefficientBlockHtml(record) {
 // 상세 카드 히어로 오른쪽 빈 자리에 붙는 착용 조건.
 // 아직 안 채운 장비가 많아 값이 없으면 칸 자체를 만들지 않는다.
 function cardWearHtml(record) {
-  const lines = [record.wearLevel, record.wearStat].filter(Boolean);
+  const lines = [formatWearLevel(record.wearLevel), record.wearStat].filter(Boolean);
   if (!lines.length) return "";
   return `
       <div class="item-wear">
