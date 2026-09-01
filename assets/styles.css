@@ -2479,8 +2479,42 @@ img.dmg-chk-icon {
   border-bottom: 1px solid var(--line);
 }
 
-.item-hero > div:last-child {
+/* 이름·분류가 들어가는 가운데 칸. 긴 이름을 말줄임 하려면 min-width가 0이어야 한다.
+   아바타 상세 카드도 같은 히어로를 쓰므로 순서로 잡는다 (착용 조건 칸은 3번째) */
+.item-hero > div:nth-child(2) {
   min-width: 0;
+}
+
+/* 착용 조건은 히어로 오른쪽 빈 자리에. 값이 없으면 칸을 안 만들므로
+   :has로 그때만 열을 하나 더 연다 (아바타 카드는 2칸 그대로) */
+.item-hero:has(.item-wear) {
+  grid-template-columns: 82px 1fr auto;
+}
+
+.item-wear {
+  display: grid;
+  gap: 2px;
+  justify-items: end;
+  padding-left: 12px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.item-wear-label {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.item-wear strong {
+  font-size: 15px;
+  line-height: 1.25;
+}
+
+.item-wear strong + strong {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .item-image {
@@ -3898,6 +3932,31 @@ img.dmg-chk-icon {
 
 .equip-info-cell {
   min-width: 220px;
+}
+
+/* 착용 조건: 레벨과 요구 스탯을 두 줄로 쌓는다 (장비 정보 칸의 이름+분류와 같은 리듬) */
+.equip-wear {
+  min-width: 92px;
+  white-space: nowrap;
+}
+
+.equip-wear span {
+  display: block;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.equip-wear span:first-child {
+  font-weight: 700;
+}
+
+.equip-wear span + span {
+  color: var(--muted);
+}
+
+.equip-wear.is-zero {
+  color: var(--muted);
+  opacity: 0.55;
 }
 
 .equip-info {

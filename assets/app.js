@@ -821,6 +821,9 @@ function buildColumnIndex(headerRow, subHeaderRow) {
     type: category + 1,
     // 1행에 착용조건이 여러 칸 걸쳐 있어도 indexOf가 첫 칸(캐릭터)을 잡는다
     condition: at("착용조건", SHEET_COLUMN_FALLBACK.condition),
+    // 아직 안 채운 시트도 있어 없으면 -1 (row[-1]은 undefined라 빈 값이 된다)
+    wearLevel: at("착용레벨", -1),
+    wearStat: at("요구스탯", -1),
     materials: at("재료", SHEET_COLUMN_FALLBACK.materials),
     stats: {},
   };
@@ -865,6 +868,8 @@ function toRecord(row, index, cols) {
     .filter((item) => item && item !== "#REF!");
 
   const condition = clean(row[cols.condition]);
+  const wearLevel = clean(row[cols.wearLevel]);
+  const wearStat = clean(row[cols.wearStat]);
   const id = `${imageFile || name}-${index}`;
 
   return {
@@ -875,6 +880,8 @@ function toRecord(row, index, cols) {
     type,
     stats,
     condition,
+    wearLevel,
+    wearStat,
     materials,
     searchText: [name, category, type, condition, materials.join(" "), imageFile]
       .join(" ")
@@ -4180,7 +4187,8 @@ function openEquipmentDetail(index) {
 function renderList() {
   if (!state.filtered.length) {
     els.equipmentListBody.innerHTML = listPlaceholderRow(
-      STAT_NAMES.length + 1,
+      // 장비 정보 + 착용 조건 + 스탯 9종
+      STAT_NAMES.length + 2,
       state.records.length > 0,
       "검색 결과가 없습니다",
       "조건을 조금 넓혀보세요.",
@@ -4204,12 +4212,20 @@ function renderList() {
             </span>
           </div>
         </td>
+        ${listWearCellHtml(record)}
         ${statCells}
       </tr>
     `;
   }).join("");
 
   if (els.equipListWrap) els.equipListWrap.scrollTop = state.listScroll;
+}
+
+// 착용 조건 칸. 시트에 아직 안 채운 장비가 많아 값이 있는 것만 줄로 쌓는다.
+function listWearCellHtml(record) {
+  const lines = [record.wearLevel, record.wearStat].filter(Boolean);
+  if (!lines.length) return `<td class="equip-wear is-zero">-</td>`;
+  return `<td class="equip-wear">${lines.map((line) => `<span>${escapeHtml(line)}</span>`).join("")}</td>`;
 }
 
 function listStatCellHtml(stat) {
@@ -4430,6 +4446,18 @@ function coefficientBlockHtml(record) {
   `;
 }
 
+// 상세 카드 히어로 오른쪽 빈 자리에 붙는 착용 조건.
+// 아직 안 채운 장비가 많아 값이 없으면 칸 자체를 만들지 않는다.
+function cardWearHtml(record) {
+  const lines = [record.wearLevel, record.wearStat].filter(Boolean);
+  if (!lines.length) return "";
+  return `
+      <div class="item-wear">
+        <span class="item-wear-label">착용 조건</span>
+        ${lines.map((line) => `<strong>${escapeHtml(line)}</strong>`).join("")}
+      </div>`;
+}
+
 function renderCard() {
   const record = currentRecord();
   if (!record) {
@@ -4463,6 +4491,7 @@ function renderCard() {
         <h2>${escapeHtml(record.name)}</h2>
         <p class="item-condition">${escapeHtml(record.condition || "착용 조건 없음")}</p>
       </div>
+      ${cardWearHtml(record)}
     </div>
 
     <table class="stat-table">

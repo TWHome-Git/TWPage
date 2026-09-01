@@ -114,8 +114,17 @@
     flex-direction: column;
   }
 
-  .item-hero {
+  /* :has 규칙이 더 구체적이라 같이 눌러줘야 한 줄로 접힌다 */
+  .item-hero,
+  .item-hero:has(.item-wear) {
     grid-template-columns: 1fr;
+  }
+
+  /* 아래로 쌓이면 오른쪽 정렬이 어색하다 */
+  .item-wear {
+    justify-items: start;
+    padding-left: 0;
+    text-align: left;
   }
 
   .addon-view,
@@ -354,16 +363,43 @@
     color: var(--muted);
   }
 
-  /* 한 줄에 3개는 들어가야 하므로 긴 이름은 줄여 쓴다 */
-  #listWorkspace .equip-list td.equip-stat:nth-child(2)::before { content: "찌르"; }
-  #listWorkspace .equip-list td.equip-stat:nth-child(3)::before { content: "베기"; }
-  #listWorkspace .equip-list td.equip-stat:nth-child(4)::before { content: "물방"; }
-  #listWorkspace .equip-list td.equip-stat:nth-child(5)::before { content: "마공"; }
-  #listWorkspace .equip-list td.equip-stat:nth-child(6)::before { content: "마방"; }
-  #listWorkspace .equip-list td.equip-stat:nth-child(7)::before { content: "명중"; }
-  #listWorkspace .equip-list td.equip-stat:nth-child(8)::before { content: "회피"; }
-  #listWorkspace .equip-list td.equip-stat:nth-child(9)::before { content: "민첩"; }
-  #listWorkspace .equip-list td.equip-stat:nth-child(10)::before { content: "크리"; }
+  /* 한 줄에 3개는 들어가야 하므로 긴 이름은 줄여 쓴다.
+     1번 칸이 장비 정보, 2번 칸이 착용 조건이라 스탯은 3번부터 시작한다.
+     열을 더 끼우면 이 번호도 함께 밀어야 한다. */
+  #listWorkspace .equip-list td.equip-stat:nth-child(3)::before { content: "찌르"; }
+  #listWorkspace .equip-list td.equip-stat:nth-child(4)::before { content: "베기"; }
+  #listWorkspace .equip-list td.equip-stat:nth-child(5)::before { content: "물방"; }
+  #listWorkspace .equip-list td.equip-stat:nth-child(6)::before { content: "마공"; }
+  #listWorkspace .equip-list td.equip-stat:nth-child(7)::before { content: "마방"; }
+  #listWorkspace .equip-list td.equip-stat:nth-child(8)::before { content: "명중"; }
+  #listWorkspace .equip-list td.equip-stat:nth-child(9)::before { content: "회피"; }
+  #listWorkspace .equip-list td.equip-stat:nth-child(10)::before { content: "민첩"; }
+  #listWorkspace .equip-list td.equip-stat:nth-child(11)::before { content: "크리"; }
+
+  /* 착용 조건도 스탯과 같은 칩으로. 값이 없으면 통째로 접는다 */
+  #listWorkspace .equip-list td.equip-wear.is-zero {
+    display: none;
+  }
+
+  #listWorkspace .equip-list td.equip-wear {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 4px;
+    margin: 0 3px 3px 0;
+    border-radius: 6px;
+    padding: 1px 6px;
+    background: var(--panel-strong);
+  }
+
+  #listWorkspace .equip-list td.equip-wear span {
+    display: inline;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  #listWorkspace .equip-list td.equip-wear span + span {
+    font-weight: 400;
+  }
 }
 
 /* ── 어빌리티 · 아바타 목록 ───────────────────────────────────
