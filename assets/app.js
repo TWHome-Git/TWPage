@@ -634,7 +634,9 @@ function restoreLastCharacter() {
 // AZ1이 비어 있으면 Google이 range를 무시하고 전체 CSV를 반환하므로,
 // "짧은 단일 토큰"일 때만 유효한 버전으로 인정한다.
 const SHEET_VERSION_URL = `${SHEET_CSV_URL}&range=AZ1`;
-const CSV_CACHE_KEY = "tw-equipment-csv-cache-v1";
+// v2: 시트에서 열이 하나 빠져 배치가 바뀌었다. 옛 배치로 캐시된 CSV를 새 파서가
+// 읽으면 어긋나므로 키를 올려 버리게 한다.
+const CSV_CACHE_KEY = "tw-equipment-csv-cache-v2";
 
 async function fetchSheetVersionCell(versionUrl) {
   try {
@@ -783,24 +785,73 @@ function parseDelimited(text, delimiter) {
   return rows;
 }
 
+// 열 위치는 헤더 이름으로 찾는다. 예전에는 번호를 고정해 뒀는데, 시트에서 열 하나를
+// 지우자 이름·스탯·재료가 통째로 한 칸씩 밀려 버렸다. 헤더를 기준으로 잡으면
+// 열이 늘거나 줄어도 파서가 따라간다.
+//
+// 헤더를 찾지 못하면 아래 번호로 되돌아간다 (현재 시트 배치 기준).
+const SHEET_COLUMN_FALLBACK = {
+  imageFile: 0,
+  name: 1,
+  category: 2,
+  firstStat: 4,
+  condition: 31,
+  materials: 34,
+};
+
+function buildColumnIndex(headerRow, subHeaderRow) {
+  const header = (headerRow || []).map(clean);
+  const subHeader = (subHeaderRow || []).map(clean);
+  // 1행(묶음 헤더)에서 먼저 찾고 없으면 2행(세부 헤더)에서 찾는다.
+  // 스탯이 "찌르기 / Min·Max·Limit"로 나뉘듯, 착용조건도 1행은 한 이름으로 묶고
+  // 2행에 캐릭터·착용레벨·요구스탯을 나눠 적는다.
+  const at = (label, fallback) => {
+    const found = header.indexOf(label);
+    if (found >= 0) return found;
+    const foundInSub = subHeader.indexOf(label);
+    return foundInSub >= 0 ? foundInSub : fallback;
+  };
+
+  const category = at("카테고리", SHEET_COLUMN_FALLBACK.category);
+  const cols = {
+    imageFile: at("이미지 파일", SHEET_COLUMN_FALLBACK.imageFile),
+    name: at("이름", SHEET_COLUMN_FALLBACK.name),
+    category,
+    // 종류는 헤더 칸이 비어 있어 이름으로 찾을 수 없다. 카테고리 바로 오른쪽에 온다
+    type: category + 1,
+    // 1행에 착용조건이 여러 칸 걸쳐 있어도 indexOf가 첫 칸(캐릭터)을 잡는다
+    condition: at("착용조건", SHEET_COLUMN_FALLBACK.condition),
+    materials: at("재료", SHEET_COLUMN_FALLBACK.materials),
+    stats: {},
+  };
+
+  // 스탯은 헤더에 이름이 한 번만 적히고 Min/Max/Limit 3칸을 차지한다
+  STAT_NAMES.forEach((label, statIndex) => {
+    cols.stats[label] = at(label, SHEET_COLUMN_FALLBACK.firstStat + statIndex * 3);
+  });
+
+  return cols;
+}
+
 function normalizeRows(rows) {
+  const cols = buildColumnIndex(rows[0], rows[1]);
   return rows
     .slice(2)
-    .map((row, index) => toRecord(row, index))
+    .map((row, index) => toRecord(row, index, cols))
     .filter(Boolean);
 }
 
-function toRecord(row, index) {
-  const name = clean(row[2]);
+function toRecord(row, index, cols) {
+  const name = clean(row[cols.name]);
   if (!name) return null;
 
-  const imageFile = clean(row[0]);
-  const category = clean(row[3]) || "기타";
-  const type = clean(row[4]) || "기타";
+  const imageFile = clean(row[cols.imageFile]);
+  const category = clean(row[cols.category]) || "기타";
+  const type = clean(row[cols.type]) || "기타";
   const stats = {};
 
-  STAT_NAMES.forEach((label, statIndex) => {
-    const start = 5 + statIndex * 3;
+  STAT_NAMES.forEach((label) => {
+    const start = cols.stats[label];
     stats[label] = {
       min: toNumber(row[start]),
       max: toNumber(row[start + 1]),
@@ -809,11 +860,11 @@ function toRecord(row, index) {
   });
 
   const materials = row
-    .slice(33, 39)
+    .slice(cols.materials, cols.materials + 6)
     .map(clean)
     .filter((item) => item && item !== "#REF!");
 
-  const condition = clean(row[32]);
+  const condition = clean(row[cols.condition]);
   const id = `${imageFile || name}-${index}`;
 
   return {
