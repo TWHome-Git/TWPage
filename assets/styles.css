@@ -3656,6 +3656,13 @@ img.dmg-chk-icon {
   border-radius: 8px;
   background: #fff;
   padding: 12px 10px;
+  /* 캐릭터 19명을 펼치면 목록이 화면 아래로 넘어간다. 오른쪽 표와 같은 높이로
+     묶어 두고 안에서 스크롤시킨다 (.equip-list-wrap과 같은 값) */
+  max-height: max(400px, calc(100vh - 296px));
+  overflow-y: auto;
+  /* 화면을 내려도 목록이 따라오게 한다 */
+  position: sticky;
+  top: 12px;
 }
 
 .eta-cat {

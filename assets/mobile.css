@@ -40,8 +40,13 @@
     gap: 8px;
   }
 
+  /* 폰에서는 사이드바가 표 위로 올라온다. 높이를 묶어 두면 카드 안에서
+     또 스크롤해야 해서 답답하다. 그냥 내용만큼 늘어나게 둔다 */
   .eta-sidebar {
     padding: 8px;
+    max-height: none;
+    overflow-y: visible;
+    position: static;
   }
 
   /* 캐릭터 목록이 세로로 길게 늘어지지 않게 칩처럼 깐다 */
