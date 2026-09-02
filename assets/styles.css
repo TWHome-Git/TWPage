@@ -3844,12 +3844,13 @@ img.dmg-chk-icon {
   line-height: 1.5;
 }
 
-/* 목록이 길어도 페이지가 통째로 늘어나지 않게 각자 스크롤한다 */
-.eta-newcomer-list-wrap {
-  max-height: 340px;
-}
+/* 높이는 .equip-list-wrap의 화면 비례 값을 그대로 쓴다. 목록이 길어도
+   페이지가 통째로 늘어나지 않고 표 안에서 스크롤된다.
+   (여기서 max-height를 다시 잡아도 .equip-list-wrap이 뒤에 있어 지지 않는다) */
 
-.eta-newcomer-list {
+/* 4열뿐이라 장비 목록의 min-width: 900px에 끌려가면 안 된다.
+   .equip-list가 뒤에 오므로 두 클래스로 잡아야 이긴다 */
+.equip-list.eta-newcomer-list {
   min-width: 0;
 }
 

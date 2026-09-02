@@ -424,6 +424,35 @@
   }
 }
 
+/* ── 진입 · 이탈 ─────────────────────────────────────────────
+   4열이라 표를 카드로 펼 필요는 없다. 폰 폭에 들어가게 여백만 줄인다. */
+@media (max-width: 560px) {
+  .eta-newcomer-list th,
+  .eta-newcomer-list td {
+    padding-left: 4px;
+    padding-right: 4px;
+    font-size: 12px;
+  }
+
+  /* 아이디가 길면 줄바꿈해서 다른 열을 밀지 않게 한다 */
+  .eta-newcomer-list .eta-newcomer-id {
+    word-break: break-all;
+  }
+
+  /* 폰에서는 표 두 개가 세로로 이어져 스크롤이 길어진다. 각 표를 낮춘다.
+     (mobile.css가 뒤에 실려 .equip-list-wrap의 값을 덮는다) */
+  .eta-newcomer-list-wrap {
+    max-height: 260px;
+  }
+
+  /* 서버 탭과 비교 기간이 한 줄에 안 들어간다 */
+  [data-eta-panel="newcomers"] .result-meta {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+  }
+}
+
 /* 3열이어도 효과·획득처가 길어 폰 폭을 넘는다. 장비 목록과 같이 카드로 편다. */
 @media (max-width: 560px) {
   .ability-list,
