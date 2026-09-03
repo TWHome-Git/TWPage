@@ -5853,13 +5853,7 @@ const INHERIT_BLOCKED_ITEMS = [
 function inheritNoticeHtml() {
   const cells = INHERIT_BLOCKED_ITEMS
     .map((name) => `<li>${escapeHtml(name)}</li>`).join("");
-
-  return `
-    <div id="inhNotice" class="inherit-notice" hidden>
-      <p class="inherit-notice-sub">상속 이용이 가능하지 않은 아이템 리스트</p>
-      <ul class="inherit-notice-grid">${cells}</ul>
-    </div>
-  `;
+  return `<ul class="inherit-notice-grid">${cells}</ul>`;
 }
 
 // 화면과 계산이 어긋난다.
@@ -5885,9 +5879,8 @@ function renderInheritFormula() {
   simEls.inhFormula.innerHTML = `
     <div class="inherit-formula-head">
       상속 주문서
-      <button id="inhNoticeToggle" class="inherit-notice-toggle" type="button" aria-expanded="false">주의 사항</button>
+      <button id="inhNoticeToggle" class="inherit-notice-toggle" type="button">주의 사항</button>
     </div>
-    ${inheritNoticeHtml()}
     <p class="inherit-formula-intro">
       상속 주문서는 Lv 200 이상 장비의 인챈트, 강화를 상속할 때 필요한 아이템입니다.
       추출할 장비의 인챈트 총합, 인크립트 횟수와 장비 강화 레벨에 따라
@@ -6002,14 +5995,9 @@ function wireInheritSim() {
   renderInheritFormula();
   renderInheritEnchantRows();
 
-  // 공지 원문이 길어 접어 둔다. 상속 주문서 설명 옆 버튼으로 편다
-  const noticeToggle = document.getElementById("inhNoticeToggle");
-  const notice = document.getElementById("inhNotice");
-  noticeToggle?.addEventListener("click", () => {
-    const open = notice.hidden;
-    notice.hidden = !open;
-    noticeToggle.setAttribute("aria-expanded", String(open));
-  });
+  // 목록이 길어 설명 옆에 펼치면 계산기가 밀린다. 확률표와 같은 창으로 띄운다
+  document.getElementById("inhNoticeToggle")?.addEventListener("click", () =>
+    openRateModal("상속 이용이 가능하지 않은 아이템 리스트", "", inheritNoticeHtml()));
 
   const panel = document.querySelector('[data-calculator-panel="inherit"]');
   panel?.addEventListener("input", renderInheritResult);

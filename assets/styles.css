@@ -1615,33 +1615,11 @@ select {
   border-color: var(--accent);
 }
 
-.inherit-notice-toggle[aria-expanded="true"] {
-  background: var(--accent);
-  color: #fff;
-  border-color: var(--accent);
-}
-
-.inherit-notice {
-  margin: 0 0 12px;
-  padding: 12px 14px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #fff;
-  font-size: 12px;
-  line-height: 1.7;
-}
-
-.inherit-notice p {
-  margin: 0 0 8px;
-}
-
-.inherit-notice-sub {
-  font-weight: 700;
-}
-
-/* 공지 표를 그대로 옮긴다. 칸 수는 폭에 맞춰 접힌다 */
+/* 확률표 모달 안에 들어간다. 모달은 내용만큼만 넓어지므로 폭을 직접 준다 */
 .inherit-notice-grid {
   display: grid;
+  width: min(760px, 78vw);
+  font-size: 12px;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   margin: 0;
   padding: 0;
