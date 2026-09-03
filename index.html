@@ -6,9 +6,9 @@
     <title>TW DB</title>
     <!-- 이미지 CDN. 첫 이미지 요청 전에 DNS+TLS를 미리 끝내둔다 -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
-    <link rel="stylesheet" href="./assets/styles.css?v=20260903-inherit-open" />
+    <link rel="stylesheet" href="./assets/styles.css?v=20260903-calc-inherit" />
     <!-- 모바일 전용. media 속성 덕에 넓은 화면에서는 렌더링을 막지 않는다 -->
-    <link rel="stylesheet" href="./assets/mobile.css?v=20260903-inherit-open" media="(max-width: 720px)" />
+    <link rel="stylesheet" href="./assets/mobile.css?v=20260903-calc-inherit" media="(max-width: 720px)" />
   </head>
   <body>
     <main class="app-shell">
@@ -372,14 +372,44 @@
           <div class="addon-tab-field">
             <span>계산기 메뉴</span>
             <nav class="addon-subtabs" aria-label="계산기 메뉴">
-              <button class="addon-tab is-active" type="button" data-calculator-tab="coefficient">계수 계산기</button>
+              <button class="addon-tab is-active" type="button" data-calculator-tab="inherit">상속서 계산기</button>
+              <button class="addon-tab" type="button" data-calculator-tab="coefficient">계수 계산기</button>
               <button class="addon-tab" type="button" data-calculator-tab="damage">대미지 계산기</button>
+              <button class="addon-tab" type="button" data-calculator-tab="equipment" data-local-only hidden>장비 계산기</button>
             </nav>
           </div>
         </div>
 
         <div class="addon-window">
-          <section class="addon-content is-active" data-calculator-panel="coefficient">
+          <section class="addon-content sim-panel is-active" data-calculator-panel="inherit">
+            <div id="inhFormula" class="inherit-formula"></div>
+            <div class="sim-grid">
+              <div class="sim-controls">
+                <h3 class="inherit-heading">추출할 장비</h3>
+                <div id="inhEnchants" class="sim-fields"></div>
+                <div class="sim-fields">
+                  <label class="field"><span>인크립트 횟수</span><input id="inhIncrement" type="number" min="0" max="60" step="1" value="1" /></label>
+                  <div class="field inherit-total"><span>능력치 총합</span><output id="inhTotal">0</output></div>
+                </div>
+
+                <h3 class="inherit-heading">상속받을 장비</h3>
+                <div class="sim-row">
+                  <label class="sim-radio"><input type="radio" name="inhGrade" value="normal" checked /><span>일반</span></label>
+                  <label class="sim-radio"><input type="radio" name="inhGrade" value="abyss" /><span>어비스 이상</span></label>
+                  <label class="sim-radio"><input type="radio" name="inhGrade" value="eclipse" /><span>이클립스 이상</span></label>
+                  <label class="sim-check"><input id="inhFusionMax" type="checkbox" /><span>합성 횟수 MAX</span></label>
+                </div>
+              </div>
+
+              <div class="inherit-result">
+                <div id="inhStatus" class="sim-status"></div>
+                <div id="inhSummary" class="sim-summary"></div>
+                <div class="sim-table-wrap"><table id="inhTable" class="sim-table"></table></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="addon-content" data-calculator-panel="coefficient" hidden>
             <div id="coefficientSelectView" class="coefficient-select">
               <div id="characterGrid" class="character-grid" aria-label="계수 계산기 캐릭터 선택"></div>
             </div>
@@ -457,6 +487,10 @@
               <p class="coefficient-pierce-title">방어 관통 <button id="pierceHelpButton" class="eta-help-button" type="button" title="방어 관통 안내" aria-label="방어 관통 안내">?</button></p>
               <div id="coefficientPierce" class="coefficient-pierce"></div>
             </div>
+          </section>
+
+          <section class="addon-content" data-calculator-panel="equipment" hidden>
+            <p class="calc-placeholder">장비 계산기는 준비 중입니다.</p>
           </section>
 
           <section class="addon-content sim-panel" data-calculator-panel="damage" hidden>
@@ -623,7 +657,6 @@
               <button class="addon-tab is-active" type="button" data-simulator-tab="encrypt">인크립트</button>
               <button class="addon-tab" type="button" data-simulator-tab="core">코어 강화</button>
               <button class="addon-tab" type="button" data-simulator-tab="relic">신조 렐릭</button>
-              <button class="addon-tab" type="button" data-simulator-tab="inherit">상속</button>
             </nav>
           </div>
         </div>
@@ -698,33 +731,6 @@
             <div class="sim-table-wrap"><table id="relicTable" class="sim-table"></table></div>
           </section>
 
-          <section class="addon-content sim-panel" data-simulator-panel="inherit" hidden>
-            <div id="inhFormula" class="inherit-formula"></div>
-            <div class="sim-grid">
-              <div class="sim-controls">
-                <h3 class="inherit-heading">추출할 장비</h3>
-                <div id="inhEnchants" class="sim-fields"></div>
-                <div class="sim-fields">
-                  <label class="field"><span>인크립트 횟수</span><input id="inhIncrement" type="number" min="0" max="60" step="1" value="1" /></label>
-                  <div class="field inherit-total"><span>능력치 총합</span><output id="inhTotal">0</output></div>
-                </div>
-
-                <h3 class="inherit-heading">상속받을 장비</h3>
-                <div class="sim-row">
-                  <label class="sim-radio"><input type="radio" name="inhGrade" value="normal" checked /><span>일반</span></label>
-                  <label class="sim-radio"><input type="radio" name="inhGrade" value="abyss" /><span>어비스 이상</span></label>
-                  <label class="sim-radio"><input type="radio" name="inhGrade" value="eclipse" /><span>이클립스 이상</span></label>
-                  <label class="sim-check"><input id="inhFusionMax" type="checkbox" /><span>합성 횟수 MAX</span></label>
-                </div>
-              </div>
-
-              <div class="inherit-result">
-                <div id="inhStatus" class="sim-status"></div>
-                <div id="inhSummary" class="sim-summary"></div>
-                <div class="sim-table-wrap"><table id="inhTable" class="sim-table"></table></div>
-              </div>
-            </div>
-          </section>
         </div>
       </section>
 
@@ -826,7 +832,7 @@
       </div>
     </template>
 
-    <script src="./assets/app.js?v=20260903-inherit-open" type="module"></script>
+    <script src="./assets/app.js?v=20260903-calc-inherit" type="module"></script>
     <!-- GoatCounter 방문자 분석 (localhost 방문은 count.js가 기본으로 집계 제외) -->
     <script data-goatcounter="https://holedis88.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
   </body>

@@ -5279,3 +5279,12 @@ img.dmg-chk-icon {
   display: flex;
   gap: 6px;
 }
+
+/* 아직 만들지 않은 계산기 자리 */
+.calc-placeholder {
+  margin: 0;
+  padding: 40px 12px;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+}

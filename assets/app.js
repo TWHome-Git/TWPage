@@ -576,7 +576,7 @@ async function boot() {
   resetControls();
   renderCharacterGrid();
   activateMainTab("extra");
-  activateCalculatorTab("coefficient");
+  activateCalculatorTab("inherit");
   activateSimulatorTab("encrypt");
   activateExtraTab("content");
   revealLocalOnly();
@@ -2232,6 +2232,10 @@ function renderAbilityList() {
 }
 
 function activateCalculatorTab(key) {
+  // 아직 공개하지 않은 탭은 버튼이 숨겨져 있다. 주소로 바로 들어와도 열리지 않게 막는다
+  const target = [...els.calculatorTabButtons].find((b) => b.dataset.calculatorTab === key);
+  if (target?.hidden) key = "inherit";
+
   els.calculatorTabButtons.forEach((button) => {
     button.classList.toggle("is-active", button.dataset.calculatorTab === key);
   });
@@ -5785,6 +5789,7 @@ function initSimulators() {
   wireEncryptSim();
   wireCoreSim();
   wireRelicSim();
+  // 상속은 계산기 탭 화면이지만 입력 요소를 simEls로 함께 잡아 두어 여기서 엮는다
   wireInheritSim();
 }
 
@@ -5964,7 +5969,7 @@ function wireInheritSim() {
   renderInheritFormula();
   renderInheritEnchantRows();
 
-  const panel = document.querySelector('[data-simulator-panel="inherit"]');
+  const panel = document.querySelector('[data-calculator-panel="inherit"]');
   panel?.addEventListener("input", renderInheritResult);
   panel?.addEventListener("change", renderInheritResult);
 
