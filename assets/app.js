@@ -22,7 +22,7 @@ const SNAPSHOT_URL = "./data/equipment-snapshot.json";
 //   git tag v3.0.1 && git push origin v3.0.1
 const CDN_ROOT = "https://cdn.jsdelivr.net/gh/TWHome-Git/TWPage@";
 const CDN_AVATAR_ROOT = `${CDN_ROOT}v1.0.10/`;
-const CDN_EQUIP_ROOT = `${CDN_ROOT}v2.0.6/`;
+const CDN_EQUIP_ROOT = `${CDN_ROOT}v2.0.7/`;
 const CDN_ETC_ROOT = `${CDN_ROOT}v3.0.0/`;
 
 const IMAGE_BASE = `${CDN_EQUIP_ROOT}equipment-images/`;
@@ -7377,8 +7377,17 @@ function eqcUnitPrice(name) {
 
 // 재료 아이콘. 이름이 파일명과 조금씩 달라 장비 상세와 같은 후보 목록을 쓰고,
 // 실패하면 handleMaterialImageError가 다음 후보로 넘어간다
+// 무기·갑옷·손목·투구는 부위를 묶은 이름이라 그 이름의 아이템이 DB에 없다.
+// 계열마다 대표 아이템 하나를 골라 아이콘을 빌린다.
+const EQC_TIER_ICON = { "무기": "핸드벨", "갑옷": "로브", "손목": "암릿", "투구": "헬름" };
+
+function eqcIconName(name) {
+  const match = /^(인퍼널|아퀼루스|어비스|이클립스)\s+(무기|갑옷|손목|투구)$/u.exec(clean(name));
+  return match ? `${match[1]} ${EQC_TIER_ICON[match[2]]}` : name;
+}
+
 function eqcMaterialIcon(name) {
-  const [src, ...fallbacks] = materialImageUrls(name);
+  const [src, ...fallbacks] = materialImageUrls(eqcIconName(name));
   if (!src) return "";
   // 숨겨진 탭에서 만들어지므로 lazy로 두면 로드가 걸리지 않는다. 재료 수가 적어 바로 받는다
   return `<img class="material-icon eqc-icon" src="${src}" alt="" decoding="async"`
