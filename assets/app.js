@@ -576,7 +576,7 @@ async function boot() {
   resetControls();
   renderCharacterGrid();
   activateMainTab("extra");
-  activateCalculatorTab("inherit");
+  activateCalculatorTab("equipment");
   activateSimulatorTab("encrypt");
   activateExtraTab("content");
   revealLocalOnly();
@@ -2236,7 +2236,7 @@ function renderAbilityList() {
 function activateCalculatorTab(key) {
   // 아직 공개하지 않은 탭은 버튼이 숨겨져 있다. 주소로 바로 들어와도 열리지 않게 막는다
   const target = [...els.calculatorTabButtons].find((b) => b.dataset.calculatorTab === key);
-  if (target?.hidden) key = "inherit";
+  if (target?.hidden) key = "equipment";
 
   els.calculatorTabButtons.forEach((button) => {
     button.classList.toggle("is-active", button.dataset.calculatorTab === key);
