@@ -3626,7 +3626,6 @@ img.dmg-chk-icon {
   height: 18px;
   object-fit: contain;
   image-rendering: pixelated;
-  vertical-align: -4px;
   margin-right: 2px;
 }
 
@@ -5280,11 +5279,157 @@ img.dmg-chk-icon {
   gap: 6px;
 }
 
-/* 아직 만들지 않은 계산기 자리 */
-.calc-placeholder {
-  margin: 0;
-  padding: 40px 12px;
-  color: var(--muted);
+/* ── 장비 제작 계산기 ─────────────────────────────────────────── */
+.eqc-controls {
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  margin-bottom: 10px;
+}
+
+
+/* 단계를 좌우 칸으로 나눈다. 좁아지면 자동으로 줄바꿈된다.
+   auto-fit이면 단계가 하나일 때 그 칸이 폭을 다 먹는다. auto-fill로 두어
+   빈 칸을 남기면 카드 크기가 유지되고 왼쪽부터 채워진다 */
+.eqc-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+.eqc-step-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 10px 12px;
+}
+
+.eqc-step-card h4 {
+  margin: 0 0 8px;
+  color: var(--accent);
   font-size: 13px;
-  text-align: center;
+  font-weight: 800;
+  line-height: 1.5;
+  word-break: keep-all;
+}
+
+.eqc-mat {
+  display: grid;
+  gap: 4px;
+  border-top: 1px solid var(--line);
+  padding: 7px 0;
+}
+
+/* 재료 이름은 길고 개수는 짧다. 이름을 늘리고 개수를 끝에 붙인다 */
+.eqc-mat-name {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+/* 아이콘은 글자 앞에 붙여 이름과 한 줄로 읽히게 한다 */
+.eqc-mat-name .eqc-icon {
+  width: 18px;
+  height: 18px;
+  margin-right: 4px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  vertical-align: -4px;
+}
+
+/* 아이콘·이름·흥정 토글의 세로 중심을 맞춘다. inline 정렬로는 글꼴에 따라 어긋난다 */
+.eqc-mat-name > span {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 0;
+  min-width: 0;
+}
+
+.eqc-mat-name b {
+  flex: 0 0 auto;
+  color: var(--muted);
+}
+
+/* 고정가 재료는 값을 그대로 보여준다 (입력칸 자리) */
+.eqc-fixed {
+  align-self: center;
+  font-weight: 700;
+}
+
+/* 흥정 토글. 재료 이름 옆에 붙어 눌러서 값을 바꾼다 */
+.eqc-haggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 4px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 1px 7px 1px 5px;
+  background: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.eqc-haggle input {
+  width: 12px;
+  height: 12px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+/* 켜져 있으면 값이 내려간 상태라는 걸 눈에 띄게 한다 */
+.eqc-haggle:has(input:checked) {
+  border-color: var(--accent);
+  color: #fff;
+  background: var(--accent);
+}
+
+.eqc-mat-calc {
+  display: grid;
+  grid-template-columns: minmax(84px, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.eqc-mat-calc input {
+  width: 100%;
+  min-height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0 8px;
+  color: var(--ink);
+  background: #fff;
+  font-size: 13px;
+  text-align: right;
+  outline: none;
+}
+
+.eqc-mat-calc input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(15, 111, 99, 0.14);
+}
+
+.eqc-mat-calc .eqc-sum {
+  min-width: 0;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: right;
+}
+
+.eqc-step-foot {
+  margin-top: 4px;
+  border-top: 2px solid var(--line);
+  padding-top: 7px;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: right;
+}
+
+.eqc-step-foot b {
+  color: var(--accent);
 }

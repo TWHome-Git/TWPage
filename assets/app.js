@@ -22,7 +22,7 @@ const SNAPSHOT_URL = "./data/equipment-snapshot.json";
 //   git tag v3.0.1 && git push origin v3.0.1
 const CDN_ROOT = "https://cdn.jsdelivr.net/gh/TWHome-Git/TWPage@";
 const CDN_AVATAR_ROOT = `${CDN_ROOT}v1.0.10/`;
-const CDN_EQUIP_ROOT = `${CDN_ROOT}v2.0.4/`;
+const CDN_EQUIP_ROOT = `${CDN_ROOT}v2.0.5/`;
 const CDN_ETC_ROOT = `${CDN_ROOT}v3.0.0/`;
 
 const IMAGE_BASE = `${CDN_EQUIP_ROOT}equipment-images/`;
@@ -919,6 +919,8 @@ function materialImageNameCandidates(material) {
     (value) => value.replaceAll("달 여왕", "달여왕"),
     (value) => value.replace(/ 오브 디펜시오$/, " 오브 - 디펜시오"),
     (value) => stripTrailingParenthetical(value),
+    // 파일명은 (귀속)인데 표기는 묶음 크기가 붙는 경우가 있다 (룬의 원석(20) → 룬의_원석(귀속))
+    (value) => `${stripTrailingParenthetical(value)}(귀속)`,
     (value) => value.replaceAll("파편", "조각"),
     (value) => value.replaceAll("조각", "파편"),
   ];
@@ -5781,6 +5783,7 @@ function initSimulators() {
     "rateModal", "rateModalTitle", "rateModalNote", "rateModalBody",
     "inhFormula", "inhEnchants", "inhIncrement", "inhTotal", "inhFusionMax",
     "inhStatus", "inhSummary", "inhTable",
+    "eqcPart", "eqcFrom", "eqcTo", "eqcSteps", "eqcTotal",
   ].forEach((id) => (simEls[id] = q(id)));
 
   wireRateModal();
@@ -5789,8 +5792,9 @@ function initSimulators() {
   wireEncryptSim();
   wireCoreSim();
   wireRelicSim();
-  // 상속은 계산기 탭 화면이지만 입력 요소를 simEls로 함께 잡아 두어 여기서 엮는다
+  // 상속·장비 제작은 계산기 탭 화면이지만 입력 요소를 simEls로 함께 잡아 두어 여기서 엮는다
   wireInheritSim();
+  wireEquipCraft();
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -6702,11 +6706,6 @@ function wireRelicSim() {
   simEls.relicCalc.addEventListener("click", relicCalc);
 }
 
-boot().catch((error) => {
-  console.error(error);
-  els.dataStatus.textContent = "데이터 로드 실패";
-  els.equipmentCard.replaceChildren(els.emptyTemplate.content.cloneNode(true));
-});
 
 // 대미지 계산기 스킬 프리셋·버프 목록 로드 (실패해도 기본값으로 동작)
 loadDmgSkills();
@@ -7193,3 +7192,349 @@ function wireCalcJsonIo() {
 }
 
 wireCalcJsonIo();
+
+// ══════════════════════════════════════════════════════════════
+//  장비 제작 계산기
+// ══════════════════════════════════════════════════════════════
+//
+// 제작표는 장비 DB에서 뽑지 않는다. DB에는 아퀼루스 위쪽만 있어 아카드·인퍼널
+// 단계가 통째로 빠지기 때문이다. 아래 표에 직접 적어 둔다.
+//
+// 형식: 부위 이름을 한 줄에 쓰고, 그 아래 단계를 적는다.
+//   결과물 | 이전 단계 | 재료 개수 | 재료 개수 | ...
+// 이전 단계 장비는 만들면서 소모되므로 재료로 따로 세지 않는다.
+// 재료 이름 안의 괄호(예: 아크론 혈투의 증표(100))는 묶음 크기라 이름의 일부다.
+const EQC_RECIPE_TEXT = `
+무기
+인퍼널 무기 | 아카드 무기 | 수르트의 무기 파편 2 | 환상초 10
+아퀼루스 무기 | 인퍼널 무기 | 프시키의 파편 - 파괴 4 | 시트린 10 | 태청금액신단 6
+어비스 무기 | 아퀼루스 무기 | 고대 기사의 무기 파편 5 | 요새 수호자의 보석 파편 3 | 심연의 핵 1 | 아크론 혈투의 증표(100) 1
+이클립스 무기 | 어비스 무기 | 가짜 달여왕 군단의 무기 파편 3 | 달의 약초 100 | 가공된 달의 광물(1) 1 | 룬의 원석(20) 1 | 가짜 달여왕 군단의 인장(6) 1
+
+손목
+인퍼널 손목 | 엔키라 칼라그 손목 | 환상초 1
+아퀼루스 손목 | 인퍼널 손목 | 프시키의 파편 - 인도 4 | 시트린 10 | 태청금액신단 6
+어비스 손목 | 아퀼루스 손목 | 고대 기사의 방패 조각 5 | 요새 문양이 새겨진 금속 파편 3 | 아크론 혈투의 증표(100) 1
+이클립스 손목 | 어비스 손목 | 가짜 달여왕 군단의 방패 조각 3 | 달의 약초 100 | 가공된 달의 광물(1) 1 | 룬의 원석(20) 1 | 가짜 달여왕 군단의 인장(6) 1
+
+투구
+인퍼널 투구 | 엔키라 칼라그 투구 | 광전사의 투구 파편 2 | 환상초 10
+아퀼루스 투구 | 인퍼널 투구 | 프시키의 파편 - 분리 4 | 시트린 10 | 태청금액신단 6
+어비스 투구 | 아퀼루스 투구 | 고대 기사의 투구 파편 5 | 요새 수호자의 보호구 조각 3 | 아크론 혈투의 증표(100) 1
+이클립스 투구 | 어비스 투구 | 가짜 달여왕 군단의 투구 장식 3 | 달의 약초 100 | 가공된 달의 광물(1) 1 | 룬의 원석(20) 1 | 가짜 달여왕 군단의 인장(6) 1
+
+머리
+인퍼널 아뮬렛 | 엔키라 칼라그 아뮬렛 | 사서의 보석 파편 2 | 환상초 10
+아퀼루스 아뮬렛 | 인퍼널 아뮬렛 | 프시키의 파편 - 형성 4 | 시트린 10 | 태청금액신단 6
+어비스 아뮬렛 | 아퀼루스 아뮬렛 | 고대 기사의 펜던트 파편 5 | 요새 문양이 새겨진 목걸이 조각 3 | 아크론 혈투의 증표(100) 1
+이클립스 아뮬렛 | 어비스 아뮬렛 | 가짜 달여왕 군단의 펜던트 파편 3 | 달의 약초 100 | 가공된 달의 광물(1) 1 | 룬의 원석(20) 1 | 가짜 달여왕 군단의 인장(6) 1
+
+몸
+인퍼널 윙 | 엔키라 칼라그 윙 | 파괴자의 어깨 장식 2 | 환상초 10
+아퀼루스 윙 | 인퍼널 윙 | 프시키의 파편 - 안정 4 | 시트린 10 | 태청금액신단 6
+어비스 윙 | 아퀼루스 윙 | 고대 기사의 휘장 조각 5 | 요새 수호자의 장식 깃털 3 | 아크론 혈투의 증표(100) 1
+이클립스 윙 | 어비스 윙 | 가짜 달여왕 군단의 휘장 장식 3 | 달의 약초 100 | 가공된 달의 광물(1) 1 | 룬의 원석(20) 1 | 가짜 달여왕 군단의 인장(6) 1
+
+손
+인퍼널 건틀렛 | 엔키라 칼라그 건틀렛 | 용암 거인의 건틀렛 파편 2 | 환상초 10
+아퀼루스 건틀렛 | 인퍼널 건틀렛 | 프시키의 파편 - 고정 4 | 시트린 10 | 태청금액신단 6
+어비스 건틀렛 | 아퀼루스 건틀렛 | 고대 기사의 건틀렛 파편 5 | 요새 문양이 새겨진 가죽 조각 3 | 아크론 혈투의 증표(100) 1
+이클립스 건틀렛 | 어비스 건틀렛 | 가짜 달여왕 군단의 건틀렛 파편 3 | 달의 약초 100 | 가공된 달의 광물(1) 1 | 룬의 원석(20) 1 | 가짜 달여왕 군단의 인장(6) 1
+
+발
+인퍼널 부츠 | 엔키라 칼라그 부츠 | 수감자의 기둥 파편 2 | 환상초 10
+아퀼루스 부츠 | 인퍼널 부츠 | 프시키의 파편 - 구원 4 | 시트린 10 | 태청금액신단 6
+어비스 부츠 | 아퀼루스 부츠 | 고대 기사의 각갑 파편 5 | 요새 수호자의 부츠 조각 3 | 아크론 혈투의 증표(100) 1
+이클립스 부츠 | 어비스 부츠 | 가짜 달여왕 군단의 각갑 파편 3 | 달의 약초 100 | 가공된 달의 광물(1) 1 | 룬의 원석(20) 1 | 가짜 달여왕 군단의 인장(6) 1
+`;
+
+const EQC_PRICE_KEY = "tw-equip-craft-price-v1";
+const EQC_HAGGLE_KEY = "tw-equip-craft-haggle-v1";
+
+// NPC에게 정해진 값으로 사는 재료. 흥정에 성공하면 더 싸게 산다 (만 단위)
+const EQC_FIXED_PRICES = {
+  "가공된 달의 광물(1)": { base: 100000, haggle: 80000 },
+  "룬의 원석(20)": { base: 600000, haggle: 520000 },
+};
+
+// "고대 기사의 무기 파편 5" → { name, count }. 이름에 공백이 많아 뒤에서 자른다
+function eqcParseMaterial(text) {
+  const match = clean(text).match(/^(.*?)\s+(\d+)$/u);
+  if (!match) return { name: clean(text), count: 1 };
+  return { name: match[1].trim(), count: Number(match[2]) };
+}
+
+// 표 → { 부위: { steps: [{to, from, materials}], tiers: [...] } }
+function eqcParseRecipes(text) {
+  const parts = new Map();
+  let current = null;
+  for (const raw of text.split("\n")) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (!line.includes("|")) {
+      current = { steps: [], tiers: [] };
+      parts.set(line, current);
+      continue;
+    }
+    if (!current) continue;
+    const [to, from, ...mats] = line.split("|").map((s) => s.trim());
+    current.steps.push({ to, from, materials: mats.map(eqcParseMaterial) });
+  }
+  // 단계 목록: 첫 재료(이전 단계)부터 마지막 결과물까지
+  for (const part of parts.values()) {
+    if (!part.steps.length) continue;
+    part.tiers = [part.steps[0].from, ...part.steps.map((s) => s.to)];
+  }
+  return parts;
+}
+
+const EQC_RECIPES = eqcParseRecipes(EQC_RECIPE_TEXT);
+const EQC_PARTS = [...EQC_RECIPES.keys()];
+
+const eqc = { part: EQC_PARTS[0] || "", from: "", to: "", prices: {}, haggle: {} };
+
+function eqcPart() {
+  return EQC_RECIPES.get(eqc.part) || { steps: [], tiers: [] };
+}
+
+// 시작 다음 단계부터 목표까지의 재료를 더한다
+function eqcMaterials() {
+  const { steps, tiers } = eqcPart();
+  const start = tiers.indexOf(eqc.from);
+  const end = tiers.indexOf(eqc.to);
+  if (start < 0 || end < 0 || end <= start) return [];
+
+  const totals = new Map();
+  for (const step of steps.slice(start, end)) {
+    for (const { name, count } of step.materials) {
+      totals.set(name, (totals.get(name) || 0) + count);
+    }
+  }
+  return [...totals].map(([name, count]) => ({ name, count }));
+}
+
+function eqcReadStore(key) {
+  try {
+    return JSON.parse(localStorage.getItem(key) || "{}") || {};
+  } catch (error) {
+    return {};
+  }
+}
+
+function eqcWriteHaggle() {
+  try {
+    localStorage.setItem(EQC_HAGGLE_KEY, JSON.stringify(eqc.haggle));
+  } catch (error) {
+    // 저장 공간 부족 등은 무시
+  }
+}
+
+function eqcWritePrices() {
+  try {
+    localStorage.setItem(EQC_PRICE_KEY, JSON.stringify(eqc.prices));
+  } catch (error) {
+    // 저장 공간 부족 등은 무시 (가격 기억은 편의일 뿐)
+  }
+}
+
+function renderEqcSelects() {
+  if (!simEls.eqcPart) return;
+
+  simEls.eqcPart.innerHTML = EQC_PARTS.map((p) => optionHtml(p, p)).join("");
+  simEls.eqcPart.value = eqc.part;
+
+  const { tiers } = eqcPart();
+  // 시작은 마지막 단계를 뺀 나머지, 목표는 시작보다 위쪽
+  const starts = tiers.slice(0, -1);
+  simEls.eqcFrom.innerHTML = starts.map((n) => optionHtml(n, n)).join("");
+  if (!starts.includes(eqc.from)) eqc.from = starts[0] || "";
+  simEls.eqcFrom.value = eqc.from;
+  simEls.eqcFrom.disabled = !starts.length;
+
+  const goals = tiers.slice(tiers.indexOf(eqc.from) + 1);
+  simEls.eqcTo.innerHTML = goals.map((n) => optionHtml(n, n)).join("");
+  if (!goals.includes(eqc.to)) eqc.to = goals[goals.length - 1] || "";
+  simEls.eqcTo.value = eqc.to;
+  simEls.eqcTo.disabled = !goals.length;
+}
+
+// 가격은 만 단위로 넣고, 합계는 억·만으로 끊어 보여준다.
+// 자릿수가 커지면 만 단위 숫자만으로는 크기가 잘 안 읽힌다.
+function eqcMoney(manValue) {
+  const man = Math.round(Number(manValue) || 0);
+  if (!man) return "0";
+  const eok = Math.floor(man / 10000);
+  const rest = man % 10000;
+  const parts = [];
+  if (eok) parts.push(`${eok.toLocaleString("ko-KR")}억`);
+  if (rest) parts.push(`${rest.toLocaleString("ko-KR")}만`);
+  return parts.join(" ");
+}
+
+// 고정가 재료는 입력값 대신 정해진 값을 쓴다
+function eqcUnitPrice(name) {
+  const fixed = EQC_FIXED_PRICES[name];
+  if (fixed) return eqc.haggle[name] ? fixed.haggle : fixed.base;
+  return Number(eqc.prices[name]) || 0;
+}
+
+// 재료 아이콘. 이름이 파일명과 조금씩 달라 장비 상세와 같은 후보 목록을 쓰고,
+// 실패하면 handleMaterialImageError가 다음 후보로 넘어간다
+function eqcMaterialIcon(name) {
+  const [src, ...fallbacks] = materialImageUrls(name);
+  if (!src) return "";
+  // 숨겨진 탭에서 만들어지므로 lazy로 두면 로드가 걸리지 않는다. 재료 수가 적어 바로 받는다
+  return `<img class="material-icon eqc-icon" src="${src}" alt="" decoding="async"`
+    + ` data-fallbacks="${escapeHtml(JSON.stringify(fallbacks))}" />`;
+}
+
+function renderEqcResult() {
+  if (!simEls.eqcSteps) return;
+
+  const { steps, tiers } = eqcPart();
+  const clear = () => {
+    simEls.eqcSteps.innerHTML = "";
+    simEls.eqcTotal.innerHTML = "";
+  };
+
+  if (!tiers.length) return clear();
+
+  const start = tiers.indexOf(eqc.from);
+  const end = tiers.indexOf(eqc.to);
+  if (start < 0 || end <= start) return clear();
+
+  const used = steps.slice(start, end);
+
+  // 단계를 좌우 칸으로 나누고 재료는 그 안에 세로로 쌓는다.
+  // 어느 구간에 무엇이 드는지 나란히 놓고 비교할 수 있다.
+  simEls.eqcSteps.innerHTML = used.map((step) => `
+    <section class="eqc-step-card" data-eqc-step="${escapeHtml(step.to)}">
+      <h4>${escapeHtml(step.from)}<span aria-hidden="true"> → </span>${escapeHtml(step.to)}</h4>
+      ${step.materials.map((m) => {
+        const fixed = EQC_FIXED_PRICES[m.name];
+        const name = escapeHtml(m.name);
+        return `
+        <div class="eqc-mat">
+          <div class="eqc-mat-name">
+            <span>
+              ${eqcMaterialIcon(m.name)}${name}
+              ${fixed ? `<label class="eqc-haggle">
+                <input type="checkbox" data-eqc-haggle="${name}"${eqc.haggle[m.name] ? " checked" : ""} />
+                <span>흥정</span>
+              </label>` : ""}
+            </span>
+            <b>${formatNumber(m.count)}</b>
+          </div>
+          <div class="eqc-mat-calc">
+            ${fixed
+              ? `<span class="eqc-fixed" data-eqc-fixed="${name}">${eqcMoney(eqcUnitPrice(m.name))}</span>`
+              : `<input type="number" min="0" step="1" inputmode="numeric" value="${Number(eqc.prices[m.name]) || ""}" placeholder="개당 가격 (만)"
+                        data-eqc-price="${name}" />`}
+            <span class="eqc-sum" data-eqc-sum="${name}" data-eqc-count="${m.count}">${eqcMoney(eqcUnitPrice(m.name) * m.count)}</span>
+          </div>
+        </div>`;
+      }).join("")}
+      <div class="eqc-step-foot">소계 <b class="eqc-step-sum">0</b></div>
+    </section>
+  `).join("");
+
+  simEls.eqcSteps.querySelectorAll(".eqc-icon").forEach((image) => {
+    image.addEventListener("error", handleMaterialImageError);
+  });
+
+  renderEqcTotal(used);
+}
+
+// 가격을 칠 때마다 다시 그리면 입력 중인 칸이 사라져 포커스가 튄다.
+// 그래서 소계와 총합만 따로 갱신한다.
+function renderEqcTotal(used) {
+  let total = 0;
+  for (const step of used) {
+    const sub = step.materials.reduce(
+      (sum, m) => sum + eqcUnitPrice(m.name) * m.count, 0);
+    total += sub;
+    const cell = simEls.eqcSteps.querySelector(`[data-eqc-step="${CSS.escape(step.to)}"] .eqc-step-sum`);
+    if (cell) cell.textContent = eqcMoney(sub);
+  }
+
+  simEls.eqcTotal.innerHTML =
+    `<div class="sim-summary-title">합계 <b>${eqcMoney(total)}</b></div>`;
+}
+
+function renderEquipCraft() {
+  renderEqcSelects();
+  renderEqcResult();
+}
+
+function wireEquipCraft() {
+  if (!simEls.eqcPart) return;
+  eqc.prices = eqcReadStore(EQC_PRICE_KEY);
+  eqc.haggle = eqcReadStore(EQC_HAGGLE_KEY);
+
+  simEls.eqcPart.addEventListener("change", () => {
+    eqc.part = simEls.eqcPart.value;
+    eqc.from = "";
+    eqc.to = "";
+    renderEquipCraft();
+  });
+  simEls.eqcFrom.addEventListener("change", () => {
+    eqc.from = simEls.eqcFrom.value;
+    eqc.to = "";
+    renderEquipCraft();
+  });
+  simEls.eqcTo.addEventListener("change", () => {
+    eqc.to = simEls.eqcTo.value;
+    renderEqcResult();
+  });
+
+  // 가격을 칠 때마다 다시 그리면 입력 중인 칸이 사라져 포커스가 튄다.
+  // 그래서 바뀐 재료의 줄과 소계·총합만 갱신한다.
+  const refreshMaterial = (name) => {
+    const price = eqcUnitPrice(name);
+    simEls.eqcSteps.querySelectorAll(`[data-eqc-sum="${CSS.escape(name)}"]`).forEach((cell) => {
+      const count = Number(cell.dataset.eqcCount) || 0;
+      cell.textContent = eqcMoney(price * count);
+    });
+    const { steps, tiers } = eqcPart();
+    renderEqcTotal(steps.slice(tiers.indexOf(eqc.from), tiers.indexOf(eqc.to)));
+  };
+
+  simEls.eqcSteps.addEventListener("input", (event) => {
+    const input = event.target.closest("[data-eqc-price]");
+    if (!input) return;
+    const name = input.dataset.eqcPrice;
+    eqc.prices[name] = Math.max(0, Number(input.value) || 0);
+    eqcWritePrices();
+
+    // 같은 재료가 여러 단계에 있을 수 있어 나머지 칸도 맞춰 둔다
+    simEls.eqcSteps.querySelectorAll(`[data-eqc-price="${CSS.escape(name)}"]`).forEach((el) => {
+      if (el !== input) el.value = input.value;
+    });
+    refreshMaterial(name);
+  });
+
+  simEls.eqcSteps.addEventListener("change", (event) => {
+    const box = event.target.closest("[data-eqc-haggle]");
+    if (!box) return;
+    const name = box.dataset.eqcHaggle;
+    eqc.haggle[name] = box.checked;
+    eqcWriteHaggle();
+
+    simEls.eqcSteps.querySelectorAll(`[data-eqc-haggle="${CSS.escape(name)}"]`).forEach((el) => {
+      if (el !== box) el.checked = box.checked;
+    });
+    simEls.eqcSteps.querySelectorAll(`[data-eqc-fixed="${CSS.escape(name)}"]`).forEach((el) => {
+      el.textContent = eqcMoney(eqcUnitPrice(name));
+    });
+    refreshMaterial(name);
+  });
+
+  renderEquipCraft();
+}
+
+// 정의가 모두 끝난 뒤에 시작한다 (뒤쪽 const를 부팅 중에 건드리기 때문)
+boot().catch((error) => {
+  console.error(error);
+  els.dataStatus.textContent = "데이터 로드 실패";
+  els.equipmentCard.replaceChildren(els.emptyTemplate.content.cloneNode(true));
+});
