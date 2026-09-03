@@ -5839,37 +5839,25 @@ function inheritedValue(value, grade) {
 // 공식은 코드가 실제로 쓰는 상수로 그린다. 문구만 따로 적어두면 값을 고칠 때
 // 공지에 실린 상속 불가 목록이다. 계산 결과에는 쓰지 않고 안내로만 보여준다
 const INHERIT_BLOCKED_ITEMS = [
-  "언홀리 프레이어", "트와일라잇 아이", "강령술사의 로브",
-  "더 레이지", "아쉬켈론", "지배자의 반지",
-  "괴짜 발명가의 로봇 신발", "기계 제어의 아뮬렛", "철권통치의 왕관",
-  "글로리우스", "카디널 로드", "공성추",
-  "다크 레이븐 슈츠", "실링류 가운", "어쌔신 밴드",
-  "전투 지휘관의 아머", "토마호크",
-];
-
-const INHERIT_BLOCKED_ADDED = [
-  "기간제 장비", "귀곡성 장비", "네오테시스 1, 2장비",
-  "카릴가 장비", "별의전장 장비", "영혼의 랜턴 장비",
-  "초기 합성 횟수가 1인 산스르리아 장비",
+  "眞-언홀리 프레이어", "眞-트와일라잇 아이", "眞-강령술사의 로브",
+  "眞-더 레이지", "眞-아슈켈론", "眞-지배자의 반지",
+  "眞-괴짜 발명가의 로봇 신발", "眞-기계 제어의 아뮬렛", "眞-철권통치의 왕관",
+  "眞-글로이우스", "眞-카디널 로드", "眞-공성추",
+  "眞-다크 레이븐 슈츠", "眞-실험용 가운", "眞-전투 지휘관의 아머",
+  "眞-토마호크", "眞-어쌔신 밴드",
+  "기간제 장비", "귀곡성 장비", "네오테시스 1, 2 장비",
+  "카릴가 장비", "별의 전장 장비", "영혼의 랜턴 장비",
+  "초기 합성 횟수가 1인 산스루리아 장비",
 ];
 
 function inheritNoticeHtml() {
-  const cells = (names) => names
+  const cells = INHERIT_BLOCKED_ITEMS
     .map((name) => `<li>${escapeHtml(name)}</li>`).join("");
 
   return `
     <div id="inhNotice" class="inherit-notice" hidden>
-      <p>
-        아이템 초기 합성 횟수가 1회로 인크립트 진행 없이 인첸트를 1회 추가 진행할 수 있었던
-        장비 수정이 진행되었습니다.
-      </p>
-      <p>
-        앞으로 상속 이용이 가능하지 않은 아이템은 아래 표를 통해 확인하셔서
-        게임 이용에 참고해 주시기 바랍니다.
-      </p>
-      <ul class="inherit-notice-grid">${cells(INHERIT_BLOCKED_ITEMS)}</ul>
-      <p class="inherit-notice-sub">(추가) 아래 장비 내용이 추가되었습니다.</p>
-      <ul class="inherit-notice-grid">${cells(INHERIT_BLOCKED_ADDED)}</ul>
+      <p class="inherit-notice-sub">상속 이용이 가능하지 않은 아이템 리스트</p>
+      <ul class="inherit-notice-grid">${cells}</ul>
     </div>
   `;
 }
