@@ -5837,6 +5837,43 @@ function inheritedValue(value, grade) {
 }
 
 // 공식은 코드가 실제로 쓰는 상수로 그린다. 문구만 따로 적어두면 값을 고칠 때
+// 공지에 실린 상속 불가 목록이다. 계산 결과에는 쓰지 않고 안내로만 보여준다
+const INHERIT_BLOCKED_ITEMS = [
+  "언홀리 프레이어", "트와일라잇 아이", "강령술사의 로브",
+  "더 레이지", "아쉬켈론", "지배자의 반지",
+  "괴짜 발명가의 로봇 신발", "기계 제어의 아뮬렛", "철권통치의 왕관",
+  "글로리우스", "카디널 로드", "공성추",
+  "다크 레이븐 슈츠", "실링류 가운", "어쌔신 밴드",
+  "전투 지휘관의 아머", "토마호크",
+];
+
+const INHERIT_BLOCKED_ADDED = [
+  "기간제 장비", "귀곡성 장비", "네오테시스 1, 2장비",
+  "카릴가 장비", "별의전장 장비", "영혼의 랜턴 장비",
+  "초기 합성 횟수가 1인 산스르리아 장비",
+];
+
+function inheritNoticeHtml() {
+  const cells = (names) => names
+    .map((name) => `<li>${escapeHtml(name)}</li>`).join("");
+
+  return `
+    <div id="inhNotice" class="inherit-notice" hidden>
+      <p>
+        아이템 초기 합성 횟수가 1회로 인크립트 진행 없이 인첸트를 1회 추가 진행할 수 있었던
+        장비 수정이 진행되었습니다.
+      </p>
+      <p>
+        앞으로 상속 이용이 가능하지 않은 아이템은 아래 표를 통해 확인하셔서
+        게임 이용에 참고해 주시기 바랍니다.
+      </p>
+      <ul class="inherit-notice-grid">${cells(INHERIT_BLOCKED_ITEMS)}</ul>
+      <p class="inherit-notice-sub">(추가) 아래 장비 내용이 추가되었습니다.</p>
+      <ul class="inherit-notice-grid">${cells(INHERIT_BLOCKED_ADDED)}</ul>
+    </div>
+  `;
+}
+
 // 화면과 계산이 어긋난다.
 function renderInheritFormula() {
   if (!simEls.inhFormula) return;
@@ -5858,7 +5895,11 @@ function renderInheritFormula() {
   `;
 
   simEls.inhFormula.innerHTML = `
-    <div class="inherit-formula-head">상속 주문서</div>
+    <div class="inherit-formula-head">
+      상속 주문서
+      <button id="inhNoticeToggle" class="inherit-notice-toggle" type="button" aria-expanded="false">주의 사항</button>
+    </div>
+    ${inheritNoticeHtml()}
     <p class="inherit-formula-intro">
       상속 주문서는 Lv 200 이상 장비의 인챈트, 강화를 상속할 때 필요한 아이템입니다.
       추출할 장비의 인챈트 총합, 인크립트 횟수와 장비 강화 레벨에 따라
@@ -5972,6 +6013,15 @@ function wireInheritSim() {
   if (!simEls.inhEnchants) return;
   renderInheritFormula();
   renderInheritEnchantRows();
+
+  // 공지 원문이 길어 접어 둔다. 상속 주문서 설명 옆 버튼으로 편다
+  const noticeToggle = document.getElementById("inhNoticeToggle");
+  const notice = document.getElementById("inhNotice");
+  noticeToggle?.addEventListener("click", () => {
+    const open = notice.hidden;
+    notice.hidden = !open;
+    noticeToggle.setAttribute("aria-expanded", String(open));
+  });
 
   const panel = document.querySelector('[data-calculator-panel="inherit"]');
   panel?.addEventListener("input", renderInheritResult);
