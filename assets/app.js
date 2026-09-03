@@ -22,7 +22,7 @@ const SNAPSHOT_URL = "./data/equipment-snapshot.json";
 //   git tag v3.0.1 && git push origin v3.0.1
 const CDN_ROOT = "https://cdn.jsdelivr.net/gh/TWHome-Git/TWPage@";
 const CDN_AVATAR_ROOT = `${CDN_ROOT}v1.0.10/`;
-const CDN_EQUIP_ROOT = `${CDN_ROOT}v2.0.5/`;
+const CDN_EQUIP_ROOT = `${CDN_ROOT}v2.0.6/`;
 const CDN_ETC_ROOT = `${CDN_ROOT}v3.0.0/`;
 
 const IMAGE_BASE = `${CDN_EQUIP_ROOT}equipment-images/`;
@@ -7217,6 +7217,12 @@ const EQC_RECIPE_TEXT = `
 어비스 손목 | 아퀼루스 손목 | 고대 기사의 방패 조각 5 | 요새 문양이 새겨진 금속 파편 3 | 아크론 혈투의 증표(100) 1
 이클립스 손목 | 어비스 손목 | 가짜 달여왕 군단의 방패 조각 3 | 달의 약초 100 | 가공된 달의 광물(1) 1 | 룬의 원석(20) 1 | 가짜 달여왕 군단의 인장(6) 1
 
+갑옷
+인퍼널 갑옷 | 엔키라 칼라그 갑옷 | 집행인의 해골 장식 2 | 환상초 10
+아퀼루스 갑옷 | 인퍼널 갑옷 | 프시키의 파편 - 단절 4 | 시트린 10 | 태청금액신단 6
+어비스 갑옷 | 아퀼루스 갑옷 | 고대 기사의 갑옷 파편 5 | 요새 문양이 새겨진 판금 조각 3 | 아크론 혈투의 증표(100) 1
+이클립스 갑옷 | 어비스 갑옷 | 가짜 달여왕 군단의 갑옷 파편 3 | 달의 약초 100 | 가공된 달의 광물(1) 1 | 룬의 원석(20) 1 | 가짜 달여왕 군단의 인장(6) 1
+
 투구
 인퍼널 투구 | 엔키라 칼라그 투구 | 광전사의 투구 파편 2 | 환상초 10
 아퀼루스 투구 | 인퍼널 투구 | 프시키의 파편 - 분리 4 | 시트린 10 | 태청금액신단 6
@@ -7238,7 +7244,7 @@ const EQC_RECIPE_TEXT = `
 손
 인퍼널 건틀렛 | 엔키라 칼라그 건틀렛 | 용암 거인의 건틀렛 파편 2 | 환상초 10
 아퀼루스 건틀렛 | 인퍼널 건틀렛 | 프시키의 파편 - 고정 4 | 시트린 10 | 태청금액신단 6
-어비스 건틀렛 | 아퀼루스 건틀렛 | 고대 기사의 건틀렛 파편 5 | 요새 문양이 새겨진 가죽 조각 3 | 아크론 혈투의 증표(100) 1
+어비스 건틀렛 | 아퀼루스 건틀렛 | 고대 기사의 건틀렛 조각 5 | 요새 문양이 새겨진 가죽 조각 3 | 아크론 혈투의 증표(100) 1
 이클립스 건틀렛 | 어비스 건틀렛 | 가짜 달여왕 군단의 건틀렛 파편 3 | 달의 약초 100 | 가공된 달의 광물(1) 1 | 룬의 원석(20) 1 | 가짜 달여왕 군단의 인장(6) 1
 
 발
@@ -7297,20 +7303,11 @@ function eqcPart() {
   return EQC_RECIPES.get(eqc.part) || { steps: [], tiers: [] };
 }
 
-// 시작 다음 단계부터 목표까지의 재료를 더한다
-function eqcMaterials() {
-  const { steps, tiers } = eqcPart();
-  const start = tiers.indexOf(eqc.from);
-  const end = tiers.indexOf(eqc.to);
-  if (start < 0 || end < 0 || end <= start) return [];
-
-  const totals = new Map();
-  for (const step of steps.slice(start, end)) {
-    for (const { name, count } of step.materials) {
-      totals.set(name, (totals.get(name) || 0) + count);
-    }
-  }
-  return [...totals].map(([name, count]) => ({ name, count }));
+// 첫 단계는 시작 장비를 사서 넣어야 하니 재료에 포함한다.
+// 그 뒤 단계가 쓰는 중간 장비는 앞 단계에서 만들어 나오므로 넣지 않는다.
+function eqcStepMaterials(step, index) {
+  if (index > 0) return step.materials;
+  return [{ name: step.from, count: 1 }, ...step.materials];
 }
 
 function eqcReadStore(key) {
@@ -7407,10 +7404,10 @@ function renderEqcResult() {
 
   // 단계를 좌우 칸으로 나누고 재료는 그 안에 세로로 쌓는다.
   // 어느 구간에 무엇이 드는지 나란히 놓고 비교할 수 있다.
-  simEls.eqcSteps.innerHTML = used.map((step) => `
+  simEls.eqcSteps.innerHTML = used.map((step, index) => `
     <section class="eqc-step-card" data-eqc-step="${escapeHtml(step.to)}">
       <h4>${escapeHtml(step.from)}<span aria-hidden="true"> → </span>${escapeHtml(step.to)}</h4>
-      ${step.materials.map((m) => {
+      ${eqcStepMaterials(step, index).map((m) => {
         const fixed = EQC_FIXED_PRICES[m.name];
         const name = escapeHtml(m.name);
         return `
@@ -7449,13 +7446,13 @@ function renderEqcResult() {
 // 그래서 소계와 총합만 따로 갱신한다.
 function renderEqcTotal(used) {
   let total = 0;
-  for (const step of used) {
-    const sub = step.materials.reduce(
+  used.forEach((step, index) => {
+    const sub = eqcStepMaterials(step, index).reduce(
       (sum, m) => sum + eqcUnitPrice(m.name) * m.count, 0);
     total += sub;
     const cell = simEls.eqcSteps.querySelector(`[data-eqc-step="${CSS.escape(step.to)}"] .eqc-step-sum`);
     if (cell) cell.textContent = eqcMoney(sub);
-  }
+  });
 
   simEls.eqcTotal.innerHTML =
     `<div class="sim-summary-title">합계 <b>${eqcMoney(total)}</b></div>`;
