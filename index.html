@@ -6,9 +6,9 @@
     <title>TW DB</title>
     <!-- 이미지 CDN. 첫 이미지 요청 전에 DNS+TLS를 미리 끝내둔다 -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
-    <link rel="stylesheet" href="./assets/styles.css?v=20260903-eqcicon" />
+    <link rel="stylesheet" href="./assets/styles.css?v=20260903-eqcfirst" />
     <!-- 모바일 전용. media 속성 덕에 넓은 화면에서는 렌더링을 막지 않는다 -->
-    <link rel="stylesheet" href="./assets/mobile.css?v=20260903-eqcicon" media="(max-width: 720px)" />
+    <link rel="stylesheet" href="./assets/mobile.css?v=20260903-eqcfirst" media="(max-width: 720px)" />
   </head>
   <body>
     <main class="app-shell">
@@ -372,15 +372,25 @@
           <div class="addon-tab-field">
             <span>계산기 메뉴</span>
             <nav class="addon-subtabs" aria-label="계산기 메뉴">
+              <button class="addon-tab" type="button" data-calculator-tab="equipment" data-local-only hidden>장비 계산기</button>
               <button class="addon-tab is-active" type="button" data-calculator-tab="inherit">상속서 계산기</button>
               <button class="addon-tab" type="button" data-calculator-tab="coefficient">계수 계산기</button>
               <button class="addon-tab" type="button" data-calculator-tab="damage">대미지 계산기</button>
-              <button class="addon-tab" type="button" data-calculator-tab="equipment" data-local-only hidden>장비 계산기</button>
             </nav>
           </div>
         </div>
 
         <div class="addon-window">
+          <section class="addon-content sim-panel" data-calculator-panel="equipment" hidden>
+            <div class="sim-fields eqc-controls">
+              <label class="field"><span>부위</span><select id="eqcPart"></select></label>
+              <label class="field"><span>시작 장비</span><select id="eqcFrom"></select></label>
+              <label class="field"><span>목표 장비</span><select id="eqcTo"></select></label>
+            </div>
+            <div id="eqcSteps" class="eqc-steps"></div>
+            <div id="eqcTotal" class="sim-summary"></div>
+          </section>
+
           <section class="addon-content sim-panel is-active" data-calculator-panel="inherit">
             <div id="inhFormula" class="inherit-formula"></div>
             <div class="sim-grid">
@@ -487,16 +497,6 @@
               <p class="coefficient-pierce-title">방어 관통 <button id="pierceHelpButton" class="eta-help-button" type="button" title="방어 관통 안내" aria-label="방어 관통 안내">?</button></p>
               <div id="coefficientPierce" class="coefficient-pierce"></div>
             </div>
-          </section>
-
-          <section class="addon-content sim-panel" data-calculator-panel="equipment" hidden>
-            <div class="sim-fields eqc-controls">
-              <label class="field"><span>부위</span><select id="eqcPart"></select></label>
-              <label class="field"><span>시작 장비</span><select id="eqcFrom"></select></label>
-              <label class="field"><span>목표 장비</span><select id="eqcTo"></select></label>
-            </div>
-            <div id="eqcSteps" class="eqc-steps"></div>
-            <div id="eqcTotal" class="sim-summary"></div>
           </section>
 
           <section class="addon-content sim-panel" data-calculator-panel="damage" hidden>
@@ -838,7 +838,7 @@
       </div>
     </template>
 
-    <script src="./assets/app.js?v=20260903-eqcicon" type="module"></script>
+    <script src="./assets/app.js?v=20260903-eqcfirst" type="module"></script>
     <!-- GoatCounter 방문자 분석 (localhost 방문은 count.js가 기본으로 집계 제외) -->
     <script data-goatcounter="https://holedis88.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
   </body>
