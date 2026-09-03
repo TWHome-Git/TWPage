@@ -2250,6 +2250,10 @@ function activateCalculatorTab(key) {
 }
 
 function activateSimulatorTab(key) {
+  // 아직 공개하지 않은 탭은 버튼이 숨겨져 있다. 주소로 바로 들어와도 열리지 않게 막는다
+  const target = [...els.simulatorTabButtons].find((b) => b.dataset.simulatorTab === key);
+  if (target?.hidden) key = "encrypt";
+
   els.simulatorTabButtons.forEach((button) => {
     button.classList.toggle("is-active", button.dataset.simulatorTab === key);
   });
@@ -5771,6 +5775,8 @@ function initSimulators() {
     "relicCurrent", "relicTarget", "relicDifficulty", "relicCalc", "relicSummary", "relicTable",
     "relicRateButton", "coreRateButton",
     "rateModal", "rateModalTitle", "rateModalNote", "rateModalBody",
+    "inhFormula", "inhEnchants", "inhIncrement", "inhTotal", "inhFusionMax",
+    "inhStatus", "inhSummary", "inhTable",
   ].forEach((id) => (simEls[id] = q(id)));
 
   wireRateModal();
@@ -5779,6 +5785,190 @@ function initSimulators() {
   wireEncryptSim();
   wireCoreSim();
   wireRelicSim();
+  wireInheritSim();
+}
+
+// ══════════════════════════════════════════════════════════════
+//  상속 시뮬레이터
+// ══════════════════════════════════════════════════════════════
+//
+// 주문서 수는 게임 내 "상속 주문서" 안내를 그대로 옮겼다.
+//   주문서 1개 : 인크립트 횟수 0~1, 능력치 총합 12~18
+//   주문서 n개 : 인크립트 횟수 n,  능력치 총합 (19 + (n-2)*6) ~ (+5)
+//   기본 조건은 채웠는데 능력치 총합이 별도 조건을 넘으면 1개 추가 (미달은 그대로)
+//
+// 이클립스 이상은 별도 규칙이다.
+//   - 주문서는 어비스 이상과 같이 2배
+//   - 인챈트는 70%만 넘어가고 소수점은 버린다. 능력치마다 각각 계산한다
+//   - 합성 횟수가 MAX일 때만 상속할 수 있다
+const INHERIT_ENCHANT_ROWS = 2;
+const ECLIPSE_RATE = 0.7;
+const HIGH_GRADE_SCROLL_MULTIPLIER = 2;
+
+// 인크립트 횟수 n에 해당하는 능력치 총합 구간
+function inheritStatBand(increments) {
+  const n = Math.max(1, increments);
+  if (n === 1) return { n, min: 12, max: 18 };
+  const min = 19 + (n - 2) * 6;
+  return { n, min, max: min + 5 };
+}
+
+function inheritScrollCount(increments, statTotal, grade) {
+  const band = inheritStatBand(increments);
+  const bonus = statTotal > band.max;   // 초과 달성이면 1개 추가, 미달은 그대로
+  const base = band.n + (bonus ? 1 : 0);
+  // 어비스 이상은 같은 계산에 2배를 매긴다
+  const multiplier = grade === "normal" ? 1 : HIGH_GRADE_SCROLL_MULTIPLIER;
+  return { count: base * multiplier, band, bonus, base, multiplier };
+}
+
+// 이클립스 이상은 능력치마다 따로 70%를 적용하고 버림한다
+function inheritedValue(value, grade) {
+  return grade === "eclipse" ? Math.floor(value * ECLIPSE_RATE) : value;
+}
+
+// 공식은 코드가 실제로 쓰는 상수로 그린다. 문구만 따로 적어두면 값을 고칠 때
+// 화면과 계산이 어긋난다.
+function renderInheritFormula() {
+  if (!simEls.inhFormula) return;
+  const x = HIGH_GRADE_SCROLL_MULTIPLIER;
+  const pct = Math.round(ECLIPSE_RATE * 100);
+
+  // 게임 내 "상속 주문서" 안내를 그대로 옮기고, 어비스·이클립스 항목을 덧붙였다.
+  // 배수·비율은 계산에 쓰는 상수를 그대로 끼워 넣어 화면과 계산이 어긋나지 않게 한다.
+  const block = (label, basic, extra) => `
+    <div class="inherit-formula-block">
+      <div class="inherit-formula-title">${label}</div>
+      <table class="inherit-formula-table">
+        <tbody>
+          <tr><th>기본조건</th><td>${basic}</td></tr>
+          <tr><th>별도조건</th><td>${extra}</td></tr>
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  simEls.inhFormula.innerHTML = `
+    <div class="inherit-formula-head">상속 주문서</div>
+    <p class="inherit-formula-intro">
+      상속 주문서는 Lv 200 이상 장비의 인챈트, 강화를 상속할 때 필요한 아이템입니다.
+      추출할 장비의 인챈트 총합, 인크립트 횟수와 장비 강화 레벨에 따라
+      필요한 주문서의 숫자가 다릅니다.
+    </p>
+
+    <div class="inherit-formula-cols">
+      <div>
+    ${block("[1] 주문서 1개", "인크립트 횟수 0~1", "능력치 총합 12~18")}
+    ${block("[2] 주문서 n개 (n≥2)", "인크립트 횟수 n",
+            "능력치 총합 (19 + (n−2) × 6) ~ (19 + (n−2) × 6 + 5)")}
+
+    <p class="inherit-formula-note">
+      기본조건은 달성했지만, 별도조건보다 초과 달성했을 경우에는
+      주문서 1개 추가 (별도조건 미달은 제외)
+    </p>
+      </div>
+      <div>
+    <div class="inherit-formula-block">
+      <div class="inherit-formula-title">[3] 어비스 이상 장비</div>
+      <ul class="inherit-formula-list">
+        <li>위에서 구한 주문서 수가 <b>${x}배</b>가 됩니다.</li>
+      </ul>
+    </div>
+
+    <div class="inherit-formula-block">
+      <div class="inherit-formula-title">[4] 이클립스 이상 장비</div>
+      <ul class="inherit-formula-list">
+        <li>상속서는 어비스 이상 장비와 동일하게 <b>${x}배</b>가 필요합니다.</li>
+        <li>상속에 사용된 장비 인챈트 수치의 <b>${pct}%</b>만 상속됩니다.
+            (예: 70 인챈트 → ${Math.floor(70 * ECLIPSE_RATE)})</li>
+        <li>남는 소수점은 버림 처리됩니다.
+            (예: 72 인챈트 → ${(72 * ECLIPSE_RATE).toFixed(1)} → ${Math.floor(72 * ECLIPSE_RATE)})</li>
+        <li>2개 이상의 능력치에 인챈트가 되어 있으면 각 인챈트별로 각각 ${pct}% 적용됩니다.</li>
+        <li>합성 횟수가 <b>MAX</b>인 상태에서만 상속할 수 있습니다.</li>
+      </ul>
+    </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderInheritEnchantRows() {
+  if (!simEls.inhEnchants) return;
+  // 계산에는 수치만 쓰이고 어떤 능력치인지는 쓰이지 않는다. 이름 대신 번호만 붙인다.
+  // 아래 인크립트 횟수 칸과 같은 .field 모양으로 맞춘다
+  simEls.inhEnchants.innerHTML = Array.from({ length: INHERIT_ENCHANT_ROWS }, (_, i) => `
+    <label class="field">
+      <span>스탯${i + 1}</span>
+      <input type="number" min="0" step="1" value="0" data-inh-value="${i}" />
+    </label>
+  `).join("");
+}
+
+function readInheritRows() {
+  const rows = [];
+  for (let i = 0; i < INHERIT_ENCHANT_ROWS; i += 1) {
+    const value = Number(simEls.inhEnchants.querySelector(`[data-inh-value="${i}"]`)?.value) || 0;
+    if (value > 0) rows.push({ stat: `스탯${i + 1}`, value });
+  }
+  return rows;
+}
+
+function renderInheritResult() {
+  const rows = readInheritRows();
+  const statTotal = rows.reduce((sum, r) => sum + r.value, 0);
+  const increments = Math.max(0, Number(simEls.inhIncrement?.value) || 0);
+  const grade = document.querySelector('input[name="inhGrade"]:checked')?.value || "normal";
+  const fusionMax = !!simEls.inhFusionMax?.checked;
+
+  if (simEls.inhTotal) simEls.inhTotal.textContent = formatNumber(statTotal);
+
+  // 이클립스 이상은 합성 MAX가 아니면 아예 진행할 수 없다
+  const blocked = grade === "eclipse" && !fusionMax;
+  simEls.inhStatus.innerHTML = blocked
+    ? '<b class="sim-neg">이클립스 이상 장비는 합성 횟수가 MAX일 때만 상속할 수 있습니다.</b>'
+    : rows.length
+      ? '<b class="sim-pos">상속 가능</b>'
+      : "추출할 장비의 인챈트를 입력하세요.";
+
+  const { count, band, bonus, base, multiplier } = inheritScrollCount(increments, statTotal, grade);
+
+  simEls.inhSummary.innerHTML = `
+    <div class="sim-summary-title">필요 주문서 <b>${blocked ? "-" : formatNumber(count)}</b>장</div>
+    <p class="sim-summary-note">
+      인크립트 ${formatNumber(increments)}회 → 기본 ${formatNumber(band.n)}장,
+      능력치 총합 기준 구간 ${formatNumber(band.min)}~${formatNumber(band.max)}
+      ${bonus ? " (구간 초과로 1장 추가)" : ""}
+      ${multiplier > 1
+        ? ` → ${formatNumber(base)}장 × ${multiplier}배 = ${formatNumber(count)}장`
+        : ""}
+    </p>
+  `;
+
+  simEls.inhTable.innerHTML = rows.length
+    ? `
+      <thead><tr><th>능력치</th><th>추출 수치</th><th>상속 수치</th></tr></thead>
+      <tbody>
+        ${rows.map((r) => `
+          <tr>
+            <th>${escapeHtml(r.stat)}</th>
+            <td>${formatNumber(r.value)}</td>
+            <td><b>${blocked ? "-" : formatNumber(inheritedValue(r.value, grade))}</b></td>
+          </tr>`).join("")}
+      </tbody>
+    `
+    : "";
+}
+
+function wireInheritSim() {
+  if (!simEls.inhEnchants) return;
+  renderInheritFormula();
+  renderInheritEnchantRows();
+
+  const panel = document.querySelector('[data-simulator-panel="inherit"]');
+  panel?.addEventListener("input", renderInheritResult);
+  panel?.addEventListener("change", renderInheritResult);
+
+  renderInheritResult();
 }
 
 // ── 인크립트 시뮬 (EncryptSimulatorView) ──────────────────────

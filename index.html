@@ -6,9 +6,9 @@
     <title>TW DB</title>
     <!-- 이미지 CDN. 첫 이미지 요청 전에 DNS+TLS를 미리 끝내둔다 -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
-    <link rel="stylesheet" href="./assets/styles.css?v=20260902-eta-mobile2" />
+    <link rel="stylesheet" href="./assets/styles.css?v=20260903-inherit" />
     <!-- 모바일 전용. media 속성 덕에 넓은 화면에서는 렌더링을 막지 않는다 -->
-    <link rel="stylesheet" href="./assets/mobile.css?v=20260902-eta-mobile2" media="(max-width: 720px)" />
+    <link rel="stylesheet" href="./assets/mobile.css?v=20260903-inherit" media="(max-width: 720px)" />
   </head>
   <body>
     <main class="app-shell">
@@ -623,6 +623,7 @@
               <button class="addon-tab is-active" type="button" data-simulator-tab="encrypt">인크립트</button>
               <button class="addon-tab" type="button" data-simulator-tab="core">코어 강화</button>
               <button class="addon-tab" type="button" data-simulator-tab="relic">신조 렐릭</button>
+              <button class="addon-tab" type="button" data-simulator-tab="inherit" data-local-only hidden>상속</button>
             </nav>
           </div>
         </div>
@@ -695,6 +696,34 @@
             </div>
             <div id="relicSummary" class="sim-summary"></div>
             <div class="sim-table-wrap"><table id="relicTable" class="sim-table"></table></div>
+          </section>
+
+          <section class="addon-content sim-panel" data-simulator-panel="inherit" hidden>
+            <div id="inhFormula" class="inherit-formula"></div>
+            <div class="sim-grid">
+              <div class="sim-controls">
+                <h3 class="inherit-heading">추출할 장비</h3>
+                <div id="inhEnchants" class="sim-fields"></div>
+                <div class="sim-fields">
+                  <label class="field"><span>인크립트 횟수</span><input id="inhIncrement" type="number" min="0" max="60" step="1" value="1" /></label>
+                  <div class="field inherit-total"><span>능력치 총합</span><output id="inhTotal">0</output></div>
+                </div>
+
+                <h3 class="inherit-heading">상속받을 장비</h3>
+                <div class="sim-row">
+                  <label class="sim-radio"><input type="radio" name="inhGrade" value="normal" checked /><span>일반</span></label>
+                  <label class="sim-radio"><input type="radio" name="inhGrade" value="abyss" /><span>어비스 이상</span></label>
+                  <label class="sim-radio"><input type="radio" name="inhGrade" value="eclipse" /><span>이클립스 이상</span></label>
+                  <label class="sim-check"><input id="inhFusionMax" type="checkbox" /><span>합성 횟수 MAX</span></label>
+                </div>
+              </div>
+
+              <div class="inherit-result">
+                <div id="inhStatus" class="sim-status"></div>
+                <div id="inhSummary" class="sim-summary"></div>
+                <div class="sim-table-wrap"><table id="inhTable" class="sim-table"></table></div>
+              </div>
+            </div>
           </section>
         </div>
       </section>
@@ -797,7 +826,7 @@
       </div>
     </template>
 
-    <script src="./assets/app.js?v=20260902-eta-mobile2" type="module"></script>
+    <script src="./assets/app.js?v=20260903-inherit" type="module"></script>
     <!-- GoatCounter 방문자 분석 (localhost 방문은 count.js가 기본으로 집계 제외) -->
     <script data-goatcounter="https://holedis88.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
   </body>

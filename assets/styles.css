@@ -1576,6 +1576,124 @@ select {
   display: none;
 }
 
+/* ── 상속 시뮬레이터 ─────────────────────────────────────────── */
+.inherit-formula {
+  margin-bottom: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-strong);
+  color: var(--ink);
+  padding: 14px 16px;
+}
+
+.inherit-formula-head {
+  margin-bottom: 8px;
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.inherit-formula-intro {
+  margin: 0 0 12px;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+/* [1][2]와 [3][4]를 좌우로 나눠 세로 길이를 줄인다 */
+.inherit-formula-cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 8px 20px;
+  align-items: start;
+}
+
+.inherit-formula-block + .inherit-formula-block,
+.inherit-formula-note + .inherit-formula-block {
+  margin-top: 12px;
+}
+
+/* 오른쪽 칸 첫 블록은 왼쪽 [1]과 높이를 맞춘다 */
+.inherit-formula-cols > div > .inherit-formula-block:first-child {
+  margin-top: 0;
+}
+
+.inherit-formula-title {
+  margin-bottom: 4px;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.inherit-formula-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  font-size: 12px;
+}
+
+/* 원본 안내처럼 조건 이름 칸을 눌러 둔다 */
+.inherit-formula-table th {
+  width: 92px;
+  border: 1px solid var(--line);
+  background: var(--panel-strong);
+  padding: 5px 8px;
+  text-align: left;
+  font-weight: 700;
+}
+
+.inherit-formula-table td {
+  border: 1px solid var(--line);
+  padding: 5px 8px;
+}
+
+.inherit-formula-list {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 12px;
+  line-height: 1.75;
+}
+
+.inherit-formula-list b {
+  color: var(--accent);
+}
+
+.inherit-formula-note {
+  margin: 10px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.inherit-heading {
+  margin: 4px 0 2px;
+  color: #9fb4c8;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.inherit-heading + * {
+  margin-top: 0;
+}
+
+/* 능력치 총합은 계산 결과라 고칠 수 없다. 입력칸처럼 보이지 않게 테두리를 빼고
+   값만 굵게 보여준다 */
+.inherit-total output {
+  display: block;
+  min-height: 36px;
+  padding: 0 10px;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 36px;
+}
+
+.inherit-result {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+}
+
 .sim-table-wrap {
   overflow-x: auto;
 }
