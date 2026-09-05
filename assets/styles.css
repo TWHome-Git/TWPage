@@ -5721,3 +5721,21 @@ img.dmg-chk-icon {
   gap: 8px;
   align-content: center;
 }
+
+.pop-legend-total {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  font-weight: 400;
+}
+
+.pop-legend-total b {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 범례 칸에서는 오른쪽 정렬 폭을 주지만 여기서는 글 흐름에 붙인다 */
+.pop-legend-total .pop-legend-diff {
+  min-width: 0;
+  font-weight: 700;
+}

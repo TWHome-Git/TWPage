@@ -414,6 +414,7 @@ const els = {
   popChart: document.querySelector("#popChart"),
   popEmpty: document.querySelector("#popEmpty"),
   popLegend: document.querySelector("#popLegend"),
+  popLegendTotal: document.querySelector("#popLegendTotal"),
   popSelectAll: document.querySelector("#popSelectAll"),
   popSelectNone: document.querySelector("#popSelectNone"),
   etaSidebar: document.querySelector("#etaSidebar"),
@@ -1606,6 +1607,8 @@ function renderEtaPopulation() {
 
   renderPopLegend(all);
 
+  renderPopLegendTotal(shown);
+
   const reason = !dates.length ? "데이터 없음"
     : !etaPop.bands.size ? "레벨 구간을 선택해주세요"
     : !shown.length ? "캐릭터를 선택해주세요"
@@ -1650,6 +1653,24 @@ function renderPopServerTabs() {
   els.popServerTabs.innerHTML = popServerNames().map((name) => `
     <button class="eta-server-tab${name === etaPop.server ? " is-active" : ""}" type="button" role="radio" aria-checked="${name === etaPop.server}" data-pop-server="${escapeHtml(name)}">${escapeHtml(name)}</button>
   `).join("");
+}
+
+// 켜 둔 캐릭터·레벨 구간의 합과, 그 값이 기간 동안 얼마나 움직였는지
+function renderPopLegendTotal(shown) {
+  if (!els.popLegendTotal) return;
+  if (!shown.length) {
+    els.popLegendTotal.innerHTML = "";
+    return;
+  }
+
+  const now = shown.reduce((sum, series) => sum + popLastValue(series), 0);
+  const diff = now - shown.reduce((sum, series) => sum + popFirstValue(series), 0);
+  const sign = diff > 0 ? "+" : "";
+  const tone = diff > 0 ? " is-up" : diff < 0 ? " is-down" : "";
+  els.popLegendTotal.innerHTML = `
+    총 <b>${now.toLocaleString("ko-KR")}명</b>
+    <span class="pop-legend-diff${tone}">${diff === 0 ? "변화 없음" : `${sign}${diff.toLocaleString("ko-KR")}명`}</span>
+  `;
 }
 
 function renderPopLegend(series) {
