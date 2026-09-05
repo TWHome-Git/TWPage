@@ -75,7 +75,16 @@ http://127.0.0.1:5173/
 
 GitHub Pages로 서비스 중입니다. 주소는 <https://twhome-git.github.io/TWPage/> 입니다.
 
-`.github/workflows` 폴더가 없는데도 배포가 되는 이유는, GitHub Actions 워크플로우가 아니라 **GitHub이 브랜치를 직접 빌드해 주는 레거시 Pages 방식**을 쓰기 때문입니다. `main`에 push하면 GitHub이 알아서 배포합니다. 빌드 단계가 없으므로 이 폴더가 그대로 배포 결과물입니다.
+배포는 GitHub Actions 워크플로우가 아니라 **GitHub이 브랜치를 직접 빌드해 주는 레거시 Pages 방식**입니다. `main`에 push하면 GitHub이 알아서 배포합니다. 빌드 단계가 없으므로 이 폴더가 그대로 배포 결과물입니다.
+
+`.github/workflows`에 있는 워크플로우는 배포와 무관한 별개의 작업입니다.
+
+| 파일 | 언제 | 하는 일 |
+| --- | --- | --- |
+| `cdn-warm.yml` | `v*` 태그 push | 새 태그가 덮는 이미지를 jsDelivr에서 한 번씩 받아 캐시를 데운다 |
+| `eta-population.yml` | 매일 02:00 UTC (11시 KST) | 에타 스냅샷에서 캐릭터별 인원수를 세어 `assets/eta-population.json`에 없는 날짜만 덧붙이고, 바뀌면 커밋한다 |
+
+`eta-population.yml`이 커밋을 밀면 그 push로 Pages가 다시 배포됩니다. 집계 로직은 `scripts/build-eta-population.mjs`에 있고, 로컬에서 `node scripts/build-eta-population.mjs`로도 돌릴 수 있습니다.
 
 배포 상태는 API로 확인할 수 있습니다.
 

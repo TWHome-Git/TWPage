@@ -20,7 +20,9 @@ async function fetchJson(url, attempts = 3) {
     try {
       const response = await fetch(url);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      return await response.json();
+      // 원본 파일 앞에 BOM이 붙어 있다. response.json()이 걸러 주기는 하지만 직접 떼고 파싱한다.
+      const text = await response.text();
+      return JSON.parse(text.charCodeAt(0) === 0xfeff ? text.slice(1) : text);
     } catch (error) {
       lastError = error;
       await new Promise((resolve) => setTimeout(resolve, 1000 * (i + 1)));
