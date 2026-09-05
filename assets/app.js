@@ -1409,7 +1409,7 @@ const etaPop = {
   range: "3m",
   from: "",          // 직접 선택. 값이 있으면 range보다 우선한다
   to: "",
-  bands: null,       // 켜 둔 레벨 구간 인덱스. null이면 전체
+  bands: new Set(POP_BAND_TOPS.map((_, index) => index)), // 켜 둔 레벨 구간. 처음엔 전부 켜 둔다
   hidden: new Set(), // 숨긴 캐릭터 코드
 };
 
@@ -1449,15 +1449,9 @@ function wireEtaPopulation() {
   els.popBandButtons?.addEventListener("click", (event) => {
     const value = event.target.closest("[data-pop-band]")?.dataset.popBand;
     if (value === undefined) return;
-    if (value === "all") {
-      etaPop.bands = null;
-    } else {
-      const index = Number(value);
-      const next = new Set(etaPop.bands || POP_BAND_LABELS.map((_, i) => i));
-      if (next.has(index)) next.delete(index);
-      else next.add(index);
-      etaPop.bands = next.size && next.size < POP_BAND_LABELS.length ? next : null;
-    }
+    const index = Number(value);
+    if (etaPop.bands.has(index)) etaPop.bands.delete(index);
+    else etaPop.bands.add(index);
     renderEtaPopulation();
   });
 
@@ -1583,7 +1577,7 @@ function popSeries(dates) {
 function popSumBands(bands) {
   let sum = 0;
   for (let i = 0; i < bands.length; i += 1) {
-    if (!etaPop.bands || etaPop.bands.has(i)) sum += bands[i];
+    if (etaPop.bands.has(i)) sum += bands[i];
   }
   return sum;
 }
@@ -1612,12 +1606,15 @@ function renderEtaPopulation() {
 
   renderPopLegend(all);
 
-  const empty = !dates.length || !shown.length;
-  els.popEmpty.hidden = !empty;
-  els.popChart.hidden = empty;
-  if (empty) {
+  const reason = !dates.length ? "데이터 없음"
+    : !etaPop.bands.size ? "레벨 구간을 선택해주세요"
+    : !shown.length ? "캐릭터를 선택해주세요"
+    : "";
+  els.popEmpty.hidden = !reason;
+  els.popChart.hidden = Boolean(reason);
+  if (reason) {
     els.popTotal.textContent = "0명";
-    els.popRangeLabel.textContent = dates.length ? "캐릭터를 선택해주세요" : "데이터 없음";
+    els.popRangeLabel.textContent = reason;
     return;
   }
 
@@ -1639,17 +1636,13 @@ function renderPopRangeButtons() {
   if (els.popToDate) els.popToDate.value = etaPop.to;
 }
 
-// 구간은 여러 개를 켤 수 있다. 하나도 안 켜면 "전체"로 되돌린다.
+// 켠 구간만 불이 들어온다. 처음엔 전부 켜져 있고, 다 끄면 그릴 게 없다.
 function renderPopBandButtons() {
   if (!els.popBandButtons) return;
-  const all = !etaPop.bands;
-  els.popBandButtons.innerHTML = [
-    `<button class="pop-range-btn${all ? " is-active" : ""}" type="button" data-pop-band="all">전체</button>`,
-    ...POP_BAND_LABELS.map((label, index) => {
-      const on = !all && etaPop.bands.has(index);
-      return `<button class="pop-range-btn${on ? " is-active" : ""}" type="button" data-pop-band="${index}" aria-pressed="${on}">${label}</button>`;
-    }),
-  ].join("");
+  els.popBandButtons.innerHTML = POP_BAND_LABELS.map((label, index) => {
+    const on = etaPop.bands.has(index);
+    return `<button class="pop-range-btn${on ? " is-active" : ""}" type="button" data-pop-band="${index}" aria-pressed="${on}">${label}</button>`;
+  }).join("");
 }
 
 function renderPopServerTabs() {
@@ -1679,9 +1672,12 @@ function renderPopLegend(series) {
 
 const POP_VIEW = { w: 900, h: 340, left: 52, right: 16, top: 16, bottom: 28 };
 
-// y축 눈금을 1·2·5×10ⁿ 중 하나로 떨어뜨려 축 숫자가 읽기 편한 값이 되게 한다
+// y축 눈금을 1·2·5×10ⁿ 중 하나로 떨어뜨려 축 숫자가 읽기 편한 값이 되게 한다.
+// 인원이 한 자리면 y축 위끝이 1까지 내려와 1명 차이가 절벽처럼 보인다. 10 아래로는 내리지 않는다.
+const POP_MIN_AXIS = 10;
+
 function popNiceMax(value) {
-  if (value <= 0) return 10;
+  if (value <= POP_MIN_AXIS) return POP_MIN_AXIS;
   const exponent = Math.floor(Math.log10(value));
   const base = 10 ** exponent;
   const step = [1, 2, 2.5, 5, 10].find((multiple) => value <= multiple * base) || 10;
@@ -1697,7 +1693,9 @@ function popChartSvg(dates, series) {
   const x = (index) => left + (dates.length > 1 ? index * stepX : plotW / 2);
   const y = (value) => top + plotH - (value / maxValue) * plotH;
 
-  const ticks = [0, 0.25, 0.5, 0.75, 1].map((ratio) => {
+  // 위끝이 10이면 1/4 눈금이 2.5라 반올림한 숫자가 어그러진다. 그때는 눈금을 셋만 둔다.
+  const ratios = maxValue <= POP_MIN_AXIS ? [0, 0.5, 1] : [0, 0.25, 0.5, 0.75, 1];
+  const ticks = ratios.map((ratio) => {
     const value = Math.round(maxValue * ratio);
     const py = y(value);
     return `
