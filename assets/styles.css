@@ -5474,3 +5474,244 @@ img.dmg-chk-icon {
 .eqc-step-foot b {
   color: var(--accent);
 }
+
+/* ── 에타 인구 추이 ─────────────────────────────────────────── */
+.pop-range-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.pop-range-field > span {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.pop-range-buttons {
+  display: inline-flex;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+}
+
+.pop-range-btn {
+  border: 0;
+  border-radius: 999px;
+  padding: 5px 12px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pop-range-btn:hover {
+  color: var(--accent);
+}
+
+.pop-range-btn.is-active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.pop-custom-range {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pop-custom-range input {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 5px 8px;
+  background: var(--panel);
+  font: inherit;
+  font-size: 12px;
+}
+
+.pop-range-dash {
+  color: var(--muted);
+}
+
+.pop-workspace {
+  /* .workspace는 오른쪽 300px 열을 두지만 여기는 차트가 전체 폭을 쓴다 */
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  padding: 14px;
+}
+
+.pop-chart-wrap {
+  position: relative;
+}
+
+.pop-svg {
+  display: block;
+  width: 100%;
+  height: 340px;
+}
+
+.pop-grid {
+  stroke: var(--line);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.pop-axis-y,
+.pop-axis-x {
+  fill: var(--muted);
+  font-size: 11px;
+}
+
+.pop-axis-y { text-anchor: end; }
+.pop-axis-x { text-anchor: middle; }
+
+.pop-line {
+  fill: none;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  /* preserveAspectRatio: none으로 늘려 그리므로 선 굵기는 배율을 무시한다 */
+  vector-effect: non-scaling-stroke;
+}
+
+.pop-cursor {
+  stroke: var(--accent);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  vector-effect: non-scaling-stroke;
+}
+
+.pop-hit { cursor: crosshair; }
+
+.pop-tooltip {
+  position: absolute;
+  top: 8px;
+  transform: translateX(10px);
+  display: grid;
+  gap: 2px;
+  min-width: 132px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 12%);
+  font-size: 11px;
+  pointer-events: none;
+}
+
+.pop-tooltip.is-left {
+  transform: translateX(calc(-100% - 10px));
+}
+
+.pop-tooltip strong {
+  margin-bottom: 3px;
+  font-size: 12px;
+}
+
+.pop-tip-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.pop-tip-row i {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex: 0 0 auto;
+}
+
+.pop-tip-row b {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.pop-legend-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.pop-legend-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+}
+
+.pop-legend {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  gap: 6px;
+}
+
+.pop-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 5px 8px;
+  background: var(--panel);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.pop-legend-item:hover {
+  border-color: var(--accent);
+}
+
+.pop-legend-item.is-off {
+  opacity: 0.42;
+}
+
+.pop-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex: 0 0 auto;
+}
+
+.pop-legend-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pop-legend-value {
+  margin-left: auto;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.pop-legend-diff {
+  min-width: 34px;
+  text-align: right;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.pop-legend-diff.is-up { color: #c2410c; }
+.pop-legend-diff.is-down { color: #2563eb; }
+
+.pop-empty {
+  padding: 60px 0;
+}
+
+/* "에타 인구 추이"는 190px 고정폭에서 두 줄로 접힌다. 이 패널만 제목 너비를 내용에 맞춘다 */
+.pop-toolbar {
+  grid-template-columns: auto 1fr;
+}
+
+/* .empty-state와 .pop-tooltip이 display를 지정해서 hidden 속성만으로는 안 숨는다 */
+.pop-empty[hidden],
+.pop-tooltip[hidden] {
+  display: none;
+}

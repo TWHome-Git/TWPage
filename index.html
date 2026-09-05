@@ -6,9 +6,9 @@
     <title>TW DB</title>
     <!-- 이미지 CDN. 첫 이미지 요청 전에 DNS+TLS를 미리 끝내둔다 -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
-    <link rel="stylesheet" href="./assets/styles.css?v=20260905-gauntlet" />
+    <link rel="stylesheet" href="./assets/styles.css?v=20260905-eta-pop" />
     <!-- 모바일 전용. media 속성 덕에 넓은 화면에서는 렌더링을 막지 않는다 -->
-    <link rel="stylesheet" href="./assets/mobile.css?v=20260905-gauntlet" media="(max-width: 720px)" />
+    <link rel="stylesheet" href="./assets/mobile.css?v=20260905-eta-pop" media="(max-width: 720px)" />
   </head>
   <body>
     <main class="app-shell">
@@ -26,6 +26,7 @@
         <nav class="db-subtabs" aria-label="에타 메뉴">
           <button class="db-subtab is-active" type="button" data-eta-tab="ranking">에타 순위</button>
           <button class="db-subtab" type="button" data-eta-tab="newcomers">진입 · 이탈</button>
+          <button class="db-subtab" type="button" data-eta-tab="population">인구 추이</button>
           <button class="db-subtab" type="button" data-eta-tab="info">에타 정보</button>
           <button class="db-subtab" type="button" data-eta-tab="calc">에타 계산기</button>
         </nav>
@@ -123,6 +124,51 @@
             기준 날짜의 에타 순위를 그 전날과 비교해, 진입한 아이디와 이탈한 아이디를 보여줍니다.
           </p>
           <div id="etaNewGroups" class="eta-newcomer-groups"></div>
+        </section>
+        </div>
+
+        <div data-eta-panel="population" hidden>
+        <section class="toolbar pop-toolbar" aria-label="에타 인구 추이 조건">
+          <div class="brand-block">
+            <p class="eyebrow">TW DB</p>
+            <h1>에타 인구 추이</h1>
+          </div>
+
+          <div class="pop-range-field">
+            <span>기간</span>
+            <div id="popRangeButtons" class="pop-range-buttons" role="group" aria-label="기간 선택"></div>
+            <div class="pop-custom-range">
+              <input id="popFromDate" type="date" aria-label="시작 날짜" />
+              <span class="pop-range-dash" aria-hidden="true">~</span>
+              <input id="popToDate" type="date" aria-label="종료 날짜" />
+            </div>
+          </div>
+        </section>
+
+        <section class="result-band" aria-live="polite">
+          <div class="result-meta">
+            <div id="popServerTabs" class="eta-server-tabs" role="radiogroup" aria-label="서버 선택"></div>
+            <strong id="popTotal">0명</strong>
+            <span id="popRangeLabel">-</span>
+          </div>
+        </section>
+
+        <section class="workspace pop-workspace">
+          <div class="pop-chart-wrap">
+            <div id="popChart" class="pop-chart"></div>
+            <div id="popEmpty" class="empty-state pop-empty" hidden>
+              <strong>표시할 데이터가 없습니다</strong>
+              <span>기간을 넓히거나 캐릭터를 선택해주세요.</span>
+            </div>
+          </div>
+          <div class="pop-legend-head">
+            <span>캐릭터</span>
+            <div class="pop-legend-actions">
+              <button id="popSelectAll" class="sim-btn" type="button">전체 선택</button>
+              <button id="popSelectNone" class="sim-btn" type="button">전체 해제</button>
+            </div>
+          </div>
+          <div id="popLegend" class="pop-legend"></div>
         </section>
         </div>
 
@@ -838,7 +884,7 @@
       </div>
     </template>
 
-    <script src="./assets/app.js?v=20260905-gauntlet" type="module"></script>
+    <script src="./assets/app.js?v=20260905-eta-pop" type="module"></script>
     <!-- GoatCounter 방문자 분석 (localhost 방문은 count.js가 기본으로 집계 제외) -->
     <script data-goatcounter="https://holedis88.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
   </body>

@@ -404,6 +404,17 @@ const els = {
   etaSummaryTable: document.querySelector("#etaSummaryTable"),
   etaLevelTable: document.querySelector("#etaLevelTable"),
   etaServerTabs: document.querySelector("#etaServerTabs"),
+  popRangeButtons: document.querySelector("#popRangeButtons"),
+  popFromDate: document.querySelector("#popFromDate"),
+  popToDate: document.querySelector("#popToDate"),
+  popServerTabs: document.querySelector("#popServerTabs"),
+  popTotal: document.querySelector("#popTotal"),
+  popRangeLabel: document.querySelector("#popRangeLabel"),
+  popChart: document.querySelector("#popChart"),
+  popEmpty: document.querySelector("#popEmpty"),
+  popLegend: document.querySelector("#popLegend"),
+  popSelectAll: document.querySelector("#popSelectAll"),
+  popSelectNone: document.querySelector("#popSelectNone"),
   etaSidebar: document.querySelector("#etaSidebar"),
   etaCharacterList: document.querySelector("#etaCharacterList"),
   etaRankingBody: document.querySelector("#etaRankingBody"),
@@ -1364,6 +1375,39 @@ function renderEtaNewServerTabs() {
 }
 
 // ── 에타 정보 페이지 ([?] 버튼 → 조견표·레벨별 상세) ──
+// ── 에타 인구 추이 ──
+// 날짜별 스냅샷은 하루치가 1MB 가까워 브라우저에서 기간만큼 받을 수 없다.
+// 캐릭터별 인원수만 미리 집계해 둔 파일을 쓴다(73일에 17KB).
+const ETA_POPULATION_URL = "./assets/eta-population.json";
+
+const POP_RANGES = [
+  { key: "1w", label: "1주일", days: 7 },
+  { key: "1m", label: "1개월", days: 30 },
+  { key: "3m", label: "3개월", days: 90 },
+  { key: "6m", label: "6개월", days: 182 },
+  { key: "1y", label: "1년", days: 365 },
+  { key: "all", label: "전체", days: 0 },
+];
+
+// 19개 선을 겹쳐 그리므로 이웃한 캐릭터끼리 색이 붙지 않게 색상환을 띄엄띄엄 돈다
+const POP_COLORS = [
+  "#0f6f63", "#c2410c", "#2563eb", "#b45309", "#7c3aed",
+  "#059669", "#db2777", "#0891b2", "#65a30d", "#e11d48",
+  "#4f46e5", "#ca8a04", "#0d9488", "#9333ea", "#dc2626",
+  "#0284c7", "#16a34a", "#a16207", "#be123c",
+];
+
+const etaPop = {
+  days: null,        // { "yyyy-MM-dd": { 서버: { 캐릭터코드: 인원 } } }
+  loading: false,
+  server: "",
+  range: "3m",
+  from: "",          // 직접 선택. 값이 있으면 range보다 우선한다
+  to: "",
+  hidden: new Set(), // 숨긴 캐릭터 코드
+  hover: null,       // 마우스가 가리키는 날짜 인덱스
+};
+
 const ETA_INFO_URL = "./assets/eta_info.json";
 const etaInfo = { data: null, loading: false };
 
@@ -1379,9 +1423,331 @@ function activateEtaTab(key) {
   if (key === "newcomers") {
     if (etaNew.base) renderEtaNewcomers();
     else loadEtaNewcomerData();
+  } else if (key === "population") {
+    if (etaPop.days) renderEtaPopulation();
+    else loadEtaPopulation();
   } else if (key !== "ranking" && !etaInfo.data && !etaInfo.loading) loadEtaInfo();
 
   routeWrite();
+}
+
+function wireEtaPopulation() {
+  els.popRangeButtons?.addEventListener("click", (event) => {
+    const key = event.target.closest("[data-pop-range]")?.dataset.popRange;
+    if (!key) return;
+    etaPop.range = key;
+    etaPop.from = "";
+    etaPop.to = "";
+    renderEtaPopulation();
+  });
+
+  const applyCustom = () => {
+    etaPop.from = els.popFromDate.value;
+    etaPop.to = els.popToDate.value;
+    renderEtaPopulation();
+  };
+  els.popFromDate?.addEventListener("change", applyCustom);
+  els.popToDate?.addEventListener("change", applyCustom);
+
+  els.popServerTabs?.addEventListener("click", (event) => {
+    const name = event.target.closest("[data-pop-server]")?.dataset.popServer;
+    if (!name || name === etaPop.server) return;
+    etaPop.server = name;
+    renderEtaPopulation();
+  });
+
+  els.popLegend?.addEventListener("click", (event) => {
+    const code = event.target.closest("[data-pop-code]")?.dataset.popCode;
+    if (code === undefined) return;
+    const key = Number(code);
+    if (etaPop.hidden.has(key)) etaPop.hidden.delete(key);
+    else etaPop.hidden.add(key);
+    renderEtaPopulation();
+  });
+
+  els.popSelectAll?.addEventListener("click", () => {
+    etaPop.hidden.clear();
+    renderEtaPopulation();
+  });
+
+  els.popSelectNone?.addEventListener("click", () => {
+    popSeries(popVisibleDates()).forEach((series) => etaPop.hidden.add(series.code));
+    renderEtaPopulation();
+  });
+}
+
+async function loadEtaPopulation() {
+  if (etaPop.days || etaPop.loading) return;
+  etaPop.loading = true;
+  try {
+    const response = await fetch(ETA_POPULATION_URL);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const payload = await response.json();
+    etaPop.days = payload?.days || {};
+    if (!etaPop.server) etaPop.server = popServerNames()[0] || "";
+    renderEtaPopulation();
+  } catch (error) {
+    console.warn("에타 인구 추이 로딩 실패", error);
+    if (els.popChart) {
+      els.popChart.innerHTML = `<div class="empty-state"><strong>인구 추이를 불러오지 못했습니다</strong><span>잠시 후 다시 시도해주세요.</span></div>`;
+    }
+  } finally {
+    etaPop.loading = false;
+  }
+}
+
+// 서버는 도중에 늘어난다(네냐플은 뒤늦게 들어왔다). 전체 날짜에서 모아 쓴다.
+function popServerNames() {
+  const names = new Set();
+  Object.values(etaPop.days || {}).forEach((byServer) => {
+    Object.keys(byServer).forEach((name) => names.add(name));
+  });
+  return [...names];
+}
+
+function popAllDates() {
+  return Object.keys(etaPop.days || {}).sort();
+}
+
+// 화면에 그릴 날짜 목록. 직접 선택이 있으면 그 구간, 없으면 마지막 날에서 N일 전까지.
+function popVisibleDates() {
+  const dates = popAllDates().filter((date) => (etaPop.days[date] || {})[etaPop.server]);
+  if (!dates.length) return [];
+
+  if (etaPop.from || etaPop.to) {
+    const from = etaPop.from || dates[0];
+    const to = etaPop.to || dates[dates.length - 1];
+    return dates.filter((date) => date >= from && date <= to);
+  }
+
+  const range = POP_RANGES.find((item) => item.key === etaPop.range);
+  if (!range || !range.days) return dates;
+
+  const last = new Date(`${dates[dates.length - 1]}T00:00:00`);
+  last.setDate(last.getDate() - (range.days - 1));
+  const pad = (value) => String(value).padStart(2, "0");
+  const start = `${last.getFullYear()}-${pad(last.getMonth() + 1)}-${pad(last.getDate())}`;
+  return dates.filter((date) => date >= start);
+}
+
+// 마지막 날 인원이 많은 순으로 정렬해, 범례와 툴팁이 같은 순서를 쓰게 한다
+function popSeries(dates) {
+  if (!dates.length) return [];
+  const codes = new Set();
+  dates.forEach((date) => {
+    Object.keys(etaPop.days[date]?.[etaPop.server] || {}).forEach((code) => codes.add(Number(code)));
+  });
+
+  // 상위 데이터에 그 캐릭터가 통째로 빠진 날이 있다(루시안이 그렇다).
+  // 0으로 찍으면 급락처럼 보이므로 전날 값을 그대로 이어 쓴다.
+  // 첫 값이 나오기 전은 이어 쓸 값이 없어 null로 두고 선을 끊는다.
+  return [...codes]
+    .map((code) => {
+      let carried = null;
+      const values = dates.map((date) => {
+        const day = etaPop.days[date]?.[etaPop.server];
+        if (day && day[code] !== undefined) carried = Number(day[code]);
+        return carried;
+      });
+      return {
+        code,
+        name: ETA_CHARACTER_BY_CODE[code] || `코드${code}`,
+        color: POP_COLORS[code % POP_COLORS.length],
+        values,
+      };
+    })
+    .sort((a, b) => popLastValue(b) - popLastValue(a));
+}
+
+function popLastValue(series) {
+  for (let i = series.values.length - 1; i >= 0; i -= 1) {
+    if (series.values[i] !== null) return series.values[i];
+  }
+  return 0;
+}
+
+function popFirstValue(series) {
+  return series.values.find((value) => value !== null) ?? 0;
+}
+
+function renderEtaPopulation() {
+  if (!els.popChart || !etaPop.days) return;
+
+  renderPopRangeButtons();
+  renderPopServerTabs();
+
+  const dates = popVisibleDates();
+  const all = popSeries(dates);
+  const shown = all.filter((series) => !etaPop.hidden.has(series.code));
+
+  renderPopLegend(all);
+
+  const empty = !dates.length || !shown.length;
+  els.popEmpty.hidden = !empty;
+  els.popChart.hidden = empty;
+  if (empty) {
+    els.popTotal.textContent = "0명";
+    els.popRangeLabel.textContent = dates.length ? "캐릭터를 선택해주세요" : "데이터 없음";
+    return;
+  }
+
+  const lastTotal = shown.reduce((sum, series) => sum + popLastValue(series), 0);
+  els.popTotal.textContent = `${lastTotal.toLocaleString("ko-KR")}명`;
+  els.popRangeLabel.textContent = `${dates[0]} ~ ${dates[dates.length - 1]} · ${dates.length}일`;
+
+  els.popChart.innerHTML = popChartSvg(dates, shown);
+  wirePopChartHover(dates, shown);
+}
+
+function renderPopRangeButtons() {
+  if (!els.popRangeButtons) return;
+  const custom = Boolean(etaPop.from || etaPop.to);
+  els.popRangeButtons.innerHTML = POP_RANGES.map((range) => `
+    <button class="pop-range-btn${!custom && range.key === etaPop.range ? " is-active" : ""}" type="button" data-pop-range="${range.key}">${range.label}</button>
+  `).join("");
+  if (els.popFromDate) els.popFromDate.value = etaPop.from;
+  if (els.popToDate) els.popToDate.value = etaPop.to;
+}
+
+function renderPopServerTabs() {
+  if (!els.popServerTabs) return;
+  els.popServerTabs.innerHTML = popServerNames().map((name) => `
+    <button class="eta-server-tab${name === etaPop.server ? " is-active" : ""}" type="button" role="radio" aria-checked="${name === etaPop.server}" data-pop-server="${escapeHtml(name)}">${escapeHtml(name)}</button>
+  `).join("");
+}
+
+function renderPopLegend(series) {
+  if (!els.popLegend) return;
+  els.popLegend.innerHTML = series.map((item) => {
+    const off = etaPop.hidden.has(item.code);
+    const now = popLastValue(item);
+    const diff = now - popFirstValue(item);
+    const sign = diff > 0 ? "+" : "";
+    return `
+      <button class="pop-legend-item${off ? " is-off" : ""}" type="button" data-pop-code="${item.code}" aria-pressed="${!off}">
+        <span class="pop-swatch" style="background:${item.color}"></span>
+        <span class="pop-legend-name">${escapeHtml(item.name)}</span>
+        <span class="pop-legend-value">${now.toLocaleString("ko-KR")}</span>
+        <span class="pop-legend-diff${diff > 0 ? " is-up" : diff < 0 ? " is-down" : ""}">${diff === 0 ? "-" : `${sign}${diff.toLocaleString("ko-KR")}`}</span>
+      </button>
+    `;
+  }).join("");
+}
+
+const POP_VIEW = { w: 900, h: 340, left: 52, right: 16, top: 16, bottom: 28 };
+
+// y축 눈금을 1·2·5×10ⁿ 중 하나로 떨어뜨려 축 숫자가 읽기 편한 값이 되게 한다
+function popNiceMax(value) {
+  if (value <= 0) return 10;
+  const exponent = Math.floor(Math.log10(value));
+  const base = 10 ** exponent;
+  const step = [1, 2, 2.5, 5, 10].find((multiple) => value <= multiple * base) || 10;
+  return step * base;
+}
+
+function popChartSvg(dates, series) {
+  const { w, h, left, right, top, bottom } = POP_VIEW;
+  const plotW = w - left - right;
+  const plotH = h - top - bottom;
+  const maxValue = popNiceMax(Math.max(...series.flatMap((item) => item.values.filter((value) => value !== null)), 1));
+  const stepX = dates.length > 1 ? plotW / (dates.length - 1) : 0;
+  const x = (index) => left + (dates.length > 1 ? index * stepX : plotW / 2);
+  const y = (value) => top + plotH - (value / maxValue) * plotH;
+
+  const ticks = [0, 0.25, 0.5, 0.75, 1].map((ratio) => {
+    const value = Math.round(maxValue * ratio);
+    const py = y(value);
+    return `
+      <line class="pop-grid" x1="${left}" y1="${py}" x2="${w - right}" y2="${py}" />
+      <text class="pop-axis-y" x="${left - 8}" y="${py + 4}">${value.toLocaleString("ko-KR")}</text>
+    `;
+  }).join("");
+
+  // 날짜가 촘촘하면 라벨이 겹치므로 최대 6개만 남긴다
+  const labelStep = Math.max(1, Math.ceil(dates.length / 6));
+  const xLabels = dates.map((date, index) => {
+    if (index % labelStep !== 0 && index !== dates.length - 1) return "";
+    return `<text class="pop-axis-x" x="${x(index)}" y="${h - 8}">${date.slice(5)}</text>`;
+  }).join("");
+
+  const lines = series.map((item) => {
+    // 값이 없는 날은 건너뛰고, 다음 값에서 선을 새로 시작한다
+    let pen = "M";
+    const d = item.values.map((value, index) => {
+      if (value === null) {
+        pen = "M";
+        return "";
+      }
+      const segment = `${pen}${x(index).toFixed(1)} ${y(value).toFixed(1)}`;
+      pen = "L";
+      return segment;
+    }).filter(Boolean).join(" ");
+    return `<path class="pop-line" d="${d}" stroke="${item.color}" data-pop-line="${item.code}" />`;
+  }).join("");
+
+  return `
+    <svg class="pop-svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="캐릭터별 에타 인원 추이">
+      ${ticks}
+      ${xLabels}
+      ${lines}
+      <line class="pop-cursor" x1="0" y1="${top}" x2="0" y2="${top + plotH}" hidden />
+      <rect class="pop-hit" x="${left}" y="${top}" width="${plotW}" height="${plotH}" fill="transparent" />
+    </svg>
+    <div class="pop-tooltip" hidden></div>
+  `;
+}
+
+function wirePopChartHover(dates, series) {
+  const svg = els.popChart.querySelector(".pop-svg");
+  const cursor = els.popChart.querySelector(".pop-cursor");
+  const tooltip = els.popChart.querySelector(".pop-tooltip");
+  if (!svg || !cursor || !tooltip) return;
+
+  const { w, left, right } = POP_VIEW;
+  const plotW = w - left - right;
+
+  const hide = () => {
+    cursor.hidden = true;
+    tooltip.hidden = true;
+  };
+
+  const move = (event) => {
+    const box = svg.getBoundingClientRect();
+    const point = event.touches?.[0] || event;
+    // viewBox 좌표로 되돌린 뒤 가장 가까운 날짜를 고른다
+    const vx = ((point.clientX - box.left) / box.width) * w;
+    const ratio = clamp((vx - left) / plotW, 0, 1);
+    const index = Math.round(ratio * (dates.length - 1));
+    if (!Number.isFinite(index)) return;
+
+    const px = left + (dates.length > 1 ? (index / (dates.length - 1)) * plotW : plotW / 2);
+    cursor.setAttribute("x1", px);
+    cursor.setAttribute("x2", px);
+    cursor.hidden = false;
+
+    const rows = series
+      .map((item) => ({ name: item.name, color: item.color, value: item.values[index] }))
+      .sort((a, b) => (b.value ?? -1) - (a.value ?? -1))
+      .slice(0, 12);
+    tooltip.innerHTML = `
+      <strong>${dates[index]}</strong>
+      ${rows.map((row) => `
+        <span class="pop-tip-row">
+          <i style="background:${row.color}"></i>${escapeHtml(row.name)}
+          <b>${row.value === null ? "-" : row.value.toLocaleString("ko-KR")}</b>
+        </span>
+      `).join("")}
+    `;
+    tooltip.hidden = false;
+    // 오른쪽 끝에서는 툴팁을 왼쪽에 붙여 화면 밖으로 나가지 않게 한다
+    tooltip.classList.toggle("is-left", ratio > 0.6);
+    tooltip.style.left = `${(px / w) * 100}%`;
+  };
+
+  svg.addEventListener("pointermove", move);
+  svg.addEventListener("pointerleave", hide);
+  svg.addEventListener("touchmove", move, { passive: true });
+  svg.addEventListener("touchend", hide);
 }
 
 async function loadEtaInfo() {
@@ -4235,6 +4601,7 @@ function wireEvents() {
     button.addEventListener("click", () => activateEtaTab(button.dataset.etaTab));
   });
   wireEtaCalc();
+  wireEtaPopulation();
 
   els.etaCompareSelect?.addEventListener("change", () => {
     eta.compareDays = Number(els.etaCompareSelect.value) || 1;
