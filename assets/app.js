@@ -405,6 +405,7 @@ const els = {
   etaLevelTable: document.querySelector("#etaLevelTable"),
   etaServerTabs: document.querySelector("#etaServerTabs"),
   popRangeButtons: document.querySelector("#popRangeButtons"),
+  popBandButtons: document.querySelector("#popBandButtons"),
   popFromDate: document.querySelector("#popFromDate"),
   popToDate: document.querySelector("#popToDate"),
   popServerTabs: document.querySelector("#popServerTabs"),
@@ -1397,15 +1398,19 @@ const POP_COLORS = [
   "#0284c7", "#16a34a", "#a16207", "#be123c",
 ];
 
+// 레벨 구간. 집계 파일의 bandTops와 같은 순서다.
+const POP_BAND_TOPS = [20, 40, 60, 80, 90, 100];
+const POP_BAND_LABELS = POP_BAND_TOPS.map((top, index) => `${(POP_BAND_TOPS[index - 1] || 0) + 1}-${top}`);
+
 const etaPop = {
-  days: null,        // { "yyyy-MM-dd": { 서버: { 캐릭터코드: 인원 } } }
+  days: null,        // { "yyyy-MM-dd": { 서버: { 캐릭터코드: [구간별 인원] } } }
   loading: false,
   server: "",
   range: "3m",
   from: "",          // 직접 선택. 값이 있으면 range보다 우선한다
   to: "",
+  bands: null,       // 켜 둔 레벨 구간 인덱스. null이면 전체
   hidden: new Set(), // 숨긴 캐릭터 코드
-  hover: null,       // 마우스가 가리키는 날짜 인덱스
 };
 
 const ETA_INFO_URL = "./assets/eta_info.json";
@@ -1438,6 +1443,21 @@ function wireEtaPopulation() {
     etaPop.range = key;
     etaPop.from = "";
     etaPop.to = "";
+    renderEtaPopulation();
+  });
+
+  els.popBandButtons?.addEventListener("click", (event) => {
+    const value = event.target.closest("[data-pop-band]")?.dataset.popBand;
+    if (value === undefined) return;
+    if (value === "all") {
+      etaPop.bands = null;
+    } else {
+      const index = Number(value);
+      const next = new Set(etaPop.bands || POP_BAND_LABELS.map((_, i) => i));
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      etaPop.bands = next.size && next.size < POP_BAND_LABELS.length ? next : null;
+    }
     renderEtaPopulation();
   });
 
@@ -1545,8 +1565,8 @@ function popSeries(dates) {
     .map((code) => {
       let carried = null;
       const values = dates.map((date) => {
-        const day = etaPop.days[date]?.[etaPop.server];
-        if (day && day[code] !== undefined) carried = Number(day[code]);
+        const bands = etaPop.days[date]?.[etaPop.server]?.[code];
+        if (bands) carried = popSumBands(bands);
         return carried;
       });
       return {
@@ -1557,6 +1577,15 @@ function popSeries(dates) {
       };
     })
     .sort((a, b) => popLastValue(b) - popLastValue(a));
+}
+
+// 켜 둔 레벨 구간만 더한다. 저장할 때 뒤쪽 0을 잘라서 배열이 짧을 수 있다.
+function popSumBands(bands) {
+  let sum = 0;
+  for (let i = 0; i < bands.length; i += 1) {
+    if (!etaPop.bands || etaPop.bands.has(i)) sum += bands[i];
+  }
+  return sum;
 }
 
 function popLastValue(series) {
@@ -1574,6 +1603,7 @@ function renderEtaPopulation() {
   if (!els.popChart || !etaPop.days) return;
 
   renderPopRangeButtons();
+  renderPopBandButtons();
   renderPopServerTabs();
 
   const dates = popVisibleDates();
@@ -1607,6 +1637,19 @@ function renderPopRangeButtons() {
   `).join("");
   if (els.popFromDate) els.popFromDate.value = etaPop.from;
   if (els.popToDate) els.popToDate.value = etaPop.to;
+}
+
+// 구간은 여러 개를 켤 수 있다. 하나도 안 켜면 "전체"로 되돌린다.
+function renderPopBandButtons() {
+  if (!els.popBandButtons) return;
+  const all = !etaPop.bands;
+  els.popBandButtons.innerHTML = [
+    `<button class="pop-range-btn${all ? " is-active" : ""}" type="button" data-pop-band="all">전체</button>`,
+    ...POP_BAND_LABELS.map((label, index) => {
+      const on = !all && etaPop.bands.has(index);
+      return `<button class="pop-range-btn${on ? " is-active" : ""}" type="button" data-pop-band="${index}" aria-pressed="${on}">${label}</button>`;
+    }),
+  ].join("");
 }
 
 function renderPopServerTabs() {

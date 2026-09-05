@@ -5715,3 +5715,9 @@ img.dmg-chk-icon {
 .pop-tooltip[hidden] {
   display: none;
 }
+
+.pop-controls {
+  display: grid;
+  gap: 8px;
+  align-content: center;
+}
