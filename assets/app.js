@@ -1403,6 +1403,9 @@ const POP_COLORS = [
 const POP_BAND_TOPS = [20, 40, 60, 80, 90, 100];
 const POP_BAND_LABELS = POP_BAND_TOPS.map((top, index) => `${(POP_BAND_TOPS[index - 1] || 0) + 1}-${top}`);
 
+// 서버 탭 맨 앞에 놓는 가상 항목. 실제 서버 이름과 겹치지 않는다.
+const POP_ALL_SERVERS = "통합";
+
 const etaPop = {
   days: null,        // { "yyyy-MM-dd": { 서버: { 캐릭터코드: [구간별 인원] } } }
   loading: false,
@@ -1524,9 +1527,23 @@ function popAllDates() {
   return Object.keys(etaPop.days || {}).sort();
 }
 
+// 그 날짜에 지금 보고 있는 서버의 데이터가 있는지.
+// 통합은 한 서버라도 빠진 날을 빼야 한다. 네냐플이 들어온 날 합계가 계단처럼 뛰기 때문이다.
+function popDateHasServer(date) {
+  const day = etaPop.days[date] || {};
+  if (etaPop.server !== POP_ALL_SERVERS) return Boolean(day[etaPop.server]);
+  const names = popServerNames();
+  return names.length > 0 && names.every((name) => day[name]);
+}
+
+// 지금 보고 있는 서버 목록. 통합이면 전부.
+function popActiveServers() {
+  return etaPop.server === POP_ALL_SERVERS ? popServerNames() : [etaPop.server];
+}
+
 // 화면에 그릴 날짜 목록. 직접 선택이 있으면 그 구간, 없으면 마지막 날에서 N일 전까지.
 function popVisibleDates() {
-  const dates = popAllDates().filter((date) => (etaPop.days[date] || {})[etaPop.server]);
+  const dates = popAllDates().filter(popDateHasServer);
   if (!dates.length) return [];
 
   if (etaPop.from || etaPop.to) {
@@ -1546,11 +1563,25 @@ function popVisibleDates() {
 }
 
 // 마지막 날 인원이 많은 순으로 정렬해, 범례와 툴팁이 같은 순서를 쓰게 한다
+// 그 날짜 그 캐릭터의 인원. 통합이면 서버를 다 더한다. 데이터가 없으면 null.
+function popCountAt(date, code) {
+  const day = etaPop.days[date];
+  if (!day) return null;
+  let sum = null;
+  popActiveServers().forEach((name) => {
+    const bands = day[name]?.[code];
+    if (bands) sum = (sum ?? 0) + popSumBands(bands);
+  });
+  return sum;
+}
+
 function popSeries(dates) {
   if (!dates.length) return [];
   const codes = new Set();
   dates.forEach((date) => {
-    Object.keys(etaPop.days[date]?.[etaPop.server] || {}).forEach((code) => codes.add(Number(code)));
+    popActiveServers().forEach((name) => {
+      Object.keys(etaPop.days[date]?.[name] || {}).forEach((code) => codes.add(Number(code)));
+    });
   });
 
   // 상위 데이터에 그 캐릭터가 통째로 빠진 날이 있다(루시안이 그렇다).
@@ -1560,8 +1591,8 @@ function popSeries(dates) {
     .map((code) => {
       let carried = null;
       const values = dates.map((date) => {
-        const bands = etaPop.days[date]?.[etaPop.server]?.[code];
-        if (bands) carried = popSumBands(bands);
+        const count = popCountAt(date, code);
+        if (count !== null) carried = count;
         return carried;
       });
       return {
@@ -1623,7 +1654,10 @@ function renderEtaPopulation() {
 
   const lastTotal = shown.reduce((sum, series) => sum + popLastValue(series), 0);
   els.popTotal.textContent = `${lastTotal.toLocaleString("ko-KR")}명`;
-  els.popRangeLabel.textContent = `${dates[0]} ~ ${dates[dates.length - 1]} · ${dates.length}일`;
+  // 통합은 서버가 다 모인 날부터라 기간이 잘린다. 왜 짧은지 적어 준다.
+  const clipped = etaPop.server === POP_ALL_SERVERS && dates[0] > popAllDates()[0];
+  els.popRangeLabel.textContent = `${dates[0]} ~ ${dates[dates.length - 1]} · ${dates.length}일`
+    + (clipped ? " · 서버가 모두 수집된 날부터" : "");
 
   els.popChart.innerHTML = popChartSvg(dates, shown);
   wirePopChartHover(dates, shown);
@@ -1650,7 +1684,10 @@ function renderPopBandButtons() {
 
 function renderPopServerTabs() {
   if (!els.popServerTabs) return;
-  els.popServerTabs.innerHTML = popServerNames().map((name) => `
+  const names = popServerNames();
+  // 서버가 하나뿐이면 통합을 내놔도 같은 값이라 뺀다
+  const options = names.length > 1 ? [POP_ALL_SERVERS, ...names] : names;
+  els.popServerTabs.innerHTML = options.map((name) => `
     <button class="eta-server-tab${name === etaPop.server ? " is-active" : ""}" type="button" role="radio" aria-checked="${name === etaPop.server}" data-pop-server="${escapeHtml(name)}">${escapeHtml(name)}</button>
   `).join("");
 }
