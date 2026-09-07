@@ -6262,6 +6262,16 @@ function simDrawUntil(successes, rate) {
   return n;
 }
 
+// 한 판이 기대값과 얼마나 벌어졌는지 적는다. 재료는 단계마다 값이 달라
+// 시도 횟수를 기준으로 잰다.
+function simDiffNote(sampled, expected) {
+  if (!(expected > 0)) return "";
+  const gap = sampled - expected;
+  const sign = gap >= 0 ? "+" : "−";
+  return `기대 시도 ${formatNumber(Math.round(expected))}회 대비 `
+    + `×${(sampled / expected).toFixed(2)} (${sign}${formatNumber(Math.round(Math.abs(gap)))}회)`;
+}
+
 function simCapped(total) {
   return total >= SIM_ATTEMPT_CAP;
 }
@@ -6893,6 +6903,7 @@ function coreRun(sampled) {
 
   const rows = [];
   let totalDust = 0, totalCrystal = 0, totalSeed = 0, totalCost = 0;
+  let totalAttempts = 0, expectedAttempts = 0;
 
   for (let i = startIdx + 1; i <= targetIdx; i++) {
     const step = coreStages[i];
@@ -6901,6 +6912,8 @@ function coreRun(sampled) {
       return;
     }
     const expected = sampled ? simDrawAttempts(step.rate) : 1 / step.rate;
+    totalAttempts += expected;
+    expectedAttempts += 1 / step.rate;
 
     let dustPer = step.dust, crystalPer = step.crystal, seedPer = step.seed;
     if (isSubStat) {
@@ -6924,7 +6937,8 @@ function coreRun(sampled) {
   }
 
   coreRenderTable(rows);
-  coreRenderSummary({ isMainStat, startIdx, targetIdx, totalDust, totalCrystal, totalSeed, totalCost, sampled });
+  coreRenderSummary({ isMainStat, startIdx, targetIdx, totalDust, totalCrystal, totalSeed, totalCost,
+    sampled, totalAttempts, expectedAttempts });
 }
 
 function coreCalc() {
@@ -6974,7 +6988,8 @@ function coreRenderSummary(s) {
     `<div class="sim-summary-cols">` +
     `<div class="sim-summary-col"><span class="sim-summary-label">코어 1개</span>${mats(1)}</div>` +
     `<div class="sim-summary-col"><span class="sim-summary-label">코어 ${CORE_SLOT_COUNT}개 전체</span>${mats(CORE_SLOT_COUNT)}</div>` +
-    `</div>`;
+    `</div>` +
+    (s.sampled ? `<div class="sim-summary-note">${escapeHtml(simDiffNote(s.totalAttempts, s.expectedAttempts))}</div>` : "");
 }
 function wireCoreSim() {
   coreStages = coreBuildStages(coreIsAbyss());
@@ -7063,6 +7078,7 @@ function relicRun(sampled) {
 
   const rows = [];
   let totalPowder = 0, totalEssence = 0, totalMoonStone = 0, totalMoonPiece = 0;
+  let totalAttempts = 0, expectedAttempts = 0;
   let reached = currentLevel;
   let stopReason = null;
 
@@ -7076,6 +7092,8 @@ function relicRun(sampled) {
     const expected = sampled
       ? simDrawUntil(cost.required, chance)
       : cost.required / chance;
+    totalAttempts += expected;
+    expectedAttempts += cost.required / chance;
     const powder = expected * cost.powder;
     const moonPiece = expected * cost.moonPiece;
     // 정수/월광석: 이전 단계 → 이 단계 진화에 쓴 재료 (첫 레벨은 없음)
@@ -7107,6 +7125,7 @@ function relicRun(sampled) {
   }
   let html = `<div class="sim-summary-title">| ${escapeHtml(name)} | ${escapeHtml(relicFmtLevel(currentLevel))} → ${escapeHtml(relicFmtLevel(targetLevel))} | ${escapeHtml(relicFmtLevel(reached))} MAX | ${sampled ? "시뮬레이션" : "기대값"} |</div>`;
   html += `<div class="sim-summary-mats">${mats.join("")}</div>`;
+  if (sampled) html += `<div class="sim-summary-note">${escapeHtml(simDiffNote(totalAttempts, expectedAttempts))}</div>`;
   if (stopReason) html += `<div class="sim-summary-note">※ ${escapeHtml(stopReason)}</div>`;
   simEls.relicSummary.innerHTML = html;
 }
@@ -7512,6 +7531,11 @@ function enhRun(sampled) {
   let html = `<div class="sim-summary-title">| ${escapeHtml(parts.join(" | "))} |</div>`
     + `<div class="sim-summary-mats">${mats.join("")}</div>`;
   if (run) {
+    const model = enhAttemptTable(track, target, luck, charm);
+    let expectedTotal = 0;
+    if (model) for (let level = from; level < target; level += 1) expectedTotal += model[level] || 0;
+    html += `<div class="sim-summary-note">${escapeHtml(simDiffNote(total, expectedTotal))}</div>`;
+
     const fell = [];
     if (run.drops) fell.push(`하락 ${formatNumber(run.drops)}회`);
     if (run.resets) fell.push(`초기화 ${formatNumber(run.resets)}회`);
