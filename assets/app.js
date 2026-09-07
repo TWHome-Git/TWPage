@@ -7432,8 +7432,9 @@ function enhRateTableHtml() {
       : "";
     const rows = track.steps.map((step, i) => {
       const level = track.base + i;
+        // 0 → 1은 행운석을 넣어도 그대로 100%다. 오르지 않는 칸은 비워 둔다
       const luckCells = track.luck
-        ? track.luck[i].map((v) => `<td>${v}%</td>`).join("")
+        ? track.luck[i].map((v) => `<td>${v > step.success ? `${v}%` : "—"}</td>`).join("")
         : "";
       return `<tr><th>${level} → ${level + 1}</th>`
         + `<td>${enhFmtPct(step.success / 100)}</td>`
