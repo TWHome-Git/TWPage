@@ -219,7 +219,16 @@ const eta = {
   loading: false,
   index: null, // 날짜 → 커밋 SHA
   date: "", // 선택한 날짜 ("" = 최신)
+  visible: [], // 현재 조건에 걸린 행 전부
+  shown: 0, // 그중 실제로 그린 개수
+  prevMap: null, // 비교 기준 순위. 이어 그릴 때 다시 만들지 않는다
+  deltaTitle: "",
 };
+
+// 순위표는 5천 행이 넘는다. 한 번에 그리면 노드 6만 개를 만드느라 0.5초쯤
+// 멈춘다. 한 화면에 아홉 행쯤 보이므로 앞쪽만 그리고 스크롤이 바닥에 닿을
+// 때마다 이어 붙인다.
+const ETA_CHUNK = 200;
 
 function etaCurrentRows() {
   return eta.servers[eta.server] || [];
@@ -288,6 +297,7 @@ async function fetchEtaPayload(url, cacheSlot) {
 
 function etaResetScroll() {
   if (els.etaListWrap) els.etaListWrap.scrollTop = 0;
+  eta.shown = 0; // 조건이 바뀌었으니 다시 앞쪽부터 그린다
 }
 
 const state = {
@@ -2154,10 +2164,31 @@ function renderEtaRanking() {
     return;
   }
 
-  const prevMap = etaPrevRankMap();
-  const deltaTitle = eta.prevDate ? ` title="${escapeHtml(eta.prevDate)} 대비"` : "";
+  eta.visible = visible;
+  // 이어 붙일 때마다 다시 만들면 5천 행을 그때마다 정렬하게 된다.
+  // 조건이 바뀌면 어차피 이 함수를 다시 타므로 여기서 한 번만 만든다
+  eta.prevMap = etaPrevRankMap();
+  eta.deltaTitle = eta.prevDate ? ` title="${escapeHtml(eta.prevDate)} 대비"` : "";
+  // 변동 데이터가 뒤늦게 와서 다시 그릴 때는 보던 만큼 그대로 되살린다
+  eta.shown = Math.min(visible.length, Math.max(ETA_CHUNK, eta.shown));
+  els.etaRankingBody.innerHTML = etaRowsHtml(visible.slice(0, eta.shown));
 
-  els.etaRankingBody.innerHTML = visible.map((row) => {
+  if (els.etaListWrap) els.etaListWrap.scrollTop = keepScroll;
+}
+
+// 스크롤이 바닥 가까이 오면 다음 묶음을 이어 붙인다
+function etaShowMore() {
+  if (eta.shown >= eta.visible.length) return;
+  const next = eta.visible.slice(eta.shown, eta.shown + ETA_CHUNK);
+  eta.shown += next.length;
+  els.etaRankingBody.insertAdjacentHTML("beforeend", etaRowsHtml(next));
+}
+
+function etaRowsHtml(rows) {
+  const prevMap = eta.prevMap;
+  const deltaTitle = eta.deltaTitle;
+
+  return rows.map((row) => {
     const deltaBadge = (diff) => diff > 0
       ? `<span class="eta-delta up"${deltaTitle}>▲${formatNumber(diff)}</span>`
       : diff < 0
@@ -2188,8 +2219,6 @@ function renderEtaRanking() {
       </tr>
     `;
   }).join("");
-
-  if (els.etaListWrap) els.etaListWrap.scrollTop = keepScroll;
 }
 
 // DB 검색 서브탭 (장비 / 어빌리티 / 아바타)
@@ -4678,6 +4707,13 @@ function wireEvents() {
     state.listScroll = 0;
     applyFilters();
   });
+
+  // 200행이면 1만 픽셀이 넘어 어떤 화면에서도 스크롤이 생긴다.
+  // 바닥 300px 전부터 미리 채워 끊김을 줄인다.
+  els.etaListWrap?.addEventListener("scroll", () => {
+    const wrap = els.etaListWrap;
+    if (wrap.scrollTop + wrap.clientHeight >= wrap.scrollHeight - 300) etaShowMore();
+  }, { passive: true });
 
   let etaSearchTimer = null;
   els.etaSearchInput?.addEventListener("input", () => {
