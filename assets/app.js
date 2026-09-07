@@ -23,7 +23,7 @@ const SNAPSHOT_URL = "./data/equipment-snapshot.json";
 const CDN_ROOT = "https://cdn.jsdelivr.net/gh/TWHome-Git/TWPage@";
 const CDN_AVATAR_ROOT = `${CDN_ROOT}v1.0.10/`;
 const CDN_EQUIP_ROOT = `${CDN_ROOT}v2.0.8/`;
-const CDN_ETC_ROOT = `${CDN_ROOT}v3.0.0/`;
+const CDN_ETC_ROOT = `${CDN_ROOT}v3.0.1/`;
 
 const IMAGE_BASE = `${CDN_EQUIP_ROOT}equipment-images/`;
 const CHARACTER_IMAGE_BASE = `${CDN_ETC_ROOT}character-images/`;
@@ -7409,7 +7409,7 @@ function enhCalc() {
   const mats = [`<span>기대 시도 ${enhFmtCount(total)}회</span>`];
   if (show.luck) mats.push(`<span>행운석 ${enhFmtCount(totalLuck)}개</span>`);
   if (show.charm) mats.push(`<span>부적 ${enhFmtCount(totalCharm)}개</span>`);
-  if (show.stone) mats.push(`<span>빛나는 장비 강화석 ${enhFmtCount(totalStone)}개</span>`);
+  if (show.stone) mats.push(`<span>${simIcon("빛나는장비강화석.png", 24)}${enhFmtCount(totalStone)}개</span>`);
   if (show.seed) mats.push(`<span>${simIcon("시드.png", 24)}${formatMan(totalSeed)}</span>`);
 
   simEls.enhSummary.innerHTML =
