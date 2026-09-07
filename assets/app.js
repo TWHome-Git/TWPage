@@ -7213,6 +7213,9 @@ const ENH_TRACKS = [
     key: "low",
     label: "1~11단계",
     base: 0,
+    // 보조 아이템을 등록할 수 있는 최소 강화 단계 (출발 단계 기준)
+    luckFrom: 2,
+    charmFrom: 7,
     steps: [
       { success: 100, drop: null },                        // 0 → 1
       { success: 70, drop: null },
@@ -7271,7 +7274,7 @@ function enhTop(track) {
 function enhSuccessRate(track, level, luck) {
   const step = track.steps[level - track.base];
   if (!step) return 0;
-  const row = track.luck?.[level - track.base];
+  const row = enhLuckAllowed(track, level) ? track.luck[level - track.base] : null;
   const boosted = luck > 0 && row ? row[luck - 1] : 0;
   return Math.max(step.success, boosted) / 100;
 }
@@ -7279,13 +7282,24 @@ function enhSuccessRate(track, level, luck) {
 function enhPenaltyRate(track, level, charm) {
   const step = track.steps[level - track.base];
   if (!step || step.drop == null) return 0;
+  if (!enhCharmAllowed(track, level)) return 1;
   return Math.max(0, 1 - charm * ENH_CHARM_PER_ITEM);
 }
 
+function enhLuckAllowed(track, level) {
+  return !!track.luck && track.luckFrom != null && level >= track.luckFrom;
+}
+
+function enhCharmAllowed(track, level) {
+  const step = track.steps[level - track.base];
+  return !!step && step.drop != null
+    && track.charmFrom != null && level >= track.charmFrom;
+}
+
 // 등록한 보조 아이템은 시도할 때마다 사라진다. 다만 확률이 오르지 않는 자리에
-// 넣으면 그냥 버리는 셈이라 세지 않는다. 0 → 1은 행운석 없이도 100%다.
+// 넣으면 그냥 버리는 셈이라 세지 않는다.
 function enhLuckUsed(track, level, luck) {
-  if (!luck || !track.luck) return 0;
+  if (!luck || !enhLuckAllowed(track, level)) return 0;
   const i = level - track.base;
   const step = track.steps[i];
   const row = track.luck[i];
@@ -7293,11 +7307,8 @@ function enhLuckUsed(track, level, luck) {
   return row[luck - 1] > step.success ? luck : 0;
 }
 
-// 부적은 실패 패널티가 있는 자리에서만 쓸 수 있다
 function enhCharmUsed(track, level, charm) {
-  if (!charm) return 0;
-  const step = track.steps[level - track.base];
-  return step && step.drop != null ? charm : 0;
+  return charm && enhCharmAllowed(track, level) ? charm : 0;
 }
 
 // 한 단계 올리는 데 드는 기대 시도수.
@@ -7432,9 +7443,10 @@ function enhRateTableHtml() {
       : "";
     const rows = track.steps.map((step, i) => {
       const level = track.base + i;
-        // 0 → 1은 행운석을 넣어도 그대로 100%다. 오르지 않는 칸은 비워 둔다
+        // 못 넣거나 넣어도 안 오르는 칸은 비워 둔다
+      const usable = enhLuckAllowed(track, level);
       const luckCells = track.luck
-        ? track.luck[i].map((v) => `<td>${v > step.success ? `${v}%` : "—"}</td>`).join("")
+        ? track.luck[i].map((v) => `<td>${usable && v > step.success ? `${v}%` : "—"}</td>`).join("")
         : "";
       return `<tr><th>${level} → ${level + 1}</th>`
         + `<td>${enhFmtPct(step.success / 100)}</td>`
