@@ -6262,14 +6262,13 @@ function simDrawUntil(successes, rate) {
   return n;
 }
 
-// 한 판이 기대값과 얼마나 벌어졌는지 적는다. 재료는 단계마다 값이 달라
-// 시도 횟수를 기준으로 잰다.
-function simDiffNote(sampled, expected) {
-  if (!(expected > 0)) return "";
-  const gap = sampled - expected;
-  const sign = gap >= 0 ? "+" : "−";
-  return `기대 시도 ${formatNumber(Math.round(expected))}회 대비 `
-    + `×${(sampled / expected).toFixed(2)} (${sign}${formatNumber(Math.round(Math.abs(gap)))}회)`;
+// 한 판이 기대값에서 얼마나 벌어졌는지 재료 옆에 붙인다.
+// 더 썼으면 붉게, 덜 썼으면 초록으로 적어 한눈에 좋고 나쁨이 보이게 한다.
+function simDelta(sampled, expected, unit = "") {
+  const gap = Math.round(sampled) - Math.round(expected);
+  if (!gap) return "";
+  const dir = gap > 0 ? "up" : "down";
+  return `<b class="sim-delta ${dir}">${gap > 0 ? "+" : "−"}${formatNumber(Math.abs(gap))}${unit}</b>`;
 }
 
 function simCapped(total) {
@@ -6903,7 +6902,7 @@ function coreRun(sampled) {
 
   const rows = [];
   let totalDust = 0, totalCrystal = 0, totalSeed = 0, totalCost = 0;
-  let totalAttempts = 0, expectedAttempts = 0;
+  const model = { dust: 0, crystal: 0, seed: 0, cost: 0 };
 
   for (let i = startIdx + 1; i <= targetIdx; i++) {
     const step = coreStages[i];
@@ -6912,8 +6911,7 @@ function coreRun(sampled) {
       return;
     }
     const expected = sampled ? simDrawAttempts(step.rate) : 1 / step.rate;
-    totalAttempts += expected;
-    expectedAttempts += 1 / step.rate;
+    const modelAttempt = 1 / step.rate;
 
     let dustPer = step.dust, crystalPer = step.crystal, seedPer = step.seed;
     if (isSubStat) {
@@ -6928,6 +6926,13 @@ function coreRun(sampled) {
     const dustCost = !hasDust ? dustExp * dustUnitPrice : 0;
     const stepCost = dustCost + seedExp;
 
+    const modelDust = Math.round(dustPer * modelAttempt);
+    const modelSeed = Math.round(seedPer * modelAttempt);
+    model.dust += modelDust;
+    model.crystal += Math.round(crystalPer * modelAttempt);
+    model.seed += modelSeed;
+    model.cost += (!hasDust ? modelDust * dustUnitPrice : 0) + modelSeed;
+
     totalDust += dustExp;
     totalCrystal += crystalExp;
     totalSeed += seedExp;
@@ -6938,7 +6943,7 @@ function coreRun(sampled) {
 
   coreRenderTable(rows);
   coreRenderSummary({ isMainStat, startIdx, targetIdx, totalDust, totalCrystal, totalSeed, totalCost,
-    sampled, totalAttempts, expectedAttempts });
+    sampled, model });
 }
 
 function coreCalc() {
@@ -6976,11 +6981,12 @@ function coreRenderSummary(s) {
   const statLabel = s.isMainStat ? "주스탯" : "부스탯";
   const range = `${coreStages[s.startIdx].display} → ${coreStages[s.targetIdx].display}`;
   const kind = s.sampled ? "시뮬레이션" : "기대값";
+  const gap = (value, expected, n) => (s.sampled ? simDelta(value * n, expected * n) : "");
   const mats = (n) =>
     `<div class="sim-summary-mats">` +
-    `<span>${simIcon("코어가루.png", 24)}${(s.totalDust * n).toLocaleString("ko-KR")}개</span>` +
-    `<span>${simIcon("코어결정.png", 24)}${(s.totalCrystal * n).toLocaleString("ko-KR")}개</span>` +
-    `<span>${simIcon("시드.png", 24)}${coreFmtEok(s.totalCost * n)}억</span>` +
+    `<span>${simIcon("코어가루.png", 24)}${(s.totalDust * n).toLocaleString("ko-KR")}개${gap(s.totalDust, s.model.dust, n)}</span>` +
+    `<span>${simIcon("코어결정.png", 24)}${(s.totalCrystal * n).toLocaleString("ko-KR")}개${gap(s.totalCrystal, s.model.crystal, n)}</span>` +
+    `<span>${simIcon("시드.png", 24)}${coreFmtEok(s.totalCost * n)}억${s.sampled ? simDelta(s.totalCost * n / 1e8, s.model.cost * n / 1e8, "억") : ""}</span>` +
     `</div>`;
 
   simEls.coreSummary.innerHTML =
@@ -6988,8 +6994,7 @@ function coreRenderSummary(s) {
     `<div class="sim-summary-cols">` +
     `<div class="sim-summary-col"><span class="sim-summary-label">코어 1개</span>${mats(1)}</div>` +
     `<div class="sim-summary-col"><span class="sim-summary-label">코어 ${CORE_SLOT_COUNT}개 전체</span>${mats(CORE_SLOT_COUNT)}</div>` +
-    `</div>` +
-    (s.sampled ? `<div class="sim-summary-note">${escapeHtml(simDiffNote(s.totalAttempts, s.expectedAttempts))}</div>` : "");
+    `</div>`;
 }
 function wireCoreSim() {
   coreStages = coreBuildStages(coreIsAbyss());
@@ -7078,7 +7083,7 @@ function relicRun(sampled) {
 
   const rows = [];
   let totalPowder = 0, totalEssence = 0, totalMoonStone = 0, totalMoonPiece = 0;
-  let totalAttempts = 0, expectedAttempts = 0;
+  const model = { powder: 0, moonPiece: 0 };
   let reached = currentLevel;
   let stopReason = null;
 
@@ -7092,8 +7097,9 @@ function relicRun(sampled) {
     const expected = sampled
       ? simDrawUntil(cost.required, chance)
       : cost.required / chance;
-    totalAttempts += expected;
-    expectedAttempts += cost.required / chance;
+    const modelAttempt = cost.required / chance;
+    model.powder += modelAttempt * cost.powder;
+    model.moonPiece += modelAttempt * cost.moonPiece;
     const powder = expected * cost.powder;
     const moonPiece = expected * cost.moonPiece;
     // 정수/월광석: 이전 단계 → 이 단계 진화에 쓴 재료 (첫 레벨은 없음)
@@ -7114,18 +7120,19 @@ function relicRun(sampled) {
 
   relicRenderTable(rows);
   const name = isPendant ? "펜던트" : "브레이슬릿";
+  // 정수와 월광석은 단계마다 정해진 양이라 판마다 달라지지 않는다
+  const gap = (value, expected) => (sampled ? simDelta(value, expected) : "");
   const mats = [];
   if (totalPowder > 0 || totalEssence > 0) {
-    mats.push(`<span>${simIcon("응축된신조의가루.png", 24)}${relicFmtNum(totalPowder)}개</span>`);
+    mats.push(`<span>${simIcon("응축된신조의가루.png", 24)}${relicFmtNum(totalPowder)}개${gap(totalPowder, model.powder)}</span>`);
     mats.push(`<span>${simIcon("신조의정수.png", 24)}${relicFmtNum(totalEssence)}개</span>`);
   }
   if (totalMoonPiece > 0 || totalMoonStone > 0) {
-    mats.push(`<span>${simIcon("달의파편.png", 24)}${relicFmtNum(totalMoonPiece)}개</span>`);
+    mats.push(`<span>${simIcon("달의파편.png", 24)}${relicFmtNum(totalMoonPiece)}개${gap(totalMoonPiece, model.moonPiece)}</span>`);
     mats.push(`<span>${simIcon("월광석.png", 24)}${relicFmtNum(totalMoonStone)}개</span>`);
   }
   let html = `<div class="sim-summary-title">| ${escapeHtml(name)} | ${escapeHtml(relicFmtLevel(currentLevel))} → ${escapeHtml(relicFmtLevel(targetLevel))} | ${escapeHtml(relicFmtLevel(reached))} MAX | ${sampled ? "시뮬레이션" : "기대값"} |</div>`;
   html += `<div class="sim-summary-mats">${mats.join("")}</div>`;
-  if (sampled) html += `<div class="sim-summary-note">${escapeHtml(simDiffNote(totalAttempts, expectedAttempts))}</div>`;
   if (stopReason) html += `<div class="sim-summary-note">※ ${escapeHtml(stopReason)}</div>`;
   simEls.relicSummary.innerHTML = html;
 }
@@ -7515,12 +7522,27 @@ function enhRun(sampled) {
   const setting = [];
   if (luck > 0) setting.push(`행운석 ${luck}개`);
   if (charm > 0) setting.push(`부적 ${charm}개`);
+  // 시뮬레이션이면 같은 조건의 기대값을 옆에 증감으로 붙인다
+  let model = null;
+  if (sampled) {
+    const table = enhAttemptTable(track, target, luck, charm);
+    model = { total: 0, luck: 0, charm: 0, stone: 0, seed: 0 };
+    for (const r of rows) {
+      const a = (table && table[r.level]) || 0;
+      model.total += a;
+      model.luck += a * r.luckPer;
+      model.charm += a * r.charmPer;
+      model.stone += a * (r.step.stone || 0);
+      model.seed += a * (r.step.seedMan || 0);
+    }
+  }
   const n = (v) => enhFmtCount(v, sampled);
-  const mats = [`<span>${sampled ? "총" : "기대"} 시도 ${n(total)}회</span>`];
-  if (show.luck) mats.push(`<span>행운석 ${n(totalLuck)}개</span>`);
-  if (show.charm) mats.push(`<span>부적 ${n(totalCharm)}개</span>`);
-  if (show.stone) mats.push(`<span>${simIcon("빛나는장비강화석.png", 24)}${n(totalStone)}개</span>`);
-  if (show.seed) mats.push(`<span>${simIcon("시드.png", 24)}${formatMan(totalSeed)}</span>`);
+  const gap = (value, expected) => (model ? simDelta(value, expected) : "");
+  const mats = [`<span>${sampled ? "총" : "기대"} 시도 ${n(total)}회${gap(total, model?.total)}</span>`];
+  if (show.luck) mats.push(`<span>행운석 ${n(totalLuck)}개${gap(totalLuck, model?.luck)}</span>`);
+  if (show.charm) mats.push(`<span>부적 ${n(totalCharm)}개${gap(totalCharm, model?.charm)}</span>`);
+  if (show.stone) mats.push(`<span>${simIcon("빛나는장비강화석.png", 24)}${n(totalStone)}개${gap(totalStone, model?.stone)}</span>`);
+  if (show.seed) mats.push(`<span>${simIcon("시드.png", 24)}${formatMan(totalSeed)}${model ? simDelta(totalSeed / 10000, (model.seed || 0) / 10000, "억") : ""}</span>`);
 
   // 12~15단계에는 보조 아이템 자체가 없다. "없음"이라 적으면 안 넣은 것처럼 보인다
   const parts = [`${start}단계 → ${target}단계`];
@@ -7531,11 +7553,6 @@ function enhRun(sampled) {
   let html = `<div class="sim-summary-title">| ${escapeHtml(parts.join(" | "))} |</div>`
     + `<div class="sim-summary-mats">${mats.join("")}</div>`;
   if (run) {
-    const model = enhAttemptTable(track, target, luck, charm);
-    let expectedTotal = 0;
-    if (model) for (let level = from; level < target; level += 1) expectedTotal += model[level] || 0;
-    html += `<div class="sim-summary-note">${escapeHtml(simDiffNote(total, expectedTotal))}</div>`;
-
     const fell = [];
     if (run.drops) fell.push(`하락 ${formatNumber(run.drops)}회`);
     if (run.resets) fell.push(`초기화 ${formatNumber(run.resets)}회`);

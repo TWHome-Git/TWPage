@@ -1565,6 +1565,21 @@ select {
   font-weight: 700;
 }
 
+/* 재료 수치보다 한 단계 작게 둔다. 곁들이는 값이지 주인공이 아니다 */
+.sim-delta {
+  margin-left: 2px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.sim-delta.up {
+  color: var(--danger);
+}
+
+.sim-delta.down {
+  color: var(--accent);
+}
+
 .sim-summary-note {
   margin-top: 8px;
   color: var(--muted);
