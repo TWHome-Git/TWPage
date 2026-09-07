@@ -6245,7 +6245,9 @@ function initSimulators() {
     "coreMainStat", "coreHasDust", "coreStartStage", "coreTargetStage",
     "coreBoxPrice", "coreBoxPriceField", "coreCalc", "coreSummary", "coreTable",
     "relicCurrent", "relicTarget", "relicDifficulty", "relicCalc", "relicSummary", "relicTable",
-    "relicRateButton", "coreRateButton",
+    "enhStart", "enhTarget", "enhLuck", "enhCharm", "enhLuckField", "enhCharmField",
+    "enhCalc", "enhSummary", "enhTable",
+    "relicRateButton", "coreRateButton", "enhRateButton",
     "rateModal", "rateModalTitle", "rateModalNote", "rateModalBody",
     "inhFormula", "inhEnchants", "inhIncrement", "inhTotal", "inhFusionMax",
     "inhStatus", "inhSummary", "inhTable",
@@ -6258,6 +6260,7 @@ function initSimulators() {
   wireEncryptSim();
   wireCoreSim();
   wireRelicSim();
+  wireEnhanceSim();
   // 상속·장비 제작은 계산기 탭 화면이지만 입력 요소를 simEls로 함께 잡아 두어 여기서 엮는다
   wireInheritSim();
   wireEquipCraft();
@@ -7196,6 +7199,273 @@ function wireRateModal() {
 
 function wireRelicSim() {
   simEls.relicCalc.addEventListener("click", relicCalc);
+}
+
+// ── 장비 강화 시뮬 (EquipEnhanceSimulatorView) ─────────────────
+// 1~11단계와 12~15단계는 서로 다른 구간이라 이어 붙이지 않는다.
+// 공지의 확률표를 그대로 옮긴다. steps 첨자 = 출발 단계 − base.
+// drop 은 실패 패널티로 떨어지는 자리(절대 단계)다. null 이면 그 자리에 머문다.
+//
+// 행운석은 1~11단계 강화에만, 부적은 실패 패널티가 있는 자리에만 쓸 수 있다.
+// luck 첨자도 출발 단계 − base 이고, 칸은 행운석 1~5개다.
+const ENH_TRACKS = [
+  {
+    key: "low",
+    label: "1~11단계",
+    base: 0,
+    steps: [
+      { success: 100, drop: null },                        // 0 → 1
+      { success: 70, drop: null },
+      { success: 50, drop: null },
+      { success: 30, drop: null },
+      { success: 20, drop: null },
+      { success: 10, drop: null },
+      { success: 7, drop: null },                          // 6 → 7
+      { success: 7, drop: 6, penalty: "1단계 하락" },      // 7 → 8
+      { success: 5, drop: 6, penalty: "2단계 하락" },      // 8 → 9
+      { success: 5, drop: 6, penalty: "3단계 하락" },      // 9 → 10
+      { success: 5, drop: 0, penalty: "0단계로 초기화" },  // 10 → 11
+    ],
+    luck: [
+      [100, 100, 100, 100, 100],  // 0 → 1
+      [71, 72, 73, 74, 75],
+      [51, 52, 53, 54, 55],
+      [31, 32, 33, 34, 35],
+      [21, 22, 23, 24, 25],
+      [11, 12, 13, 14, 15],
+      [8, 9, 10, 11, 12],         // 6 → 7
+      [8, 9, 10, 11, 12],
+      [6, 7, 8, 9, 10],
+      [6, 7, 8, 9, 10],
+      [6, 7, 8, 9, 10],           // 10 → 11
+    ],
+  },
+  {
+    key: "high",
+    label: "12~15단계",
+    base: 12,
+    steps: [
+      { success: 0.010, drop: null },  // 12 → 13
+      { success: 0.009, drop: null },
+      { success: 0.008, drop: null },  // 14 → 15
+    ],
+    luck: null,
+  },
+];
+
+// 부적은 0~5개가 패널티 발생 확률을 0~50% 낮춘다
+const ENH_CHARM_MAX = 5;
+const ENH_CHARM_PER_ITEM = 0.1;
+const ENH_LUCK_MAX = 5;
+
+function enhTrack() {
+  const key = document.querySelector('input[name="enhTrack"]:checked')?.value;
+  return ENH_TRACKS.find((t) => t.key === key) || ENH_TRACKS[0];
+}
+
+function enhTop(track) {
+  return track.base + track.steps.length;
+}
+
+// 표에 행운석 칸이 없는 구간은 기본 확률을 그대로 쓴다
+function enhSuccessRate(track, level, luck) {
+  const step = track.steps[level - track.base];
+  if (!step) return 0;
+  const row = track.luck?.[level - track.base];
+  const pct = luck > 0 && row ? row[luck - 1] : step.success;
+  return pct / 100;
+}
+
+function enhPenaltyRate(track, level, charm) {
+  const step = track.steps[level - track.base];
+  if (!step || step.drop == null) return 0;
+  return Math.max(0, 1 - charm * ENH_CHARM_PER_ITEM);
+}
+
+// 한 단계 올리는 데 드는 기대 시도수.
+//
+// 실패해 떨어지면 떨어진 자리부터 다시 올라와야 하고, 그 길에서 또 떨어질 수
+// 있다. 아래 자리의 기대값에 그 되풀이가 이미 들어 있으므로 구간 바닥부터
+// 차례로 쌓아 올리면 한 번의 훑기로 풀린다.
+//
+//   T[L] = (1 + (1 − p) × q × ΣT[drop..L−1]) / p     q = 패널티가 실제로 터질 확률
+//
+// 떨어지지 않는 자리는 q = 0 이라 익숙한 1/p 가 된다.
+function enhAttemptTable(track, target, luck, charm) {
+  const attempts = [];
+  for (let level = track.base; level < target; level += 1) {
+    const p = enhSuccessRate(track, level, luck);
+    if (p <= 0) return null;
+    const step = track.steps[level - track.base];
+    const q = enhPenaltyRate(track, level, charm);
+    let climbBack = 0;
+    if (q > 0 && step.drop != null) {
+      for (let k = step.drop; k < level; k += 1) climbBack += attempts[k];
+    }
+    attempts[level] = (1 + (1 - p) * q * climbBack) / p;
+  }
+  return attempts;
+}
+
+function enhFmtPct(rate) {
+  // 7/100 을 되돌리면 7.000000000000001 이 나온다. 소수 셋째 자리에서 끊는다
+  const pct = Math.round(rate * 100000) / 1000;
+  if (pct === 0) return "0%";
+  return `${pct < 1 ? pct.toFixed(3) : String(pct)}%`;
+}
+
+function enhFmtCount(value) {
+  if (value >= 100) return Math.round(value).toLocaleString("ko-KR");
+  return value.toFixed(value >= 10 ? 1 : 2);
+}
+
+function enhCalc() {
+  const track = enhTrack();
+  const start = parseInt(simEls.enhStart.value, 10);
+  const target = parseInt(simEls.enhTarget.value, 10);
+  if (start >= target) {
+    alert("목표 단계는 시작 단계보다 높아야 합니다.");
+    return;
+  }
+  const luck = track.luck ? parseInt(simEls.enhLuck.value, 10) : 0;
+  const charm = parseInt(simEls.enhCharm.value, 10);
+
+  // 떨어지면 시작 단계 아래로도 내려가므로 구간 바닥부터 전부 구해 둔다
+  const attempts = enhAttemptTable(track, target, luck, charm);
+  if (!attempts) {
+    alert("확률이 0%인 단계가 있어 계산할 수 없습니다.");
+    return;
+  }
+
+  const rows = [];
+  let total = 0;
+  for (let level = start; level < target; level += 1) {
+    total += attempts[level];
+    rows.push({
+      level,
+      rate: enhSuccessRate(track, level, luck),
+      penalty: enhPenaltyRate(track, level, charm),
+      step: track.steps[level - track.base],
+      attempt: attempts[level],
+      total,
+    });
+  }
+
+  enhRenderTable(rows);
+
+  const used = [];
+  if (luck > 0) used.push(`행운석 ${luck}개`);
+  if (charm > 0) used.push(`부적 ${charm}개`);
+  simEls.enhSummary.innerHTML =
+    `<div class="sim-summary-title">| ${start}단계 → ${target}단계 | ${escapeHtml(used.length ? used.join(" · ") : "보조 아이템 없음")} |</div>`
+    + `<div class="sim-summary-mats"><span>기대 시도 ${enhFmtCount(total)}회</span></div>`;
+}
+
+function enhRenderTable(rows) {
+  const head = ["단계", "성공 확률", "실패 패널티", "기대 시도", "누적 시도"];
+  const body = rows
+    .map((r) => {
+      const penalty = r.step.drop == null
+        ? "없음"
+        : `${r.step.penalty} (${enhFmtPct(r.penalty)})`;
+      const cells = [
+        `${r.level} → ${r.level + 1}`,
+        enhFmtPct(r.rate),
+        penalty,
+        `${enhFmtCount(r.attempt)}회`,
+        `${enhFmtCount(r.total)}회`,
+      ];
+      return "<tr>" + cells
+        .map((c, i) => `<td data-label="${escapeHtml(head[i])}">${escapeHtml(c)}</td>`)
+        .join("") + "</tr>";
+    })
+    .join("");
+  simEls.enhTable.innerHTML =
+    `<thead><tr>${head.map((h) => `<th><span class="sim-th">${h}</span></th>`).join("")}</tr></thead><tbody>${body}</tbody>`;
+}
+
+// 확률표는 계산에 쓰는 ENH_TRACKS를 그대로 그린다 (수치를 두 곳에 두지 않는다)
+function enhRateTableHtml() {
+  return ENH_TRACKS.map((track) => {
+    const luckHead = track.luck
+      ? `<th colspan="${ENH_LUCK_MAX}">행운석 개수별 성공 확률</th>`
+      : "";
+    const luckSub = track.luck
+      ? `<tr>${Array.from({ length: ENH_LUCK_MAX }, (_, i) => `<th>${i + 1}개</th>`).join("")}</tr>`
+      : "";
+    const rows = track.steps.map((step, i) => {
+      const level = track.base + i;
+      const luckCells = track.luck
+        ? track.luck[i].map((v) => `<td>${v}%</td>`).join("")
+        : "";
+      return `<tr><th>${level} → ${level + 1}</th>`
+        + `<td>${enhFmtPct(step.success / 100)}</td>`
+        + `<td>${step.drop == null ? "없음" : escapeHtml(step.penalty)}</td>`
+        + luckCells + "</tr>";
+    }).join("");
+
+    return `
+      <div class="enh-rate-block">
+        <div class="enh-rate-title">${escapeHtml(track.label)}</div>
+        <table class="sim-table">
+          <thead>
+            <tr>
+              <th${luckSub ? ' rowspan="2"' : ""}>단계</th>
+              <th${luckSub ? ' rowspan="2"' : ""}>성공</th>
+              <th${luckSub ? ' rowspan="2"' : ""}>실패 패널티</th>
+              ${luckHead}
+            </tr>
+            ${luckSub}
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+  }).join("");
+}
+
+function enhPopulateSelects() {
+  const track = enhTrack();
+  const top = enhTop(track);
+  const stages = (from, to) => {
+    let html = "";
+    for (let i = from; i <= to; i += 1) html += `<option value="${i}">${i}단계</option>`;
+    return html;
+  };
+  simEls.enhStart.innerHTML = stages(track.base, top - 1);
+  simEls.enhTarget.innerHTML = stages(track.base + 1, top);
+  simEls.enhTarget.value = String(top);
+
+  // 행운석은 1~11단계에만, 부적은 패널티가 있는 자리에만 쓴다
+  const usesCharm = track.steps.some((s) => s.drop != null);
+  simEls.enhLuckField.hidden = !track.luck;
+  simEls.enhCharmField.hidden = !usesCharm;
+  if (!track.luck) simEls.enhLuck.value = "0";
+  if (!usesCharm) simEls.enhCharm.value = "0";
+}
+
+function wireEnhanceSim() {
+  if (!simEls.enhStart) return;
+  const counts = (max) => {
+    let html = "";
+    for (let i = 0; i <= max; i += 1) html += `<option value="${i}">${i}개</option>`;
+    return html;
+  };
+  simEls.enhLuck.innerHTML = counts(ENH_LUCK_MAX);
+  simEls.enhCharm.innerHTML = counts(ENH_CHARM_MAX);
+  enhPopulateSelects();
+
+  document.querySelectorAll('input[name="enhTrack"]').forEach((radio) =>
+    radio.addEventListener("change", () => {
+      enhPopulateSelects();
+      simEls.enhTable.innerHTML = "";
+      simEls.enhSummary.innerHTML = "";
+    }));
+  simEls.enhCalc.addEventListener("click", enhCalc);
+  simEls.enhRateButton?.addEventListener("click", () => openRateModal(
+    "장비 강화 확률",
+    "1~11단계와 12~15단계는 서로 다른 구간입니다. 11 → 12단계는 확률 강화가 아니라 특수 아이템으로 올립니다. 행운석은 1~11단계에만, 부적은 7단계 이상에서만 쓰며 1개당 패널티 발생 확률을 10%씩 낮춥니다.",
+    enhRateTableHtml(),
+  ));
 }
 
 

@@ -1615,6 +1615,18 @@ select {
   border-color: var(--accent);
 }
 
+/* 강화 확률표는 구간이 둘이라 제목을 달아 나눠 싣는다 */
+.enh-rate-block + .enh-rate-block {
+  margin-top: 16px;
+}
+
+.enh-rate-title {
+  margin-bottom: 6px;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
+}
+
 /* 확률표 모달 안에 들어간다. 모달은 내용만큼만 넓어지므로 폭을 직접 준다 */
 .inherit-notice-grid {
   display: grid;
