@@ -7247,10 +7247,11 @@ const ENH_TRACKS = [
     key: "high",
     label: "12~15단계",
     base: 12,
+    // 시드는 만 단위다
     steps: [
-      { success: 0.010, drop: null },  // 12 → 13
-      { success: 0.009, drop: null },
-      { success: 0.008, drop: null },  // 14 → 15
+      { success: 0.010, drop: null, stone: 1, seedMan: 744 },  // 12 → 13
+      { success: 0.009, drop: null, stone: 2, seedMan: 806 },
+      { success: 0.008, drop: null, stone: 3, seedMan: 868 },  // 14 → 15
     ],
     luck: null,
   },
@@ -7367,48 +7368,61 @@ function enhCalc() {
   }
 
   const rows = [];
-  let total = 0, totalLuck = 0, totalCharm = 0;
+  let total = 0, totalLuck = 0, totalCharm = 0, totalStone = 0, totalSeed = 0;
   for (let level = start; level < target; level += 1) {
     const attempt = attempts[level];
+    const step = track.steps[level - track.base];
     const luckPer = enhLuckUsed(track, level, luck);
     const charmPer = enhCharmUsed(track, level, charm);
     total += attempt;
     totalLuck += attempt * luckPer;
     totalCharm += attempt * charmPer;
+    totalStone += attempt * (step.stone || 0);
+    totalSeed += attempt * (step.seedMan || 0);
     rows.push({
       level,
       rate: enhSuccessRate(track, level, luck),
       penalty: enhPenaltyRate(track, level, charm),
-      step: track.steps[level - track.base],
+      step,
       attempt,
       total,
       luckPer,
       charmPer,
       luck: attempt * luckPer,
       charm: attempt * charmPer,
+      stone: attempt * (step.stone || 0),
+      seed: attempt * (step.seedMan || 0),
     });
   }
 
-  const showLuck = rows.some((r) => r.luckPer > 0);
-  const showCharm = rows.some((r) => r.charmPer > 0);
-  enhRenderTable(rows, showLuck, showCharm);
+  const show = {
+    luck: rows.some((r) => r.luckPer > 0),
+    charm: rows.some((r) => r.charmPer > 0),
+    stone: rows.some((r) => r.step.stone),
+    seed: rows.some((r) => r.step.seedMan),
+  };
+  enhRenderTable(rows, show);
 
   const setting = [];
   if (luck > 0) setting.push(`행운석 ${luck}개`);
   if (charm > 0) setting.push(`부적 ${charm}개`);
   const mats = [`<span>기대 시도 ${enhFmtCount(total)}회</span>`];
-  if (showLuck) mats.push(`<span>행운석 ${enhFmtCount(totalLuck)}개</span>`);
-  if (showCharm) mats.push(`<span>부적 ${enhFmtCount(totalCharm)}개</span>`);
+  if (show.luck) mats.push(`<span>행운석 ${enhFmtCount(totalLuck)}개</span>`);
+  if (show.charm) mats.push(`<span>부적 ${enhFmtCount(totalCharm)}개</span>`);
+  if (show.stone) mats.push(`<span>빛나는 장비 강화석 ${enhFmtCount(totalStone)}개</span>`);
+  if (show.seed) mats.push(`<span>${simIcon("시드.png", 24)}${formatMan(totalSeed)}</span>`);
 
   simEls.enhSummary.innerHTML =
     `<div class="sim-summary-title">| ${start}단계 → ${target}단계 | ${escapeHtml(setting.length ? `1회당 ${setting.join(" · ")}` : "보조 아이템 없음")} |</div>`
     + `<div class="sim-summary-mats">${mats.join("")}</div>`;
 }
 
-function enhRenderTable(rows, showLuck, showCharm) {
+function enhRenderTable(rows, show) {
   const head = ["단계", "성공 확률", "실패 패널티", "기대 시도", "누적 시도"];
-  if (showLuck) head.push("행운석");
-  if (showCharm) head.push("부적");
+  if (show.luck) head.push("행운석");
+  if (show.charm) head.push("부적");
+  if (show.stone) head.push("강화석");
+  if (show.seed) head.push("시드");
   const body = rows
     .map((r) => {
       const penalty = r.step.drop == null
@@ -7421,8 +7435,10 @@ function enhRenderTable(rows, showLuck, showCharm) {
         `${enhFmtCount(r.attempt)}회`,
         `${enhFmtCount(r.total)}회`,
       ];
-      if (showLuck) cells.push(r.luckPer > 0 ? `${enhFmtCount(r.luck)}개` : "—");
-      if (showCharm) cells.push(r.charmPer > 0 ? `${enhFmtCount(r.charm)}개` : "—");
+      if (show.luck) cells.push(r.luckPer > 0 ? `${enhFmtCount(r.luck)}개` : "—");
+      if (show.charm) cells.push(r.charmPer > 0 ? `${enhFmtCount(r.charm)}개` : "—");
+      if (show.stone) cells.push(r.step.stone ? `${enhFmtCount(r.stone)}개` : "—");
+      if (show.seed) cells.push(r.step.seedMan ? formatMan(r.seed) : "—");
       return "<tr>" + cells
         .map((c, i) => `<td data-label="${escapeHtml(head[i])}">${escapeHtml(c)}</td>`)
         .join("") + "</tr>";
@@ -8169,7 +8185,8 @@ function renderEqcSelects() {
 
 // 가격은 만 단위로 넣고, 합계는 억·만으로 끊어 보여준다.
 // 자릿수가 커지면 만 단위 숫자만으로는 크기가 잘 안 읽힌다.
-function eqcMoney(manValue) {
+// 만 단위 금액을 억·만으로 끊는다. 장비 제작과 장비 강화가 같이 쓴다
+function formatMan(manValue) {
   const man = Math.round(Number(manValue) || 0);
   if (!man) return "0";
   const eok = Math.floor(man / 10000);
@@ -8245,10 +8262,10 @@ function renderEqcResult() {
           </div>
           <div class="eqc-mat-calc">
             ${fixed
-              ? `<span class="eqc-fixed" data-eqc-fixed="${name}">${eqcMoney(eqcUnitPrice(m.name))}</span>`
+              ? `<span class="eqc-fixed" data-eqc-fixed="${name}">${formatMan(eqcUnitPrice(m.name))}</span>`
               : `<input type="number" min="0" step="1" inputmode="numeric" value="${Number(eqc.prices[m.name]) || ""}" placeholder="개당 가격 (만)"
                         data-eqc-price="${name}" />`}
-            <span class="eqc-sum" data-eqc-sum="${name}" data-eqc-count="${m.count}">${eqcMoney(eqcUnitPrice(m.name) * m.count)}</span>
+            <span class="eqc-sum" data-eqc-sum="${name}" data-eqc-count="${m.count}">${formatMan(eqcUnitPrice(m.name) * m.count)}</span>
           </div>
         </div>`;
       }).join("")}
@@ -8272,11 +8289,11 @@ function renderEqcTotal(used) {
       (sum, m) => sum + eqcUnitPrice(m.name) * m.count, 0);
     total += sub;
     const cell = simEls.eqcSteps.querySelector(`[data-eqc-step="${CSS.escape(step.to)}"] .eqc-step-sum`);
-    if (cell) cell.textContent = eqcMoney(sub);
+    if (cell) cell.textContent = formatMan(sub);
   });
 
   simEls.eqcTotal.innerHTML =
-    `<div class="sim-summary-title">합계 <b>${eqcMoney(total)}</b></div>`;
+    `<div class="sim-summary-title">합계 <b>${formatMan(total)}</b></div>`;
 }
 
 function renderEquipCraft() {
@@ -8311,7 +8328,7 @@ function wireEquipCraft() {
     const price = eqcUnitPrice(name);
     simEls.eqcSteps.querySelectorAll(`[data-eqc-sum="${CSS.escape(name)}"]`).forEach((cell) => {
       const count = Number(cell.dataset.eqcCount) || 0;
-      cell.textContent = eqcMoney(price * count);
+      cell.textContent = formatMan(price * count);
     });
     const { steps, tiers } = eqcPart();
     renderEqcTotal(steps.slice(tiers.indexOf(eqc.from), tiers.indexOf(eqc.to)));
@@ -8342,7 +8359,7 @@ function wireEquipCraft() {
       if (el !== box) el.checked = box.checked;
     });
     simEls.eqcSteps.querySelectorAll(`[data-eqc-fixed="${CSS.escape(name)}"]`).forEach((el) => {
-      el.textContent = eqcMoney(eqcUnitPrice(name));
+      el.textContent = formatMan(eqcUnitPrice(name));
     });
     refreshMaterial(name);
   });
