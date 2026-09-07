@@ -1620,6 +1620,12 @@ select {
   margin-top: 16px;
 }
 
+/* 머리글 둘째 줄의 첫 칸은 단계가 아니라 행운석 1개다.
+   th:first-child 왼쪽 정렬에 걸려 한 칸 밀려 보이던 것을 되돌린다 */
+.enh-rate-block thead tr + tr th:first-child {
+  text-align: right;
+}
+
 .enh-rate-title {
   margin-bottom: 6px;
   color: var(--accent);

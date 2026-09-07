@@ -7272,14 +7272,32 @@ function enhSuccessRate(track, level, luck) {
   const step = track.steps[level - track.base];
   if (!step) return 0;
   const row = track.luck?.[level - track.base];
-  const pct = luck > 0 && row ? row[luck - 1] : step.success;
-  return pct / 100;
+  const boosted = luck > 0 && row ? row[luck - 1] : 0;
+  return Math.max(step.success, boosted) / 100;
 }
 
 function enhPenaltyRate(track, level, charm) {
   const step = track.steps[level - track.base];
   if (!step || step.drop == null) return 0;
   return Math.max(0, 1 - charm * ENH_CHARM_PER_ITEM);
+}
+
+// 등록한 보조 아이템은 시도할 때마다 사라진다. 다만 확률이 오르지 않는 자리에
+// 넣으면 그냥 버리는 셈이라 세지 않는다. 0 → 1은 행운석 없이도 100%다.
+function enhLuckUsed(track, level, luck) {
+  if (!luck || !track.luck) return 0;
+  const i = level - track.base;
+  const step = track.steps[i];
+  const row = track.luck[i];
+  if (!step || !row) return 0;
+  return row[luck - 1] > step.success ? luck : 0;
+}
+
+// 부적은 실패 패널티가 있는 자리에서만 쓸 수 있다
+function enhCharmUsed(track, level, charm) {
+  if (!charm) return 0;
+  const step = track.steps[level - track.base];
+  return step && step.drop != null ? charm : 0;
 }
 
 // 한 단계 올리는 데 드는 기대 시도수.
@@ -7338,31 +7356,48 @@ function enhCalc() {
   }
 
   const rows = [];
-  let total = 0;
+  let total = 0, totalLuck = 0, totalCharm = 0;
   for (let level = start; level < target; level += 1) {
-    total += attempts[level];
+    const attempt = attempts[level];
+    const luckPer = enhLuckUsed(track, level, luck);
+    const charmPer = enhCharmUsed(track, level, charm);
+    total += attempt;
+    totalLuck += attempt * luckPer;
+    totalCharm += attempt * charmPer;
     rows.push({
       level,
       rate: enhSuccessRate(track, level, luck),
       penalty: enhPenaltyRate(track, level, charm),
       step: track.steps[level - track.base],
-      attempt: attempts[level],
+      attempt,
       total,
+      luckPer,
+      charmPer,
+      luck: attempt * luckPer,
+      charm: attempt * charmPer,
     });
   }
 
-  enhRenderTable(rows);
+  const showLuck = rows.some((r) => r.luckPer > 0);
+  const showCharm = rows.some((r) => r.charmPer > 0);
+  enhRenderTable(rows, showLuck, showCharm);
 
-  const used = [];
-  if (luck > 0) used.push(`행운석 ${luck}개`);
-  if (charm > 0) used.push(`부적 ${charm}개`);
+  const setting = [];
+  if (luck > 0) setting.push(`행운석 ${luck}개`);
+  if (charm > 0) setting.push(`부적 ${charm}개`);
+  const mats = [`<span>기대 시도 ${enhFmtCount(total)}회</span>`];
+  if (showLuck) mats.push(`<span>행운석 ${enhFmtCount(totalLuck)}개</span>`);
+  if (showCharm) mats.push(`<span>부적 ${enhFmtCount(totalCharm)}개</span>`);
+
   simEls.enhSummary.innerHTML =
-    `<div class="sim-summary-title">| ${start}단계 → ${target}단계 | ${escapeHtml(used.length ? used.join(" · ") : "보조 아이템 없음")} |</div>`
-    + `<div class="sim-summary-mats"><span>기대 시도 ${enhFmtCount(total)}회</span></div>`;
+    `<div class="sim-summary-title">| ${start}단계 → ${target}단계 | ${escapeHtml(setting.length ? `1회당 ${setting.join(" · ")}` : "보조 아이템 없음")} |</div>`
+    + `<div class="sim-summary-mats">${mats.join("")}</div>`;
 }
 
-function enhRenderTable(rows) {
+function enhRenderTable(rows, showLuck, showCharm) {
   const head = ["단계", "성공 확률", "실패 패널티", "기대 시도", "누적 시도"];
+  if (showLuck) head.push("행운석");
+  if (showCharm) head.push("부적");
   const body = rows
     .map((r) => {
       const penalty = r.step.drop == null
@@ -7375,6 +7410,8 @@ function enhRenderTable(rows) {
         `${enhFmtCount(r.attempt)}회`,
         `${enhFmtCount(r.total)}회`,
       ];
+      if (showLuck) cells.push(r.luckPer > 0 ? `${enhFmtCount(r.luck)}개` : "—");
+      if (showCharm) cells.push(r.charmPer > 0 ? `${enhFmtCount(r.charm)}개` : "—");
       return "<tr>" + cells
         .map((c, i) => `<td data-label="${escapeHtml(head[i])}">${escapeHtml(c)}</td>`)
         .join("") + "</tr>";
