@@ -7412,8 +7412,13 @@ function enhCalc() {
   if (show.stone) mats.push(`<span>${simIcon("빛나는장비강화석.png", 24)}${enhFmtCount(totalStone)}개</span>`);
   if (show.seed) mats.push(`<span>${simIcon("시드.png", 24)}${formatMan(totalSeed)}</span>`);
 
+  // 12~15단계에는 보조 아이템 자체가 없다. "없음"이라 적으면 안 넣은 것처럼 보인다
+  const parts = [`${start}단계 → ${target}단계`];
+  if (setting.length) parts.push(`1회당 ${setting.join(" · ")}`);
+  else if (track.luck || track.charmFrom != null) parts.push("보조 아이템 없음");
+
   simEls.enhSummary.innerHTML =
-    `<div class="sim-summary-title">| ${start}단계 → ${target}단계 | ${escapeHtml(setting.length ? `1회당 ${setting.join(" · ")}` : "보조 아이템 없음")} |</div>`
+    `<div class="sim-summary-title">| ${escapeHtml(parts.join(" | "))} |</div>`
     + `<div class="sim-summary-mats">${mats.join("")}</div>`;
 }
 
