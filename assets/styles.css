@@ -1630,24 +1630,6 @@ select {
   border-color: var(--accent);
 }
 
-/* 강화 확률표는 구간이 둘이라 제목을 달아 나눠 싣는다 */
-.enh-rate-block + .enh-rate-block {
-  margin-top: 16px;
-}
-
-/* 머리글 둘째 줄의 첫 칸은 단계가 아니라 행운석 1개다.
-   th:first-child 왼쪽 정렬에 걸려 한 칸 밀려 보이던 것을 되돌린다 */
-.enh-rate-block thead tr + tr th:first-child {
-  text-align: right;
-}
-
-.enh-rate-title {
-  margin-bottom: 6px;
-  color: var(--accent);
-  font-size: 13px;
-  font-weight: 700;
-}
-
 /* 확률표 모달 안에 들어간다. 모달은 내용만큼만 넓어지므로 폭을 직접 준다 */
 .inherit-notice-grid {
   display: grid;
