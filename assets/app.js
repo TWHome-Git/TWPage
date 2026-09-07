@@ -6231,6 +6231,41 @@ let simInited = false;
 
 // 시뮬레이터 재료 아이콘 (images 폴더)
 const SIM_IMG_BASE = `${CDN_ETC_ROOT}images/`;
+// ── 시뮬레이션 공용 ────────────────────────────────────────────
+// 기대값은 평균만 알려 준다. 실제로 몇 번 만에 붙는지는 사람마다 다르므로
+// 확률을 그대로 굴려 한 판을 보여준다.
+//
+// 아주 낮은 확률에서는 한 판이 수백만 번까지 갈 수 있어 상한을 둔다.
+// 상한에 닿으면 화면에 그렇게 적는다.
+const SIM_ATTEMPT_CAP = 20000000;
+
+// 성공할 때까지의 시도 횟수 (기하분포)
+function simDrawAttempts(rate) {
+  if (rate >= 1) return 1;
+  let n = 1;
+  while (Math.random() >= rate) {
+    n += 1;
+    if (n >= SIM_ATTEMPT_CAP) return n;
+  }
+  return n;
+}
+
+// 성공을 successes번 채울 때까지의 시도 횟수 (음이항분포)
+function simDrawUntil(successes, rate) {
+  if (rate >= 1) return successes;
+  let n = 0;
+  for (let hit = 0; hit < successes; ) {
+    n += 1;
+    if (Math.random() < rate) hit += 1;
+    if (n >= SIM_ATTEMPT_CAP) break;
+  }
+  return n;
+}
+
+function simCapped(total) {
+  return total >= SIM_ATTEMPT_CAP;
+}
+
 function simIcon(file, size = 18) {
   return `<img class="sim-icon" src="${SIM_IMG_BASE}${encodeURIComponent(file)}" alt="" width="${size}" height="${size}" loading="lazy" />`;
 }
@@ -6243,10 +6278,10 @@ function initSimulators() {
     "encElso", "encDiscount", "encBaseCost", "encCostLabel", "encStartInk", "encTargetInk",
     "encManualCount", "encPresets", "encRunBatch", "encRunTarget", "encReset", "encStatus", "encLog",
     "coreMainStat", "coreHasDust", "coreStartStage", "coreTargetStage",
-    "coreBoxPrice", "coreBoxPriceField", "coreCalc", "coreSummary", "coreTable",
-    "relicCurrent", "relicTarget", "relicDifficulty", "relicCalc", "relicSummary", "relicTable",
+    "coreBoxPrice", "coreBoxPriceField", "coreCalc", "coreSim", "coreSummary", "coreTable",
+    "relicCurrent", "relicTarget", "relicDifficulty", "relicCalc", "relicSim", "relicSummary", "relicTable",
     "enhStart", "enhTarget", "enhLuck", "enhCharm", "enhLuckField", "enhCharmField",
-    "enhCalc", "enhSummary", "enhTable",
+    "enhCalc", "enhSim", "enhSummary", "enhTable",
     "relicRateButton", "coreRateButton", "enhRateButton",
     "rateModal", "rateModalTitle", "rateModalNote", "rateModalBody",
     "inhFormula", "inhEnchants", "inhIncrement", "inhTotal", "inhFusionMax",
@@ -6834,7 +6869,7 @@ function coreApplyModeUi() {
   // 가루 보유 시 상자 가격 입력 숨김 (단계 콤보는 건드리지 않음)
   simEls.coreBoxPriceField.hidden = simEls.coreHasDust.checked;
 }
-function coreCalc() {
+function coreRun(sampled) {
   const startIdx = parseInt(simEls.coreStartStage.value, 10);
   const targetIdx = parseInt(simEls.coreTargetStage.value, 10);
   if (startIdx >= targetIdx) {
@@ -6865,7 +6900,7 @@ function coreCalc() {
       alert(`${step.display} 단계 확률이 0%라 계산할 수 없습니다.`);
       return;
     }
-    const expected = 1 / step.rate;
+    const expected = sampled ? simDrawAttempts(step.rate) : 1 / step.rate;
 
     let dustPer = step.dust, crystalPer = step.crystal, seedPer = step.seed;
     if (isSubStat) {
@@ -6889,7 +6924,15 @@ function coreCalc() {
   }
 
   coreRenderTable(rows);
-  coreRenderSummary({ isMainStat, startIdx, targetIdx, totalDust, totalCrystal, totalSeed, totalCost });
+  coreRenderSummary({ isMainStat, startIdx, targetIdx, totalDust, totalCrystal, totalSeed, totalCost, sampled });
+}
+
+function coreCalc() {
+  coreRun(false);
+}
+
+function coreSim() {
+  coreRun(true);
 }
 function coreRenderTable(rows) {
   const head = [
@@ -6918,6 +6961,7 @@ const CORE_SLOT_COUNT = 6;
 function coreRenderSummary(s) {
   const statLabel = s.isMainStat ? "주스탯" : "부스탯";
   const range = `${coreStages[s.startIdx].display} → ${coreStages[s.targetIdx].display}`;
+  const kind = s.sampled ? "시뮬레이션" : "기대값";
   const mats = (n) =>
     `<div class="sim-summary-mats">` +
     `<span>${simIcon("코어가루.png", 24)}${(s.totalDust * n).toLocaleString("ko-KR")}개</span>` +
@@ -6926,7 +6970,7 @@ function coreRenderSummary(s) {
     `</div>`;
 
   simEls.coreSummary.innerHTML =
-    `<div class="sim-summary-title">${escapeHtml(statLabel)} | ${escapeHtml(range)} 기대값</div>` +
+    `<div class="sim-summary-title">${escapeHtml(statLabel)} | ${escapeHtml(range)} ${escapeHtml(kind)}</div>` +
     `<div class="sim-summary-cols">` +
     `<div class="sim-summary-col"><span class="sim-summary-label">코어 1개</span>${mats(1)}</div>` +
     `<div class="sim-summary-col"><span class="sim-summary-label">코어 ${CORE_SLOT_COUNT}개 전체</span>${mats(CORE_SLOT_COUNT)}</div>` +
@@ -6944,6 +6988,7 @@ function wireCoreSim() {
   );
   simEls.coreHasDust.addEventListener("change", coreApplyModeUi);
   simEls.coreCalc.addEventListener("click", coreCalc);
+  simEls.coreSim?.addEventListener("click", coreSim);
 }
 
 // ── 신조 렐릭 시뮬 (RelicExpectationSimulatorView) ─────────────
@@ -7002,7 +7047,7 @@ function relicReadInt(el, label, min, max) {
   }
   return n;
 }
-function relicCalc() {
+function relicRun(sampled) {
   const currentLevel = relicReadInt(simEls.relicCurrent, "현재 레벨", 0, 19);
   if (currentLevel == null) return;
   const targetLevel = relicReadInt(simEls.relicTarget, "목표 레벨", 1, 20);
@@ -7028,7 +7073,9 @@ function relicCalc() {
       break;
     }
     const cost = costs[level - 1];
-    const expected = cost.required / chance;
+    const expected = sampled
+      ? simDrawUntil(cost.required, chance)
+      : cost.required / chance;
     const powder = expected * cost.powder;
     const moonPiece = expected * cost.moonPiece;
     // 정수/월광석: 이전 단계 → 이 단계 진화에 쓴 재료 (첫 레벨은 없음)
@@ -7058,7 +7105,7 @@ function relicCalc() {
     mats.push(`<span>${simIcon("달의파편.png", 24)}${relicFmtNum(totalMoonPiece)}개</span>`);
     mats.push(`<span>${simIcon("월광석.png", 24)}${relicFmtNum(totalMoonStone)}개</span>`);
   }
-  let html = `<div class="sim-summary-title">| ${escapeHtml(name)} | ${escapeHtml(relicFmtLevel(currentLevel))} → ${escapeHtml(relicFmtLevel(targetLevel))} | ${escapeHtml(relicFmtLevel(reached))} MAX |</div>`;
+  let html = `<div class="sim-summary-title">| ${escapeHtml(name)} | ${escapeHtml(relicFmtLevel(currentLevel))} → ${escapeHtml(relicFmtLevel(targetLevel))} | ${escapeHtml(relicFmtLevel(reached))} MAX | ${sampled ? "시뮬레이션" : "기대값"} |</div>`;
   html += `<div class="sim-summary-mats">${mats.join("")}</div>`;
   if (stopReason) html += `<div class="sim-summary-note">※ ${escapeHtml(stopReason)}</div>`;
   simEls.relicSummary.innerHTML = html;
@@ -7197,8 +7244,17 @@ function wireRateModal() {
   ));
 }
 
+function relicCalc() {
+  relicRun(false);
+}
+
+function relicSim() {
+  relicRun(true);
+}
+
 function wireRelicSim() {
   simEls.relicCalc.addEventListener("click", relicCalc);
+  simEls.relicSim?.addEventListener("click", relicSim);
 }
 
 // ── 장비 강화 시뮬 (EquipEnhanceSimulatorView) ─────────────────
@@ -7344,12 +7400,37 @@ function enhFmtPct(rate) {
   return `${pct < 1 ? pct.toFixed(3) : String(pct)}%`;
 }
 
-function enhFmtCount(value) {
-  if (value >= 100) return Math.round(value).toLocaleString("ko-KR");
+// 시뮬레이션 값은 실제로 굴린 횟수라 정수다. 기대값만 소수로 보여준다
+function enhFmtCount(value, sampled) {
+  if (sampled || value >= 100) return Math.round(value).toLocaleString("ko-KR");
   return value.toFixed(value >= 10 ? 1 : 2);
 }
 
-function enhCalc() {
+// 떨어지는 자리가 있어 단계마다 한 번씩 뽑을 수 없다. 한 번씩 굴리며
+// 실제로 오르내린 길을 그대로 따라간다.
+function enhSimulate(track, start, target, luck, charm) {
+  const visits = [];
+  for (let i = track.base; i < target; i += 1) visits[i] = 0;
+
+  let level = start, total = 0, drops = 0, resets = 0;
+  while (level < target && total < SIM_ATTEMPT_CAP) {
+    const step = track.steps[level - track.base];
+    visits[level] += 1;
+    total += 1;
+    if (Math.random() < enhSuccessRate(track, level, luck)) {
+      level += 1;
+      continue;
+    }
+    if (step.drop == null) continue;
+    if (Math.random() >= enhPenaltyRate(track, level, charm)) continue;
+    if (step.drop === track.base) resets += 1;
+    else drops += 1;
+    level = step.drop;
+  }
+  return { visits, total, drops, resets, reached: level };
+}
+
+function enhRun(sampled) {
   const track = enhTrack();
   const start = parseInt(simEls.enhStart.value, 10);
   const target = parseInt(simEls.enhTarget.value, 10);
@@ -7361,15 +7442,23 @@ function enhCalc() {
   const charm = parseInt(simEls.enhCharm.value, 10);
 
   // 떨어지면 시작 단계 아래로도 내려가므로 구간 바닥부터 전부 구해 둔다
-  const attempts = enhAttemptTable(track, target, luck, charm);
-  if (!attempts) {
-    alert("확률이 0%인 단계가 있어 계산할 수 없습니다.");
-    return;
+  let attempts, from = start, run = null;
+  if (sampled) {
+    run = enhSimulate(track, start, target, luck, charm);
+    attempts = run.visits;
+    const lowest = attempts.findIndex((v) => v > 0);
+    if (lowest >= 0) from = lowest;
+  } else {
+    attempts = enhAttemptTable(track, target, luck, charm);
+    if (!attempts) {
+      alert("확률이 0%인 단계가 있어 계산할 수 없습니다.");
+      return;
+    }
   }
 
   const rows = [];
   let total = 0, totalLuck = 0, totalCharm = 0, totalStone = 0, totalSeed = 0;
-  for (let level = start; level < target; level += 1) {
+  for (let level = from; level < target; level += 1) {
     const attempt = attempts[level];
     const step = track.steps[level - track.base];
     const luckPer = enhLuckUsed(track, level, luck);
@@ -7396,6 +7485,7 @@ function enhCalc() {
   }
 
   const show = {
+    sampled,
     luck: rows.some((r) => r.luckPer > 0),
     charm: rows.some((r) => r.charmPer > 0),
     stone: rows.some((r) => r.step.stone),
@@ -7406,24 +7496,44 @@ function enhCalc() {
   const setting = [];
   if (luck > 0) setting.push(`행운석 ${luck}개`);
   if (charm > 0) setting.push(`부적 ${charm}개`);
-  const mats = [`<span>기대 시도 ${enhFmtCount(total)}회</span>`];
-  if (show.luck) mats.push(`<span>행운석 ${enhFmtCount(totalLuck)}개</span>`);
-  if (show.charm) mats.push(`<span>부적 ${enhFmtCount(totalCharm)}개</span>`);
-  if (show.stone) mats.push(`<span>${simIcon("빛나는장비강화석.png", 24)}${enhFmtCount(totalStone)}개</span>`);
+  const n = (v) => enhFmtCount(v, sampled);
+  const mats = [`<span>${sampled ? "총" : "기대"} 시도 ${n(total)}회</span>`];
+  if (show.luck) mats.push(`<span>행운석 ${n(totalLuck)}개</span>`);
+  if (show.charm) mats.push(`<span>부적 ${n(totalCharm)}개</span>`);
+  if (show.stone) mats.push(`<span>${simIcon("빛나는장비강화석.png", 24)}${n(totalStone)}개</span>`);
   if (show.seed) mats.push(`<span>${simIcon("시드.png", 24)}${formatMan(totalSeed)}</span>`);
 
   // 12~15단계에는 보조 아이템 자체가 없다. "없음"이라 적으면 안 넣은 것처럼 보인다
   const parts = [`${start}단계 → ${target}단계`];
   if (setting.length) parts.push(`1회당 ${setting.join(" · ")}`);
   else if (track.luck || track.charmFrom != null) parts.push("보조 아이템 없음");
+  parts.push(sampled ? "시뮬레이션" : "기대값");
 
-  simEls.enhSummary.innerHTML =
-    `<div class="sim-summary-title">| ${escapeHtml(parts.join(" | "))} |</div>`
+  let html = `<div class="sim-summary-title">| ${escapeHtml(parts.join(" | "))} |</div>`
     + `<div class="sim-summary-mats">${mats.join("")}</div>`;
+  if (run) {
+    const fell = [];
+    if (run.drops) fell.push(`하락 ${formatNumber(run.drops)}회`);
+    if (run.resets) fell.push(`초기화 ${formatNumber(run.resets)}회`);
+    if (fell.length) html += `<div class="sim-summary-note">${escapeHtml(fell.join(" · "))}</div>`;
+    if (simCapped(run.total)) {
+      html += `<div class="sim-summary-note">※ 시도 상한 ${formatNumber(SIM_ATTEMPT_CAP)}회에 닿아 ${run.reached}단계에서 멈췄습니다.</div>`;
+    }
+  }
+  simEls.enhSummary.innerHTML = html;
+}
+
+function enhCalc() {
+  enhRun(false);
+}
+
+function enhSim() {
+  enhRun(true);
 }
 
 function enhRenderTable(rows, show) {
-  const head = ["단계", "성공 확률", "실패 패널티", "기대 시도", "누적 시도"];
+  const head = ["단계", "성공 확률", "실패 패널티",
+    show.sampled ? "시도" : "기대 시도", "누적 시도"];
   if (show.luck) head.push("행운석");
   if (show.charm) head.push("부적");
   if (show.stone) head.push("강화석");
@@ -7433,16 +7543,17 @@ function enhRenderTable(rows, show) {
       const penalty = r.step.drop == null
         ? "없음"
         : `${r.step.penalty} (${enhFmtPct(r.penalty)})`;
+      const n = (v) => enhFmtCount(v, show.sampled);
       const cells = [
         `${r.level} → ${r.level + 1}`,
         enhFmtPct(r.rate),
         penalty,
-        `${enhFmtCount(r.attempt)}회`,
-        `${enhFmtCount(r.total)}회`,
+        `${n(r.attempt)}회`,
+        `${n(r.total)}회`,
       ];
-      if (show.luck) cells.push(r.luckPer > 0 ? `${enhFmtCount(r.luck)}개` : "—");
-      if (show.charm) cells.push(r.charmPer > 0 ? `${enhFmtCount(r.charm)}개` : "—");
-      if (show.stone) cells.push(r.step.stone ? `${enhFmtCount(r.stone)}개` : "—");
+      if (show.luck) cells.push(r.luckPer > 0 ? `${n(r.luck)}개` : "—");
+      if (show.charm) cells.push(r.charmPer > 0 ? `${n(r.charm)}개` : "—");
+      if (show.stone) cells.push(r.step.stone ? `${n(r.stone)}개` : "—");
       if (show.seed) cells.push(r.step.seedMan ? formatMan(r.seed) : "—");
       return "<tr>" + cells
         .map((c, i) => `<td data-label="${escapeHtml(head[i])}">${escapeHtml(c)}</td>`)
@@ -7532,6 +7643,7 @@ function wireEnhanceSim() {
       simEls.enhSummary.innerHTML = "";
     }));
   simEls.enhCalc.addEventListener("click", enhCalc);
+  simEls.enhSim?.addEventListener("click", enhSim);
   simEls.enhRateButton?.addEventListener("click", () => openRateModal(
     "장비 강화 확률",
     "1~11단계와 12~15단계는 서로 다른 구간입니다. 11 → 12단계는 확률 강화가 아니라 특수 아이템으로 올립니다. 행운석은 1~11단계에만, 부적은 7단계 이상에서만 쓰며 1개당 패널티 발생 확률을 10%씩 낮춥니다.",
