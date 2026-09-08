@@ -3969,6 +3969,94 @@ img.dmg-chk-icon {
   color: #a7b0ad;
 }
 
+/* ── 아이디 드나든 기록 검색 ──────────────────────────────── */
+.eta-move-result {
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel-strong);
+}
+
+.eta-move-head {
+  margin-bottom: 10px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.eta-move-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* 여러 아이디가 걸리면 카드가 나란히 선다 */
+.eta-move-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.eta-move-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 10px 12px;
+}
+
+.eta-move-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.eta-move-card-head b {
+  font-size: 14px;
+}
+
+.eta-move-card-head span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.eta-move-dates {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+}
+
+.eta-move-dates li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0;
+}
+
+.eta-move-kind {
+  min-width: 34px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.eta-move-kind.in {
+  background: var(--accent);
+}
+
+.eta-move-kind.out {
+  background: var(--danger);
+}
+
 /* ── 신규 진입 탭 ─────────────────────────────────────────── */
 .eta-newcomer-control-grid {
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));

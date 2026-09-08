@@ -6,9 +6,9 @@
     <title>TW DB</title>
     <!-- 이미지 CDN. 첫 이미지 요청 전에 DNS+TLS를 미리 끝내둔다 -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
-    <link rel="stylesheet" href="./assets/styles.css?v=20260908-etachunk" />
+    <link rel="stylesheet" href="./assets/styles.css?v=20260908-etamoves" />
     <!-- 모바일 전용. media 속성 덕에 넓은 화면에서는 렌더링을 막지 않는다 -->
-    <link rel="stylesheet" href="./assets/mobile.css?v=20260908-etachunk" media="(max-width: 720px)" />
+    <link rel="stylesheet" href="./assets/mobile.css?v=20260908-etamoves" media="(max-width: 720px)" />
   </head>
   <body>
     <main class="app-shell">
@@ -109,6 +109,10 @@
                 <option value="">최신</option>
               </select>
             </label>
+            <label class="field">
+              <span>아이디 기록 검색</span>
+              <input id="etaMoveSearch" type="search" placeholder="아이디를 입력하세요" autocomplete="off" />
+            </label>
           </div>
         </section>
 
@@ -123,6 +127,7 @@
           <p class="eta-newcomer-note">
             기준 날짜의 에타 순위를 그 전날과 비교해, 진입한 아이디와 이탈한 아이디를 보여줍니다.
           </p>
+          <div id="etaMoveResult" class="eta-move-result" hidden></div>
           <div id="etaNewGroups" class="eta-newcomer-groups"></div>
         </section>
         </div>
@@ -909,7 +914,7 @@
       </div>
     </template>
 
-    <script src="./assets/app.js?v=20260908-etachunk" type="module"></script>
+    <script src="./assets/app.js?v=20260908-etamoves" type="module"></script>
     <!-- GoatCounter 방문자 분석 (localhost 방문은 count.js가 기본으로 집계 제외) -->
     <script data-goatcounter="https://holedis88.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
   </body>

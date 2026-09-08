@@ -431,6 +431,8 @@ const els = {
   etaCharacterList: document.querySelector("#etaCharacterList"),
   etaRankingBody: document.querySelector("#etaRankingBody"),
   etaNewDateSelect: document.querySelector("#etaNewDateSelect"),
+  etaMoveSearch: document.querySelector("#etaMoveSearch"),
+  etaMoveResult: document.querySelector("#etaMoveResult"),
   etaNewServerTabs: document.querySelector("#etaNewServerTabs"),
   etaNewRange: document.querySelector("#etaNewRange"),
   etaNewGroups: document.querySelector("#etaNewGroups"),
@@ -1310,6 +1312,106 @@ function etaNewcomerGroups() {
     entered: entered.sort(byRank),
     left: left.sort(byRank),
   };
+}
+
+// ── 아이디 드나든 기록 검색 ──
+// 진입·이탈 표는 고른 날짜 하루만 본다. "이 아이디가 언제 드나들었나"를 알려면
+// 76일을 전부 비교해야 하는데 원본은 하루치가 1MB 가까워 브라우저가 못 받는다.
+// scripts/build-eta-moves.mjs가 미리 훑어 둔 파일 하나만 받아 쓴다.
+const ETA_MOVES_URL = "./assets/eta-moves.json";
+
+const etaMoves = {
+  data: null,
+  loading: false,
+  query: "",
+};
+
+async function loadEtaMoves() {
+  if (etaMoves.data || etaMoves.loading) return etaMoves.data;
+  etaMoves.loading = true;
+  try {
+    const response = await fetch(ETA_MOVES_URL);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    etaMoves.data = await response.json();
+  } catch (error) {
+    console.warn("드나든 기록 파일 로딩 실패", error);
+  } finally {
+    etaMoves.loading = false;
+  }
+  return etaMoves.data;
+}
+
+// 정확히 일치하는 아이디를 먼저 보이고, 나머지는 부분 일치로 채운다
+function etaMoveMatches(query) {
+  const bag = etaMoves.data?.servers?.[eta.server];
+  if (!bag) return [];
+  const needle = query.toLowerCase();
+  const exact = [];
+  const partial = [];
+  for (const userId of Object.keys(bag)) {
+    const lower = userId.toLowerCase();
+    if (lower === needle) exact.push(userId);
+    else if (lower.includes(needle)) partial.push(userId);
+  }
+  return [...exact, ...partial.sort()];
+}
+
+function etaMoveRowsHtml(userId) {
+  const entry = etaMoves.data.servers[eta.server][userId];
+  const dates = etaMoves.data.dates;
+  const events = [
+    ...(entry.i || []).map((slot) => ({ date: dates[slot], kind: "진입" })),
+    ...(entry.o || []).map((slot) => ({ date: dates[slot], kind: "이탈" })),
+  ].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+
+  return `
+    <section class="eta-move-card">
+      <div class="eta-move-card-head">
+        <b>${escapeHtml(userId)}</b>
+        <span>진입 ${formatNumber((entry.i || []).length)}회 · 이탈 ${formatNumber((entry.o || []).length)}회</span>
+      </div>
+      <ul class="eta-move-dates">
+        ${events.map((event) => `
+          <li><span class="eta-move-kind ${event.kind === "진입" ? "in" : "out"}">${event.kind}</span>${escapeHtml(event.date)}</li>
+        `).join("")}
+      </ul>
+    </section>
+  `;
+}
+
+const ETA_MOVE_LIMIT = 20;
+
+function renderEtaMoveSearch() {
+  const box = els.etaMoveResult;
+  if (!box) return;
+
+  const query = etaMoves.query;
+  if (!query) {
+    box.hidden = true;
+    box.innerHTML = "";
+    return;
+  }
+
+  box.hidden = false;
+  if (!etaMoves.data) {
+    box.innerHTML = `<p class="eta-move-empty">${etaMoves.loading ? "기록을 불러오는 중입니다" : "기록을 불러오지 못했습니다"}</p>`;
+    return;
+  }
+
+  const matches = etaMoveMatches(query);
+  if (!matches.length) {
+    box.innerHTML = `<p class="eta-move-empty">${escapeHtml(query)} — 드나든 기록이 없습니다. 계속 순위에 있었거나 집계 기간 밖입니다.</p>`;
+    return;
+  }
+
+  const shown = matches.slice(0, ETA_MOVE_LIMIT);
+  const rest = matches.length - shown.length;
+  const period = `${etaMoves.data.dates[0]} ~ ${etaMoves.data.dates[etaMoves.data.dates.length - 1]}`;
+  box.innerHTML = `
+    <div class="eta-move-head">${escapeHtml(period)} 기록에서 ${formatNumber(matches.length)}건</div>
+    <div class="eta-move-cards">${shown.map(etaMoveRowsHtml).join("")}</div>
+    ${rest > 0 ? `<p class="eta-move-empty">그 밖에 ${formatNumber(rest)}개 더 있습니다. 아이디를 더 적어 좁혀보세요.</p>` : ""}
+  `;
 }
 
 function etaNewGroupHtml(title, hint, rows) {
@@ -4748,6 +4850,21 @@ function wireEvents() {
     loadEtaNewcomerData();
   });
 
+  // 기록 파일은 검색을 처음 걸 때만 받는다. 탭만 열어 보는 사람에게는 안 받는다
+  let etaMoveTimer = null;
+  els.etaMoveSearch?.addEventListener("input", () => {
+    clearTimeout(etaMoveTimer);
+    etaMoveTimer = setTimeout(async () => {
+      etaMoves.query = els.etaMoveSearch.value.trim();
+      if (etaMoves.query && !etaMoves.data) {
+        renderEtaMoveSearch(); // 불러오는 중이라고 먼저 알린다
+        await loadEtaMoves();
+        if (etaMoves.query !== els.etaMoveSearch.value.trim()) return;
+      }
+      renderEtaMoveSearch();
+    }, 250);
+  });
+
   els.etaNewServerTabs?.addEventListener("click", (event) => {
     const button = event.target.closest("[data-eta-server]");
     if (!button || button.dataset.etaServer === eta.server) return;
@@ -4757,6 +4874,7 @@ function wireEvents() {
     renderEtaSidebar();
     renderEtaRanking();
     renderEtaNewcomers();
+    renderEtaMoveSearch(); // 기록도 서버별로 나뉜다
   });
 
   els.etaServerTabs?.addEventListener("click", (event) => {
