@@ -306,6 +306,7 @@ const state = {
   page: 0,
   view: "list", // "list" = 장비 목록, "detail" = 장비 상세
   listScroll: 0,
+  shown: 0, // 실제로 그린 행 수. 나머지는 스크롤이 바닥에 닿을 때 이어 붙인다
   category: "all",
   type: "all",
   query: "",
@@ -2460,12 +2461,18 @@ const avatar = {
   viewMode: etaReadCache(AVATAR_VIEW_KEY) === "gallery" ? "gallery" : "list",
   detailIndex: 0,
   listScroll: 0,
+  shown: 0, // 목록·갤러리에서 실제로 그린 개수
   query: "",
   source: "all",
   slot: "all",
   loaded: false,
   loading: false,
 };
+
+// 아바타는 2천 개가 넘어 한 번에 그리면 0.1초쯤 멈춘다. 한 화면에는 서너 개만
+// 보이므로 앞쪽만 그리고 스크롤이 바닥에 닿을 때마다 이어 붙인다.
+// 목록은 제 스크롤 칸(.avatar-list-wrap) 안에서, 갤러리는 페이지째 스크롤된다.
+const AVATAR_CHUNK = 200;
 
 // 시트는 아바타당 한 줄이고, 획득처가 여러 곳이면 " / "로 이어 붙여 둔다.
 // 획득처와 확률은 같은 순서로 짝을 이룬다.
@@ -2663,12 +2670,43 @@ function renderAvatarList() {
     return;
   }
 
+  avatar.shown = Math.min(avatar.filtered.length, Math.max(AVATAR_CHUNK, avatar.shown));
+  const shown = avatar.filtered.slice(0, avatar.shown);
+
   if (gallery) {
-    els.avatarGallery.innerHTML = avatar.filtered.map(avatarCardHtml).join("");
+    els.avatarGallery.innerHTML = avatarCardsHtml(shown, 0);
     return;
   }
 
-  els.avatarListBody.innerHTML = avatar.filtered.map((record, index) => `
+  els.avatarListBody.innerHTML = avatarRowsHtml(shown, 0);
+
+  if (els.avatarListWrap) els.avatarListWrap.scrollTop = avatar.listScroll;
+}
+
+// 스크롤이 바닥 가까이 오면 다음 묶음을 이어 붙인다
+function avatarShowMore() {
+  if (avatar.view !== "list" || avatar.shown >= avatar.filtered.length) return;
+  const from = avatar.shown;
+  const next = avatar.filtered.slice(from, from + AVATAR_CHUNK);
+  avatar.shown += next.length;
+
+  if (avatar.viewMode === "gallery") {
+    els.avatarGallery.insertAdjacentHTML("beforeend", avatarCardsHtml(next, from));
+  } else {
+    els.avatarListBody.insertAdjacentHTML("beforeend", avatarRowsHtml(next, from));
+  }
+}
+
+// data-index는 avatar.filtered의 자리다. 이어 붙일 때 0부터 다시 매기면
+// 카드를 눌렀을 때 엉뚱한 아바타가 열린다
+function avatarCardsHtml(records, offset) {
+  return records.map((record, i) => avatarCardHtml(record, offset + i)).join("");
+}
+
+function avatarRowsHtml(records, offset) {
+  return records.map((record, i) => {
+    const index = offset + i;
+    return `
     <tr class="equip-row avatar-row" data-index="${index}">
       <td class="equip-info-cell">
         <div class="equip-info">
@@ -2683,9 +2721,8 @@ function renderAvatarList() {
       <td class="avatar-slot">${escapeHtml(record.slots.join(", ") || "-")}</td>
       <td class="avatar-source">${avatarSourceSummary(record)}</td>
     </tr>
-  `).join("");
-
-  if (els.avatarListWrap) els.avatarListWrap.scrollTop = avatar.listScroll;
+  `;
+  }).join("");
 }
 
 function renderAvatarDetail() {
@@ -4608,6 +4645,7 @@ function wireEvents() {
     avatar[key] = event.currentTarget.value;
     avatar.view = "list";
     avatar.listScroll = 0;
+    avatar.shown = 0; // 조건이 바뀌었으니 앞쪽부터 다시 그린다
     renderAvatar();
   };
   els.avatarSourceSelect?.addEventListener("change", applyAvatarFilter("source"));
@@ -4620,6 +4658,7 @@ function wireEvents() {
       avatar.query = els.avatarSearchInput.value.trim().toLowerCase();
       avatar.view = "list";
       avatar.listScroll = 0;
+      avatar.shown = 0;
       renderAvatar();
     }, 200);
   });
@@ -4633,6 +4672,19 @@ function wireEvents() {
     renderAvatar();
     routeWrite();
   });
+
+  // 목록은 제 스크롤 칸 안에서, 갤러리는 페이지째 스크롤된다
+  els.avatarListWrap?.addEventListener("scroll", () => {
+    const wrap = els.avatarListWrap;
+    if (wrap.scrollTop + wrap.clientHeight >= wrap.scrollHeight - 400) avatarShowMore();
+  }, { passive: true });
+
+  addEventListener("scroll", () => {
+    if (avatar.viewMode !== "gallery") return;
+    const gallery = els.avatarGallery;
+    if (!gallery || gallery.hidden || !gallery.offsetParent) return; // 다른 탭을 보는 중
+    if (innerHeight + scrollY >= document.body.offsetHeight - 400) avatarShowMore();
+  }, { passive: true });
 
   els.avatarViewTabs?.addEventListener("click", (event) => {
     const button = event.target.closest("[data-avatar-view]");
@@ -4790,6 +4842,7 @@ function wireEvents() {
     state.page = 0;
     state.view = "list";
     state.listScroll = 0;
+    state.shown = 0; // 조건이 바뀌었으니 앞쪽부터 다시 그린다
     populateTypeSelect();
     applyFilters();
   });
@@ -4799,6 +4852,7 @@ function wireEvents() {
     state.page = 0;
     state.view = "list";
     state.listScroll = 0;
+    state.shown = 0; // 조건이 바뀌었으니 앞쪽부터 다시 그린다
     applyFilters();
   });
 
@@ -4807,8 +4861,14 @@ function wireEvents() {
     state.page = 0;
     state.view = "list";
     state.listScroll = 0;
+    state.shown = 0; // 조건이 바뀌었으니 앞쪽부터 다시 그린다
     applyFilters();
   });
+
+  els.equipListWrap?.addEventListener("scroll", () => {
+    const wrap = els.equipListWrap;
+    if (wrap.scrollTop + wrap.clientHeight >= wrap.scrollHeight - 400) equipShowMore();
+  }, { passive: true });
 
   // 200행이면 1만 픽셀이 넘어 어떤 화면에서도 스크롤이 생긴다.
   // 바닥 300px 전부터 미리 채워 끊김을 줄인다.
@@ -5038,7 +5098,29 @@ function renderList() {
     return;
   }
 
-  els.equipmentListBody.innerHTML = state.filtered.map((record, index) => {
+  // 한 행에 스탯 칸이 아홉이라 행당 노드가 서른을 넘는다. 344행을 한 번에 그리면
+   // 0.2초쯤 멈추므로 앞쪽만 그리고 스크롤이 바닥에 닿을 때 이어 붙인다
+  state.shown = Math.min(state.filtered.length, Math.max(EQUIP_CHUNK, state.shown));
+  els.equipmentListBody.innerHTML = equipRowsHtml(state.filtered.slice(0, state.shown), 0);
+
+  if (els.equipListWrap) els.equipListWrap.scrollTop = state.listScroll;
+}
+
+const EQUIP_CHUNK = 100;
+
+function equipShowMore() {
+  if (state.view !== "list" || state.shown >= state.filtered.length) return;
+  const from = state.shown;
+  const next = state.filtered.slice(from, from + EQUIP_CHUNK);
+  state.shown += next.length;
+  els.equipmentListBody.insertAdjacentHTML("beforeend", equipRowsHtml(next, from));
+}
+
+// data-index는 state.filtered의 자리다. 이어 붙일 때 0부터 다시 매기면
+// 행을 눌렀을 때 엉뚱한 장비가 열린다
+function equipRowsHtml(records, offset) {
+  return records.map((record, i) => {
+    const index = offset + i;
     const thumb = record.imageFile
       ? `<img src="${IMAGE_BASE}${encodeURIComponent(record.imageFile)}" alt="" loading="lazy" decoding="async" />`
       : "";
@@ -5059,8 +5141,6 @@ function renderList() {
       </tr>
     `;
   }).join("");
-
-  if (els.equipListWrap) els.equipListWrap.scrollTop = state.listScroll;
 }
 
 // 시트에는 숫자만 들어 있다. 정렬·필터 여지를 남기려고 그대로 두고, 레벨이라는 건
