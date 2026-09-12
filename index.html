@@ -6,9 +6,9 @@
     <title>TW DB</title>
     <!-- 이미지 CDN. 첫 이미지 요청 전에 DNS+TLS를 미리 끝내둔다 -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
-    <link rel="stylesheet" href="./assets/styles.css?v=20260909-avatarchunk" />
+    <link rel="stylesheet" href="./assets/styles.css?v=20260912-eta-gain" />
     <!-- 모바일 전용. media 속성 덕에 넓은 화면에서는 렌더링을 막지 않는다 -->
-    <link rel="stylesheet" href="./assets/mobile.css?v=20260909-avatarchunk" media="(max-width: 720px)" />
+    <link rel="stylesheet" href="./assets/mobile.css?v=20260912-eta-gain" media="(max-width: 720px)" />
   </head>
   <body>
     <main class="app-shell">
@@ -80,13 +80,14 @@
 
           <div class="equip-list-wrap eta-list-wrap">
             <table class="equip-list eta-list" aria-label="에타 순위 목록">
-              <thead>
+              <thead id="etaRankingHead">
                 <tr>
-                  <th class="eta-rank-head">순위</th>
+                  <th class="eta-rank-head eta-sort-head is-sorted" data-eta-sort="rank">순위</th>
                   <th>캐릭터</th>
                   <th>아이디</th>
                   <th>에타레벨</th>
                   <th>정수</th>
+                  <th class="eta-sort-head" data-eta-sort="gain" title="증감 기준일 이후 얻은 경험의 정수. 레벨업에 쓴 양도 포함">획득 정수</th>
                 </tr>
               </thead>
               <tbody id="etaRankingBody"></tbody>
@@ -914,7 +915,7 @@
       </div>
     </template>
 
-    <script src="./assets/app.js?v=20260909-avatarchunk" type="module"></script>
+    <script src="./assets/app.js?v=20260912-eta-gain" type="module"></script>
     <!-- GoatCounter 방문자 분석 (localhost 방문은 count.js가 기본으로 집계 제외) -->
     <script data-goatcounter="https://holedis88.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
   </body>

@@ -4167,6 +4167,27 @@ img.dmg-chk-icon {
   object-fit: contain;
 }
 
+/* 정렬 가능한 머리글 (순위 / 획득 정수) */
+.eta-sort-head {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.eta-sort-head:hover {
+  color: #0f6f63;
+}
+
+.eta-sort-head.is-sorted::after {
+  content: " ▼";
+  font-size: 10px;
+}
+
+.eta-gain {
+  white-space: nowrap;
+  font-weight: 700;
+  color: #0f6f63;
+}
 /* 창이 좁아지면 사이드바를 세로로 쌓지 않고 폭만 줄인다
    (#etaView 접두어: 뒤에 선언된 공용 .workspace 미디어 규칙보다 우선하기 위함) */
 @media (max-width: 900px) {

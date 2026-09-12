@@ -215,6 +215,7 @@ const eta = {
   compareDays: 1, // 증감 기준: 1(1일 전) | 7(1주일 전) | 30(1달 전)
   category: "전체",
   query: "",
+  sort: "rank", // "rank" = 레벨·정수 순 | "gain" = 획득 정수 순
   loaded: false,
   loading: false,
   index: null, // 날짜 → 커밋 SHA
@@ -415,6 +416,7 @@ const els = {
   etaSummaryTable: document.querySelector("#etaSummaryTable"),
   etaLevelTable: document.querySelector("#etaLevelTable"),
   etaServerTabs: document.querySelector("#etaServerTabs"),
+  etaRankingHead: document.querySelector("#etaRankingHead"),
   popRangeButtons: document.querySelector("#popRangeButtons"),
   popBandButtons: document.querySelector("#popBandButtons"),
   popFromDate: document.querySelector("#popFromDate"),
@@ -1056,6 +1058,8 @@ async function loadEtaRankings(url = ETA_RANKING_URL) {
   eta.loading = true;
   renderEtaRanking(); // 로딩 스피너를 먼저 띄운다
   loadEtaIndex();
+  // 획득 정수 열에 레벨별 필요량이 필요하다. 늦게 도착하면 그때 다시 그린다
+  if (!etaInfo.data) ensureEtaInfo().then(() => { if (seq === etaLoadSeq) renderEtaRanking(); });
 
   try {
     const payload = await fetchEtaPayload(url, url === ETA_RANKING_URL ? "latest" : "snapshot");
@@ -1067,7 +1071,7 @@ async function loadEtaRankings(url = ETA_RANKING_URL) {
     console.warn("에타 순위 로딩 실패", error);
     if (!eta.loaded && seq === etaLoadSeq) {
       els.etaRankingBody.innerHTML = `
-        <tr><td colspan="5">
+        <tr><td colspan="6">
           <div class="empty-state"><strong>에타 순위를 불러오지 못했습니다</strong><span>잠시 후 페이지를 새로고침해주세요.</span></div>
         </td></tr>
       `;
@@ -1487,6 +1491,42 @@ function renderEtaNewServerTabs() {
   els.etaNewServerTabs.innerHTML = names.map((name) => `
     <button class="eta-server-tab${name === eta.server ? " is-active" : ""}" type="button" role="radio" aria-checked="${name === eta.server}" data-eta-server="${escapeHtml(name)}">${escapeHtml(name)}</button>
   `).join("");
+}
+
+// ── 획득 정수 ──
+// 보유 정수만 빼면 레벨업하며 쓴 정수가 빠지므로, "그 레벨까지 올리는 데 든 정수 합 + 보유 정수"를
+// 누적 획득량으로 두고 비교 기준일과의 차이를 본다. 레벨별 필요량은 eta_info.json의 레벨표(water)에서 읽는다.
+let etaEssenceCumulativeCache = null;
+
+// cum[L] = 1레벨에서 L레벨까지 올리는 데 든 정수 합. 레벨표의 water는 "그 레벨에서 다음 레벨로" 드는 양이다.
+function etaEssenceCumulative() {
+  if (etaEssenceCumulativeCache) return etaEssenceCumulativeCache;
+  const levels = etaInfo.data?.levels;
+  if (!Array.isArray(levels) || !levels.length) return null;
+  const cost = new Map();
+  levels.forEach((row) => {
+    const lv = Number(row?.lv);
+    const water = Number(String(row?.water ?? "").replace(/[^\d]/g, ""));
+    if (lv > 0 && Number.isFinite(water)) cost.set(lv, water);
+  });
+  const maxLevel = Math.max(100, ...cost.keys());
+  const cum = [0, 0];
+  for (let lv = 2; lv <= maxLevel + 1; lv += 1) cum[lv] = cum[lv - 1] + (cost.get(lv - 1) || 0);
+  etaEssenceCumulativeCache = cum;
+  return cum;
+}
+
+let etaInfoPromise = null;
+
+// 정보/계산기 탭이 아닌 곳에서 eta_info.json이 필요할 때. 이미 받았으면 바로 끝난다.
+function ensureEtaInfo() {
+  if (etaInfo.data) return Promise.resolve();
+  if (!etaInfoPromise) {
+    etaInfoPromise = loadEtaInfo().finally(() => {
+      if (!etaInfo.data) etaInfoPromise = null; // 실패했으면 다음에 다시 시도
+    });
+  }
+  return etaInfoPromise;
 }
 
 // ── 에타 정보 페이지 ([?] 버튼 → 조견표·레벨별 상세) ──
@@ -2250,7 +2290,29 @@ function renderEtaRanking() {
   rows.sort((a, b) => b.level - a.level || b.essence - a.essence || a.order - b.order);
 
   // 순위는 검색어 필터 이전(서버·카테고리 기준)에 확정한다
-  const ranked = rows.map((row, index) => ({ ...row, rank: index + 1 }));
+  const prevMap = etaPrevRankMap();
+  const cum = etaEssenceCumulative();
+  let ranked = rows.map((row, index) => {
+    // 획득 정수: 비교 기준일 이후 얻은 정수. 레벨업에 쓴 양까지 누적으로 계산한다
+    const prev = prevMap?.get(`${row.code}|${row.userId}`);
+    const gain = prev && cum
+      ? ((cum[row.level] || 0) + row.essence) - ((cum[prev.level] || 0) + prev.essence)
+      : null;
+    return { ...row, rank: index + 1, prev, gain };
+  });
+
+  // 획득 정수 순 정렬. 비교 데이터가 없는 행(NEW)은 뒤로 보내고, 순위 칸은 이 정렬 기준의 순번으로 바꾼다
+  const sortByGain = eta.sort === "gain";
+  if (sortByGain) {
+    ranked.sort((a, b) => {
+      if (a.gain == null || b.gain == null) return (a.gain == null) - (b.gain == null);
+      return b.gain - a.gain || a.rank - b.rank;
+    });
+    ranked = ranked.map((row, index) => ({ ...row, rank: index + 1 }));
+  }
+  els.etaRankingHead?.querySelectorAll("[data-eta-sort]").forEach((head) => {
+    head.classList.toggle("is-sorted", head.dataset.etaSort === eta.sort);
+  });
 
   const visible = eta.query
     ? ranked.filter((row) =>
@@ -2262,15 +2324,15 @@ function renderEtaRanking() {
 
   if (!visible.length) {
     els.etaRankingBody.innerHTML = `
-      ${listPlaceholderRow(5, eta.loaded, "표시할 순위가 없습니다", "조건을 조금 넓혀보세요.")}
+      ${listPlaceholderRow(6, eta.loaded, "표시할 순위가 없습니다", "조건을 조금 넓혀보세요.")}
     `;
     return;
   }
 
   eta.visible = visible;
   // 이어 붙일 때마다 다시 만들면 5천 행을 그때마다 정렬하게 된다.
-  // 조건이 바뀌면 어차피 이 함수를 다시 타므로 여기서 한 번만 만든다
-  eta.prevMap = etaPrevRankMap();
+  // 조건이 바뀌면 어차피 이 함수를 다시 타므로 여기서 한 번만 만든다 (prevMap은 위에서 이미 만들었다)
+  eta.prevMap = prevMap;
   eta.deltaTitle = eta.prevDate ? ` title="${escapeHtml(eta.prevDate)} 대비"` : "";
   // 변동 데이터가 뒤늦게 와서 다시 그릴 때는 보던 만큼 그대로 되살린다
   eta.shown = Math.min(visible.length, Math.max(ETA_CHUNK, eta.shown));
@@ -2290,6 +2352,7 @@ function etaShowMore() {
 function etaRowsHtml(rows) {
   const prevMap = eta.prevMap;
   const deltaTitle = eta.deltaTitle;
+  const sortByGain = eta.sort === "gain";
 
   return rows.map((row) => {
     const deltaBadge = (diff) => diff > 0
@@ -2303,15 +2366,17 @@ function etaRowsHtml(rows) {
     let levelDeltaHtml = "";
     let essenceDeltaHtml = "";
     if (prevMap) {
-      const prev = prevMap.get(`${row.code}|${row.userId}`);
+      const prev = row.prev;
       if (!prev) {
         newHtml = `<span class="eta-new"${deltaTitle}>NEW</span>`;
       } else {
-        deltaHtml = deltaBadge(prev.rank - row.rank);
+        // 획득 정수 순으로 정렬하면 순위 칸이 다른 기준이라 순위 변동은 뺀다
+        if (!sortByGain) deltaHtml = deltaBadge(prev.rank - row.rank);
         levelDeltaHtml = deltaBadge(row.level - prev.level);
         essenceDeltaHtml = deltaBadge(row.essence - prev.essence);
       }
     }
+    const gainHtml = row.gain == null ? "-" : formatNumber(row.gain);
     return `
       <tr class="eta-row">
         <td class="eta-rank">${row.rank}${deltaHtml}</td>
@@ -2319,6 +2384,7 @@ function etaRowsHtml(rows) {
         <td class="eta-userid">${escapeHtml(row.userId)}${newHtml}</td>
         <td class="eta-level">${formatNumber(row.level)}${levelDeltaHtml}</td>
         <td class="eta-essence">${formatNumber(row.essence)}${essenceDeltaHtml}</td>
+        <td class="eta-gain"${deltaTitle}>${gainHtml}</td>
       </tr>
     `;
   }).join("");
@@ -4923,6 +4989,14 @@ function wireEvents() {
       }
       renderEtaMoveSearch();
     }, 250);
+  });
+
+  els.etaRankingHead?.addEventListener("click", (event) => {
+    const head = event.target.closest("[data-eta-sort]");
+    if (!head || head.dataset.etaSort === eta.sort) return;
+    eta.sort = head.dataset.etaSort;
+    etaResetScroll();
+    renderEtaRanking();
   });
 
   els.etaNewServerTabs?.addEventListener("click", (event) => {
