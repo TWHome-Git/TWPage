@@ -469,7 +469,7 @@ const els = {
 // 메인 탭별 기본 하위 탭. 하위 탭이 기본값이면 주소에서 뺀다.
 const ROUTE_DEFAULT_SUB = {
   home: "",
-  extra: "content",
+  extra: "seed",
   eta: "ranking",
   equipment: "equipment",
   calculator: "coefficient",
@@ -621,7 +621,7 @@ async function boot() {
   activateMainTab("home");
   activateCalculatorTab("equipment");
   activateSimulatorTab("encrypt");
-  activateExtraTab("content");
+  activateExtraTab("seed");
   revealLocalOnly();
   wireEvents();
   setAvatarViewMode(avatar.viewMode); // 저장된 선택을 버튼에 반영
@@ -3434,15 +3434,37 @@ const rareBuff = makeBuffCalculator({
 
 // ══════════════════════════════════════════════════════════════
 //  테일즈 정보 > 주간 시드 보상표
-//  표는 TWChatOverlay의 WeeklySeedRewardService와 같다.
+//  주간 시드와 그룹·지역 한도는 TWChatOverlay의 WeeklySeedRewardService와 같다.
 //  카드를 눌러 켠 항목의 주간 시드를 그룹 한도 → 지역 한도(일반 66억 / 루비코나 28억) 순으로 잘라 합산한다.
 // ══════════════════════════════════════════════════════════════
 
 const SEED_EOK = 1e8;
 const SEED_MAN = 1e4;
-const SEED_SAVE_KEY = "tw-seed-weekly-save-v1";
+const SEED_SAVE_KEY = "tw-seed-weekly-save-v3";
 
-// 아페티리아는 한 주에 한 난이도만 도는 것으로 보고 일반/어려움을 같이 켜지 않는다 (excl 키가 같으면 하나만)
+// 카드 아이콘 — 게임 "콘텐츠 클리어 현황" 창의 초상화를 잘라 images/seed/에 WebP로 둔다.
+// 로컬에서는 폴더를 바로 읽고, 배포본은 다른 이미지처럼 CDN 태그(v3.x)를 탄다.
+const SEED_ICON_BASE = IS_LOCAL ? "./images/seed/" : `${CDN_ETC_ROOT}images/seed/`;
+const SEED_ICONS = {
+  "로카고스": "로카고스", "에토스": "에토스", "체리아": "체리아", "마티아": "마티아", "라이코스": "라이코스", "티로로스": "티로로스",
+  "이클립스 토벌전": "이클립스 토벌전", "보급품 탈환": "보급품 탈환", "훈련소": "훈련소", "최후의 결전": "최후의 결전",
+  "아페티리아 (일반)": "아페티리아", "아페티리아 (어려움)": "아페티리아",
+  "로카고스 코어 마스터": "로카고스", "에토스 코어 마스터": "에토스", "체리아 코어 마스터": "체리아",
+  "마티아 코어 마스터": "마티아", "라이코스 코어 마스터": "라이코스", "티로로스 코어 마스터": "티로로스",
+  "심층Ⅰ 코어 마스터": "어비스", "심층Ⅱ 코어 마스터": "어비스", "심층Ⅲ 코어 마스터": "어비스",
+  "샐리온 코어 마스터": "샐리온", "샐레아나 코어 마스터": "샐레아나", "실라이론 코어 마스터": "실라이론",
+  "실반 코어 마스터": "실반", "루미너스 코어 마스터": "루미너스",
+  "샐리온": "샐리온", "샐레아나": "샐레아나", "실라이론": "실라이론", "실반": "실반", "루미너스": "루미너스",
+  "어비스 - 심층Ⅰ": "어비스", "어비스 - 심층Ⅱ": "어비스", "어비스 - 심층Ⅲ": "어비스",
+  "차원의 틈": "차원의 틈", "신조의 둥지 어려움": "신조의 둥지", "오를리 방어전 지옥": "오를리 방어전", "카타콤 지옥": "카타콤",
+  "추종하는 환희 (일반)": "추종하는 환희", "추종하는 환희 (어려움)": "추종하는 환희",
+  "응시하는 슬픔 (일반)": "응시하는 슬픔", "응시하는 슬픔 (어려움)": "응시하는 슬픔",
+};
+
+// 항목: [이름, 주간 시드, 옵션]
+//  excl: 같은 키끼리는 하나만 켜진다 (한 주에 한 난이도만 도는 컨텐츠). defaultOff는 처음에 꺼 두는 쪽.
+//  uncapped: 같은 그룹에 놓여 있지만 그룹 한도에는 안 잡힌다 (차원의 틈 — 표시만 어비스 주간에 둔다)
+// 그룹의 rows는 화면 배치 그대로다. 한 행의 카드는 그룹에서 가장 긴 행의 칸 수에 맞춰 나란히 놓인다.
 const SEED_ZONES = [
   {
     key: "general",
@@ -3451,83 +3473,61 @@ const SEED_ZONES = [
     cap: 66 * SEED_EOK,
     groups: [
       {
-        name: "이클립스 지역",
-        cap: 5325 * SEED_MAN * 100,
-        items: [
-          ["로카고스", 245 * SEED_MAN * 100],
-          ["에토스", 245 * SEED_MAN * 100],
-          ["체리아", 245 * SEED_MAN * 100],
-          ["마티아", 245 * SEED_MAN * 100],
-          ["라이코스", 245 * SEED_MAN * 100],
-          ["티로로스", 245 * SEED_MAN * 100],
-          ["이클립스 토벌전", 840 * SEED_MAN * 100],
-          ["보급품 탈환", 210 * SEED_MAN * 100],
-          ["훈련소", 245 * SEED_MAN * 100],
-          ["최후의 결전", 20 * SEED_EOK],
-          ["아페티리아 (일반)", 735 * SEED_MAN * 100, { excl: "apetiria", defaultOff: true }],
-          ["아페티리아 (어려움)", 840 * SEED_MAN * 100, { excl: "apetiria" }],
-        ],
-      },
-      {
-        name: "이클립스 코어 마스터",
-        cap: 8 * SEED_EOK,
-        items: [
-          ["로카고스 코어 마스터", 280 * SEED_MAN * 100],
-          ["에토스 코어 마스터", 280 * SEED_MAN * 100],
-          ["체리아 코어 마스터", 280 * SEED_MAN * 100],
-          ["마티아 코어 마스터", 280 * SEED_MAN * 100],
-          ["라이코스 코어 마스터", 280 * SEED_MAN * 100],
-          ["티로로스 코어 마스터", 280 * SEED_MAN * 100],
-        ],
-      },
-      {
-        name: "어비스 코어 마스터",
-        cap: 7 * SEED_EOK,
-        items: [
-          ["심층Ⅰ 코어 마스터", 245 * SEED_MAN * 100],
-          ["심층Ⅱ 코어 마스터", 245 * SEED_MAN * 100],
-          ["심층Ⅲ 코어 마스터", 245 * SEED_MAN * 100],
+        name: "머큐리얼 주간",
+        cap: 525 * SEED_MAN * 100,
+        rows: [
+          [["샐리온", 105 * SEED_MAN * 100], ["샐레아나", 105 * SEED_MAN * 100], ["실라이론", 105 * SEED_MAN * 100], ["실반", 105 * SEED_MAN * 100]],
+          [["루미너스", 105 * SEED_MAN * 100]],
         ],
       },
       {
         name: "머큐리얼 코어 마스터",
         cap: 6 * SEED_EOK,
-        items: [
-          ["샐리온 코어 마스터", 210 * SEED_MAN * 100],
-          ["샐레아나 코어 마스터", 210 * SEED_MAN * 100],
-          ["실라이론 코어 마스터", 210 * SEED_MAN * 100],
-          ["실반 코어 마스터", 210 * SEED_MAN * 100],
-          ["루미너스 코어 마스터", 210 * SEED_MAN * 100],
+        rows: [
+          [["샐리온 코어 마스터", 210 * SEED_MAN * 100], ["샐레아나 코어 마스터", 210 * SEED_MAN * 100], ["실라이론 코어 마스터", 210 * SEED_MAN * 100], ["실반 코어 마스터", 210 * SEED_MAN * 100]],
+          [["루미너스 코어 마스터", 210 * SEED_MAN * 100]],
         ],
       },
       {
-        name: "머큐리얼 주간",
-        cap: 525 * SEED_MAN * 100,
-        items: [
-          ["샐리온", 105 * SEED_MAN * 100],
-          ["샐레아나", 105 * SEED_MAN * 100],
-          ["실라이론", 105 * SEED_MAN * 100],
-          ["실반", 105 * SEED_MAN * 100],
-          ["루미너스", 105 * SEED_MAN * 100],
-        ],
-      },
-      {
-        name: "어비스 지옥",
+        name: "어비스 주간",
         cap: 735 * SEED_MAN * 100,
-        items: [
-          ["어비스 - 심층Ⅰ", 245 * SEED_MAN * 100],
-          ["어비스 - 심층Ⅱ", 245 * SEED_MAN * 100],
-          ["어비스 - 심층Ⅲ", 245 * SEED_MAN * 100],
+        capNote: "심층Ⅰ~Ⅲ 합계",
+        rows: [
+          [["어비스 - 심층Ⅰ", 245 * SEED_MAN * 100], ["어비스 - 심층Ⅱ", 245 * SEED_MAN * 100], ["어비스 - 심층Ⅲ", 245 * SEED_MAN * 100], ["차원의 틈", 210 * SEED_MAN * 100, { uncapped: true }]],
+        ],
+      },
+      {
+        name: "어비스 코어 마스터",
+        cap: 7 * SEED_EOK,
+        rows: [
+          [["심층Ⅰ 코어 마스터", 245 * SEED_MAN * 100], ["심층Ⅱ 코어 마스터", 245 * SEED_MAN * 100], ["심층Ⅲ 코어 마스터", 245 * SEED_MAN * 100]],
+        ],
+      },
+      {
+        name: "이클립스",
+        cap: 5325 * SEED_MAN * 100,
+        rows: [
+          [["로카고스", 245 * SEED_MAN * 100], ["에토스", 245 * SEED_MAN * 100], ["체리아", 245 * SEED_MAN * 100]],
+          [["마티아", 245 * SEED_MAN * 100], ["라이코스", 245 * SEED_MAN * 100], ["티로로스", 245 * SEED_MAN * 100]],
+          [["보급품 탈환", 210 * SEED_MAN * 100], ["훈련소", 245 * SEED_MAN * 100]],
+          [["이클립스 토벌전", 840 * SEED_MAN * 100], ["최후의 결전", 20 * SEED_EOK]],
+          // 주 7판, 한 판 3클리어 (일반 3500만×3×7, 어려움 4000만×3×7)
+          [["아페티리아 (일반)", 735 * SEED_MAN * 100, { excl: "apetiria", defaultOff: true }], ["아페티리아 (어려움)", 840 * SEED_MAN * 100, { excl: "apetiria" }]],
+        ],
+      },
+      {
+        name: "이클립스 코어 마스터",
+        cap: 8 * SEED_EOK,
+        rows: [
+          [["로카고스 코어 마스터", 280 * SEED_MAN * 100], ["에토스 코어 마스터", 280 * SEED_MAN * 100], ["체리아 코어 마스터", 280 * SEED_MAN * 100]],
+          [["마티아 코어 마스터", 280 * SEED_MAN * 100], ["라이코스 코어 마스터", 280 * SEED_MAN * 100], ["티로로스 코어 마스터", 280 * SEED_MAN * 100]],
         ],
       },
       {
         name: "개별 컨텐츠",
         cap: null, // 그룹 한도가 항목 합과 같아 따로 자르지 않는다
-        items: [
-          ["차원의 틈", 210 * SEED_MAN * 100],
-          ["신조의 둥지 어려움", 735 * SEED_MAN * 100],
-          ["오를리 방어전 지옥", 210 * SEED_MAN * 100],
-          ["카타콤 지옥", 50 * SEED_MAN * 100],
+        rows: [
+          [["신조의 둥지 어려움", 735 * SEED_MAN * 100], ["오를리 방어전 지옥", 210 * SEED_MAN * 100], ["카타콤 지옥", 50 * SEED_MAN * 100]],
         ],
       },
     ],
@@ -3535,24 +3535,30 @@ const SEED_ZONES = [
   {
     key: "rubicona",
     title: "루비코나 지역",
-    note: "환희·슬픔은 보스·난이도마다 하루 2억 × 7일. 일반 지역과 별도로 주간 28억까지 받는다.",
+    note: "환희·슬픔은 보스마다 하루 2억 × 7일, 일반·어려움 중 하나만. 일반 지역과 별도로 주간 28억까지 받는다.",
     cap: 28 * SEED_EOK,
     groups: [
       {
         name: "환희 · 슬픔",
         cap: null,
-        items: [
-          ["추종하는 환희 (일반)", 14 * SEED_EOK],
-          ["응시하는 슬픔 (일반)", 14 * SEED_EOK],
-          ["추종하는 환희 (어려움)", 14 * SEED_EOK],
-          ["응시하는 슬픔 (어려움)", 14 * SEED_EOK],
+        rows: [
+          [["추종하는 환희 (일반)", 14 * SEED_EOK, { excl: "joy", defaultOff: true }], ["추종하는 환희 (어려움)", 14 * SEED_EOK, { excl: "joy" }]],
+          [["응시하는 슬픔 (일반)", 14 * SEED_EOK, { excl: "sorrow", defaultOff: true }], ["응시하는 슬픔 (어려움)", 14 * SEED_EOK, { excl: "sorrow" }]],
         ],
       },
     ],
   },
 ];
 
-// "53억 2500만"처럼 억·만으로 끊고, 0인 자리는 뺀다
+// 행 배치와 별개로 계산은 그룹의 항목 목록으로 한다
+for (const zone of SEED_ZONES) {
+  for (const group of zone.groups) {
+    group.items = group.rows.flat();
+    group.cols = Math.max(...group.rows.map((row) => row.length));
+  }
+}
+
+// "53억 2,500만"처럼 억·만으로 끊고, 0인 자리는 뺀다
 function seedFmt(v) {
   const amount = Math.floor(Math.abs(v));
   const eok = Math.floor(amount / SEED_EOK);
@@ -3565,24 +3571,40 @@ function seedFmt(v) {
 
 const seedCalc = (() => {
   let loaded = false;
-  let active = new Set();
+  let active = new Set(); // 켜진 항목 이름
 
   const allItems = () => SEED_ZONES.flatMap((z) => z.groups.flatMap((g) => g.items));
   const zoneItems = (zoneKey) => SEED_ZONES.find((z) => z.key === zoneKey).groups.flatMap((g) => g.items);
-  const itemMeta = (name) => allItems().find((it) => it[0] === name)?.[2] || {};
+  const findItem = (name) => allItems().find((it) => it[0] === name);
 
   function defaults() {
     return new Set(allItems().filter((it) => !it[2]?.defaultOff).map((it) => it[0]));
   }
 
+  // 항목을 켠다. 배타 항목은 같은 키의 다른 항목을 끈다.
+  function activate(item) {
+    const excl = item[2]?.excl;
+    if (excl) {
+      for (const it of allItems()) {
+        if (it !== item && it[2]?.excl === excl) active.delete(it[0]);
+      }
+    }
+    active.add(item[0]);
+  }
+
   function restore() {
+    active = defaults();
     try {
       const saved = JSON.parse(localStorage.getItem(SEED_SAVE_KEY) || "null");
-      if (!Array.isArray(saved)) return defaults();
-      const known = new Set(allItems().map((it) => it[0]));
-      return new Set(saved.filter((name) => known.has(name)));
+      if (!Array.isArray(saved)) return;
+      active = new Set();
+      // 저장 순서대로 켜되, 배타 규칙은 다시 적용한다 (규칙이 바뀐 뒤의 저장값 대비)
+      for (const name of saved) {
+        const item = findItem(name);
+        if (item) activate(item);
+      }
     } catch {
-      return defaults();
+      active = defaults();
     }
   }
 
@@ -3594,29 +3616,30 @@ const seedCalc = (() => {
     }
   }
 
-  // 켜진 항목 기준 그룹별 소계와 지역 최종값
+  // 켜진 항목 기준 그룹별 소계와 지역 최종값.
+  // 그룹 한도는 uncapped가 아닌 항목의 합에만 걸고, uncapped 항목은 그 위에 그대로 더한다.
   function compute(zone) {
     const groups = zone.groups.map((g) => {
-      const sum = g.items.reduce((acc, it) => acc + (active.has(it[0]) ? it[1] : 0), 0);
-      const capped = g.cap == null ? sum : Math.min(sum, g.cap);
-      return { sum, capped };
+      let capSum = 0;
+      let freeSum = 0;
+      for (const it of g.items) {
+        if (!active.has(it[0])) continue;
+        if (it[2]?.uncapped) freeSum += it[1];
+        else capSum += it[1];
+      }
+      const over = g.cap != null && capSum > g.cap;
+      const capped = (g.cap == null ? capSum : Math.min(capSum, g.cap)) + freeSum;
+      return { sum: capSum + freeSum, capped, over };
     });
     const sum = groups.reduce((acc, g) => acc + g.capped, 0);
     return { groups, sum, total: Math.min(sum, zone.cap) };
   }
 
   function toggle(name) {
-    if (active.has(name)) {
-      active.delete(name);
-    } else {
-      const excl = itemMeta(name).excl;
-      if (excl) {
-        for (const it of allItems()) {
-          if (it[2]?.excl === excl) active.delete(it[0]);
-        }
-      }
-      active.add(name);
-    }
+    const item = findItem(name);
+    if (!item) return;
+    if (active.has(name)) active.delete(name);
+    else activate(item);
     save();
     render();
   }
@@ -3626,7 +3649,7 @@ const seedCalc = (() => {
     if (!on) {
       items.forEach((it) => active.delete(it[0]));
     } else {
-      // 전체 선택 때 서로 배타인 항목은 기본 쪽(defaultOff가 아닌 것)만 켠다
+      // 전체 선택 때 배타 항목은 기본 쪽(defaultOff가 아닌 것)만 켠다
       items.forEach((it) => {
         if (it[2]?.defaultOff) active.delete(it[0]);
         else active.add(it[0]);
@@ -3639,24 +3662,36 @@ const seedCalc = (() => {
   function cardHtml(item) {
     const [name, weekly] = item;
     const on = active.has(name);
+    const safe = escapeHtml(name);
+    const icon = SEED_ICONS[name];
+    const iconHtml = icon
+      ? `<img class="seed-card-icon" src="${SEED_ICON_BASE}${encodeURIComponent(icon)}.webp" alt="" loading="lazy" decoding="async" />`
+      : `<span class="seed-card-icon"></span>`;
     return (
-      `<button class="seed-card${on ? " is-active" : ""}" type="button" data-seed-item="${escapeHtml(name)}" aria-pressed="${on}">` +
-      `<span class="seed-card-name">${escapeHtml(name)}</span>` +
+      `<button class="seed-card${on ? " is-active" : ""}" type="button" data-seed-item="${safe}" aria-pressed="${on}">` +
+      iconHtml +
+      `<span class="seed-card-body">` +
+      `<span class="seed-card-name">${safe}</span>` +
       `<span class="seed-card-amount">${seedFmt(weekly)}</span>` +
+      `</span>` +
       `</button>`
     );
   }
 
   function groupHtml(group, result) {
-    const capped = group.cap != null && result.sum > group.cap;
-    const capText = group.cap == null ? "" : `<span class="seed-group-cap">그룹 한도 ${seedFmt(group.cap)}</span>`;
+    const capText = group.cap == null
+      ? ""
+      : `<span class="seed-group-cap">그룹 한도 ${seedFmt(group.cap)}${group.capNote ? ` (${escapeHtml(group.capNote)})` : ""}</span>`;
+    const rows = group.rows
+      .map((row) => `<div class="seed-cards" style="--seed-cols: ${group.cols}">${row.map(cardHtml).join("")}</div>`)
+      .join("");
     return (
-      `<section class="seed-group${capped ? " is-capped" : ""}">` +
+      `<section class="seed-group${result.over ? " is-capped" : ""}">` +
       `<header class="seed-group-head">` +
       `<h4>${escapeHtml(group.name)}</h4>${capText}` +
-      `<strong class="seed-group-sum">${seedFmt(result.capped)}${capped ? `<small>선택 ${seedFmt(result.sum)}</small>` : ""}</strong>` +
+      `<strong class="seed-group-sum">${seedFmt(result.capped)}${result.over ? `<small>선택 ${seedFmt(result.sum)}</small>` : ""}</strong>` +
       `</header>` +
-      `<div class="seed-cards">${group.items.map(cardHtml).join("")}</div>` +
+      `<div class="seed-rows">${rows}</div>` +
       `</section>`
     );
   }
@@ -3700,7 +3735,7 @@ const seedCalc = (() => {
   function load() {
     if (loaded) return;
     loaded = true;
-    active = restore();
+    restore();
     render();
   }
 

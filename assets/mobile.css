@@ -950,12 +950,34 @@
     flex-direction: column;
   }
 
+  /* 이름표가 길어도 금액은 한 줄로 */
+  .seed-total-row span {
+    flex: 1 1 auto;
+    font-size: 12px;
+  }
+
+  .seed-total-row strong {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
   .seed-cards {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .seed-card-name {
+    white-space: normal;
+  }
+
   .seed-card {
-    min-height: 48px;
-    padding: 7px 9px;
+    gap: 7px;
+    min-height: 50px;
+    padding: 6px 8px 6px 6px;
+  }
+
+  .seed-card-icon {
+    flex-basis: 34px;
+    width: 34px;
+    height: 34px;
   }
 }
