@@ -869,3 +869,42 @@
     font-size: 11px;
   }
 }
+
+/* ── 홈 ── */
+@media (max-width: 720px) {
+  .home-hero {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+    padding: 20px 14px 16px;
+  }
+
+  .home-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+    padding: 12px 14px 16px;
+  }
+
+  /* 폰에서는 캡처를 위에, 메뉴를 아래에 둔다. 대각선은 캡처의 아래 변으로 옮긴다 */
+  .home-card {
+    --shot-cut: 28px;
+    grid-template-columns: minmax(0, 1fr);
+    min-height: 0;
+  }
+
+  .home-shot {
+    aspect-ratio: 16 / 7;
+    min-height: 0;
+    margin-right: 0;
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - var(--shot-cut)), 0 100%);
+  }
+
+  /* 대각선으로 비는 삼각형 자리에 제목이 가리지 않게, 겹치지 않고 바로 아래에 둔다 */
+  .home-menu {
+    padding: 4px 14px 14px;
+  }
+
+  .home-chips {
+    display: flex;
+    flex-wrap: wrap;
+  }
+}

@@ -21,7 +21,7 @@ const SNAPSHOT_URL = "./data/equipment-snapshot.json";
 // 기존 태그를 옮기면 안 된다. 캐시가 immutable이라 옛 이미지가 1년간 그대로 나간다.
 //   git tag v3.0.1 && git push origin v3.0.1
 const CDN_ROOT = "https://cdn.jsdelivr.net/gh/TWHome-Git/TWPage@";
-const CDN_AVATAR_ROOT = `${CDN_ROOT}v1.0.10/`;
+const CDN_AVATAR_ROOT = `${CDN_ROOT}v1.0.11/`;
 const CDN_EQUIP_ROOT = `${CDN_ROOT}v2.0.8/`;
 const CDN_ETC_ROOT = `${CDN_ROOT}v3.0.1/`;
 
@@ -332,6 +332,9 @@ const calc = {
 const els = {
   mainTabButtons: document.querySelectorAll(".top-tabs [data-main-tab]"),
   mainTabTriggers: document.querySelectorAll("[data-main-tab]"),
+  homeStats: document.querySelector("#homeStats"),
+  homeOverlayDownload: document.querySelector("#homeOverlayDownload"),
+  homeOverlayMeta: document.querySelector("#homeOverlayMeta"),
   mainPanels: document.querySelectorAll("[data-main-panel]"),
   dbTabButtons: document.querySelectorAll("[data-db-tab]"),
   dbPanels: document.querySelectorAll("[data-db-panel]"),
@@ -461,6 +464,7 @@ const els = {
 
 // 메인 탭별 기본 하위 탭. 하위 탭이 기본값이면 주소에서 뺀다.
 const ROUTE_DEFAULT_SUB = {
+  home: "",
   extra: "content",
   eta: "ranking",
   equipment: "equipment",
@@ -603,7 +607,7 @@ async function boot() {
 
   resetControls();
   renderCharacterGrid();
-  activateMainTab("extra");
+  activateMainTab("home");
   activateCalculatorTab("equipment");
   activateSimulatorTab("encrypt");
   activateExtraTab("content");
@@ -1044,6 +1048,10 @@ function activateMainTab(key) {
 
   if (key === "overlay") {
     loadOverlayTab();
+  }
+
+  if (key === "home") {
+    loadHomeTab();
   }
 
   routeWrite();
@@ -1647,24 +1655,32 @@ function wireEtaPopulation() {
   });
 }
 
-async function loadEtaPopulation() {
-  if (etaPop.days || etaPop.loading) return;
+// 인구 추이 탭과 홈 요약이 같은 파일을 쓴다. 동시에 불려도 한 번만 받도록 진행 중인 요청을 돌려준다.
+let etaPopPromise = null;
+
+function loadEtaPopulation() {
+  if (etaPop.days) return Promise.resolve();
+  if (etaPopPromise) return etaPopPromise;
   etaPop.loading = true;
-  try {
-    const response = await fetch(ETA_POPULATION_URL);
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const payload = await response.json();
-    etaPop.days = payload?.days || {};
-    if (!etaPop.server) etaPop.server = popServerNames()[0] || "";
-    renderEtaPopulation();
-  } catch (error) {
-    console.warn("에타 인구 추이 로딩 실패", error);
-    if (els.popChart) {
-      els.popChart.innerHTML = `<div class="empty-state"><strong>인구 추이를 불러오지 못했습니다</strong><span>잠시 후 다시 시도해주세요.</span></div>`;
+  etaPopPromise = (async () => {
+    try {
+      const response = await fetch(ETA_POPULATION_URL);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const payload = await response.json();
+      etaPop.days = payload?.days || {};
+      if (!etaPop.server) etaPop.server = popServerNames()[0] || "";
+      renderEtaPopulation();
+    } catch (error) {
+      console.warn("에타 인구 추이 로딩 실패", error);
+      if (els.popChart) {
+        els.popChart.innerHTML = `<div class="empty-state"><strong>인구 추이를 불러오지 못했습니다</strong><span>잠시 후 다시 시도해주세요.</span></div>`;
+      }
+    } finally {
+      etaPop.loading = false;
+      if (!etaPop.days) etaPopPromise = null; // 실패했으면 다음에 다시 시도
     }
-  } finally {
-    etaPop.loading = false;
-  }
+  })();
+  return etaPopPromise;
 }
 
 // 서버는 도중에 늘어난다(네냐플은 뒤늦게 들어왔다). 전체 날짜에서 모아 쓴다.
@@ -3286,7 +3302,7 @@ function loadOverlayTab() {
 }
 
 // 릴리스 하나를 읽어 버튼에 첨부 파일 링크와 버전 정보를 채운다
-async function fillOverlayRelease(apiUrl, link, metaEl, fallbackHref, fallbackText) {
+async function fillOverlayRelease(apiUrl, link, metaEl, fallbackHref, fallbackText, { withSize = true } = {}) {
   if (!link || !metaEl) return true;   // 버튼이 없으면 실패로 치지 않는다
 
   try {
@@ -3302,7 +3318,7 @@ async function fillOverlayRelease(apiUrl, link, metaEl, fallbackHref, fallbackTe
 
     const meta = [];
     if (release.tag_name) meta.push(`v${String(release.tag_name).replace(/^v/i, "")}`);
-    if (asset?.size) meta.push(formatOverlaySize(asset.size));
+    if (withSize && asset?.size) meta.push(formatOverlaySize(asset.size));
     if (release.published_at) meta.push(String(release.published_at).slice(0, 10));
     metaEl.textContent = meta.join(" · ") || fallbackText;
 
@@ -3329,6 +3345,98 @@ async function loadOverlayRelease() {
 
   // 실패하면 탭을 다시 눌렀을 때 재시도한다
   overlay.release = loaded ? "loaded" : "idle";
+}
+
+// ── 홈 ──
+// 첫 화면. 메뉴 카드는 index.html에 적혀 있고, 여기서는 위쪽 요약 숫자만 채운다.
+// 인구 요약은 인구 추이 탭과 같은 집계 파일(37KB)을 쓰고, 오버레이 버전은 릴리스 API를 쓴다.
+const home = { stats: "idle", release: "idle" };
+
+function loadHomeTab() {
+  if (home.stats === "idle") loadHomeStats();
+  if (home.release === "idle") loadHomeRelease();
+}
+
+// 집계 파일에서 한 날짜·한 서버의 전체 인원 (캐릭터·레벨 구간 합)
+function popTotalOf(date, server) {
+  const byCode = etaPop.days?.[date]?.[server];
+  if (!byCode) return null;
+  let total = 0;
+  Object.values(byCode).forEach((bands) => {
+    (bands || []).forEach((n) => { total += Number(n) || 0; });
+  });
+  return total;
+}
+
+async function loadHomeStats() {
+  home.stats = "loading";
+  try {
+    await loadEtaPopulation();
+    renderHomeStats();
+    home.stats = etaPop.days ? "loaded" : "idle";
+  } catch (error) {
+    console.warn("홈 요약 로딩 실패", error);
+    home.stats = "idle";
+  }
+}
+
+function renderHomeStats() {
+  if (!els.homeStats) return;
+  const dates = Object.keys(etaPop.days || {}).sort();
+  if (!dates.length) {
+    els.homeStats.innerHTML = `<div class="home-stat"><span>에타 전체 인구</span><strong>-</strong><small>데이터 없음</small></div>`;
+    return;
+  }
+
+  const latest = dates[dates.length - 1];
+  // 서버별로 "그 서버가 있는 마지막 날짜"를 쓴다. 수집이 하루 빠진 서버가 0명으로 보이지 않게
+  const servers = popServerNames();
+  const cards = [];
+
+  const deltaHtml = (now, before, label) => {
+    if (now == null || before == null) return `<small>${escapeHtml(label)} 비교 불가</small>`;
+    const diff = now - before;
+    const cls = diff > 0 ? "up" : diff < 0 ? "down" : "same";
+    const sign = diff > 0 ? "▲" : diff < 0 ? "▼" : "";
+    return `<small class="home-delta ${cls}">${sign}${formatNumber(Math.abs(diff))} <em>${escapeHtml(label)}</em></small>`;
+  };
+
+  // 통합: 모든 서버가 있는 마지막 날짜 기준
+  const allDates = dates.filter((d) => servers.every((s) => popTotalOf(d, s) != null));
+  if (servers.length > 1 && allDates.length) {
+    const d0 = allDates[allDates.length - 1];
+    const d1 = allDates[allDates.length - 2];
+    const sum = (d) => servers.reduce((acc, s) => acc + (popTotalOf(d, s) || 0), 0);
+    cards.push(`<div class="home-stat"><span>에타 전체 인구</span><strong>${formatNumber(sum(d0))}</strong>${deltaHtml(sum(d0), d1 ? sum(d1) : null, "어제 대비")}</div>`);
+  }
+
+  servers.forEach((server) => {
+    const own = dates.filter((d) => popTotalOf(d, server) != null);
+    if (!own.length) return;
+    const d0 = own[own.length - 1];
+    const d1 = own[own.length - 2];
+    const weekIdx = own.length - 8;
+    const dw = weekIdx >= 0 ? own[weekIdx] : null;
+    const now = popTotalOf(d0, server);
+    cards.push(`<div class="home-stat"><span>${escapeHtml(server)}</span><strong>${formatNumber(now)}</strong>${deltaHtml(now, d1 ? popTotalOf(d1, server) : null, "어제 대비")}${dw ? deltaHtml(now, popTotalOf(dw, server), "1주 대비") : ""}</div>`);
+  });
+
+  cards.push(`<div class="home-stat home-stat-date"><span>순위 갱신일</span><strong>${escapeHtml(latest)}</strong><small>매일 오전 10시 전후 갱신</small></div>`);
+  els.homeStats.innerHTML = cards.join("");
+}
+
+async function loadHomeRelease() {
+  if (!els.homeOverlayDownload || !els.homeOverlayMeta) return;
+  home.release = "loading";
+  const loaded = await fillOverlayRelease(
+    OVERLAY_RELEASE_API,
+    els.homeOverlayDownload,
+    els.homeOverlayMeta,
+    `${OVERLAY_REPO_URL}/releases/latest`,
+    "Latest Release",
+    { withSize: false } // 홈에서는 버전과 날짜만. 용량까지 붙이면 너무 길다
+  );
+  home.release = loaded ? "loaded" : "idle";
 }
 
 function formatOverlaySize(bytes) {
