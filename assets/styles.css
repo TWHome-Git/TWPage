@@ -2427,20 +2427,31 @@ img.dmg-chk-icon {
   color: var(--accent-strong, #2e8b57);
 }
 
-/* 6칸 격자. 항목 하나가 2칸(한 줄 3개)을 쓰고, 이름이 긴 항목은 3칸(한 줄 2개)을 쓴다 (--span은 app.js가 넣는다) */
 .buff-grid {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(3, 1fr);
   gap: 6px;
 }
 
-.buff-grid > .buff-cell {
-  grid-column: span var(--span, 2);
+/* "한줄" 줄: 격자 칸에 맞추지 않고 글자 너비만큼만 차지하며 한 줄로 흐른다 (탐험 포인트, 윙 크리스탈) */
+.buff-grid > .buff-cell-row {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
-/* 데이터의 한 줄이 화면의 한 줄이다. 줄의 첫 칸을 1열에 고정해 앞줄 빈자리로 딸려 올라가지 않게 한다 */
-.buff-grid > .buff-cell.is-first {
-  grid-column: 1 / span var(--span, 2);
+.buff-cell-row > .buff-cell {
+  flex: 0 1 auto;
+}
+
+.buff-cell-row .buff-item {
+  flex: 0 1 auto;
+}
+
+/* 폭을 맞춘 칸(윙 크리스탈)은 안쪽을 채워 배율이 오른쪽 끝에 붙게 한다 */
+.buff-cell-row > .buff-cell[data-width-group] .buff-item {
+  flex: 1 1 auto;
 }
 
 .buff-cell {
@@ -8491,20 +8502,31 @@ img.dmg-chk-icon {
   color: var(--accent-strong, #2e8b57);
 }
 
-/* 6칸 격자. 항목 하나가 2칸(한 줄 3개)을 쓰고, 이름이 긴 항목은 3칸(한 줄 2개)을 쓴다 (--span은 app.js가 넣는다) */
 .buff-grid {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(3, 1fr);
   gap: 6px;
 }
 
-.buff-grid > .buff-cell {
-  grid-column: span var(--span, 2);
+/* "한줄" 줄: 격자 칸에 맞추지 않고 글자 너비만큼만 차지하며 한 줄로 흐른다 (탐험 포인트, 윙 크리스탈) */
+.buff-grid > .buff-cell-row {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
-/* 데이터의 한 줄이 화면의 한 줄이다. 줄의 첫 칸을 1열에 고정해 앞줄 빈자리로 딸려 올라가지 않게 한다 */
-.buff-grid > .buff-cell.is-first {
-  grid-column: 1 / span var(--span, 2);
+.buff-cell-row > .buff-cell {
+  flex: 0 1 auto;
+}
+
+.buff-cell-row .buff-item {
+  flex: 0 1 auto;
+}
+
+/* 폭을 맞춘 칸(윙 크리스탈)은 안쪽을 채워 배율이 오른쪽 끝에 붙게 한다 */
+.buff-cell-row > .buff-cell[data-width-group] .buff-item {
+  flex: 1 1 auto;
 }
 
 .buff-cell {

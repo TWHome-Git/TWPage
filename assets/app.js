@@ -3236,14 +3236,34 @@ function makeBuffCalculator(cfg) {
 
   // 못 쓰는 조합은 체크박스 잠금으로 드러나므로 묶음 테두리를 두지 않는다. 모든 항목이 같은 크기의 한 칸을 쓴다.
   // 데이터의 한 줄이 화면의 한 줄이다. 두 칸짜리 줄 뒤에 다음 줄이 딸려 올라오지 않도록 줄의 첫 칸을 1열에 고정한다.
-  // 격자는 6칸이고 항목 하나가 2칸(한 줄 3개)을 쓴다. 이름이 긴 항목("넓게")은 3칸을 써서 한 줄에 2개가 놓인다.
   function cellHtml(entry, held) {
     const { item, key, first } = entry;
     const [ri, ci] = key.split("-").map(Number);
-    const span = item["넓게"] ? 3 : 2;
-    return `<div class="buff-cell${first ? " is-first" : ""}" data-group="${groupOf(item)}" style="--span:${span}">
+    return `<div class="buff-cell" data-group="${groupOf(item)}"${first ? ' style="grid-column-start:1"' : ""}>
       ${itemHtml(item, ri, ci, isLocked(item, key, held))}
     </div>`;
+  }
+
+  // "한줄" 항목이 든 줄은 격자 칸에 맞추지 않고 글자 너비만큼만 차지하게 한 줄로 흘린다
+  // (이름이 긴 탐험 포인트, 4개를 한 줄에 두는 윙 크리스탈)
+  function rowHtml(entries, held) {
+    if (!entries.some((e) => e.item["한줄"])) return entries.map((e) => cellHtml(e, held)).join("");
+    return `<div class="buff-cell-row">${entries.map((e) => {
+      const [ri, ci] = e.key.split("-").map(Number);
+      const widthGroup = e.item["폭맞춤"] ? ` data-width-group="${escapeHtml(e.item["폭맞춤"])}"` : "";
+      return `<div class="buff-cell" data-group="${groupOf(e.item)}"${widthGroup}>${itemHtml(e.item, ri, ci, isLocked(e.item, e.key, held))}</div>`;
+    }).join("")}</div>`;
+  }
+
+  // 같은 데이터 줄(ri)끼리 묶는다. 소진/유지로 나눈 뒤에도 줄 단위 배치가 유지되게
+  function byRow(list) {
+    const rows = new Map();
+    list.forEach((e) => {
+      const ri = e.key.split("-")[0];
+      if (!rows.has(ri)) rows.set(ri, []);
+      rows.get(ri).push(e);
+    });
+    return [...rows.values()];
   }
 
   function renderBuffs() {
@@ -3264,7 +3284,7 @@ function makeBuffCalculator(cfg) {
     const label = calc.data?.["소분류"] || {};
     const section = (title, list) => (list.length ? `
       <p class="buff-sub-title">${escapeHtml(title)}</p>
-      <div class="buff-grid">${list.map((e) => cellHtml(e, held)).join("")}</div>
+      <div class="buff-grid">${byRow(list).map((row) => rowHtml(row, held)).join("")}</div>
     ` : "");
 
     el.innerHTML = `
@@ -3273,6 +3293,30 @@ function makeBuffCalculator(cfg) {
       ${section(label["소진"] || "접속 종료 시에도, 버프 시간 소진되는 버프 목록", rest.filter((e) => e.item["소진"]))}
       ${section(label["유지"] || "접속 종료 시, 버프 시간 소진 안되는 버프 목록", rest.filter((e) => !e.item["소진"]))}
     `;
+    equalizeWidths(el);
+  }
+
+  // "폭맞춤" 이름이 같은 칸들은 그중 가장 넓은 칸의 너비로 맞춘다 (윙 크리스탈 9개를 로얄 크기로)
+  function equalizeWidths(el) {
+    const groups = new Map();
+    el.querySelectorAll("[data-width-group]").forEach((cell) => {
+      const name = cell.dataset.widthGroup;
+      if (!groups.has(name)) groups.set(name, []);
+      groups.get(name).push(cell);
+    });
+    groups.forEach((cells) => {
+      cells.forEach((cell) => { cell.style.flex = ""; cell.style.minWidth = ""; });
+      let widest = Math.max(...cells.map((cell) => cell.getBoundingClientRect().width));
+      // flex-wrap은 기준 너비 합이 줄 너비를 넘으면 줄이기 전에 먼저 줄바꿈한다.
+      // 그래서 가장 붐비는 줄(4개)에 다 들어가는 너비를 상한으로 잡는다
+      const rows = new Map();
+      cells.forEach((cell) => { const row = cell.parentElement; rows.set(row, (rows.get(row) || 0) + 1); });
+      rows.forEach((count, row) => {
+        const gap = parseFloat(getComputedStyle(row).columnGap) || 0;
+        widest = Math.min(widest, Math.floor((row.clientWidth - gap * (count - 1)) / count));
+      });
+      if (widest > 0) cells.forEach((cell) => { cell.style.flex = `0 1 ${widest}px`; cell.style.minWidth = "0"; });
+    });
   }
 
   function renderAll() {
