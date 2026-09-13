@@ -2456,6 +2456,20 @@ img.dmg-chk-icon {
   flex: 1 1 auto;
 }
 
+/* 폭을 맞춘 칸은 한 줄에 4개가 들어가야 하므로 좌우 여백을 조금 줄이고,
+   그래도 이름이 두 줄로 접히면 줄 간격을 좁혀 기본 높이(42px) 안에 들어가게 한다 */
+.buff-cell-row > .buff-cell[data-width-group] {
+  padding: 4px 8px;
+}
+
+.buff-cell-row > .buff-cell[data-width-group] .buff-name {
+  line-height: 1.15;
+}
+
+.buff-cell-row > .buff-cell[data-width-group] .buff-rate {
+  padding-left: 4px;
+}
+
 .buff-cell {
   display: flex;
   align-items: center;

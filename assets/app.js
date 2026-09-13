@@ -3348,6 +3348,9 @@ function makeBuffCalculator(cfg) {
     });
     groups.forEach((cells) => {
       cells.forEach((cell) => { cell.style.flex = ""; cell.style.minWidth = ""; });
+      // 폰(mobile.css)에서는 칸이 줄 너비를 꽉 채워 한 줄에 하나씩 쌓이므로 폭을 맞추지 않는다.
+      // 인라인 너비를 넣으면 그 규칙을 덮어써 좁은 칸 4개가 한 줄에 억지로 들어간다
+      if (getComputedStyle(cells[0]).flexBasis === "100%") return;
       let widest = Math.max(...cells.map((cell) => cell.getBoundingClientRect().width));
       // flex-wrap은 기준 너비 합이 줄 너비를 넘으면 줄이기 전에 먼저 줄바꿈한다.
       // 그래서 가장 붐비는 줄(4개)에 다 들어가는 너비를 상한으로 잡는다
@@ -3368,7 +3371,10 @@ function makeBuffCalculator(cfg) {
   }
 
   async function load() {
-    if (calc.loaded || !box().body) return;
+    const body = box().body;
+    if (!body) return;
+    // 이미 그려진 탭을 다시 열 때: 숨겨진 동안 창 너비가 바뀌었을 수 있으니 폭만 다시 맞춘다
+    if (calc.loaded) { equalizeWidths(body); return; }
     calc.loaded = true;
     try {
       const res = await fetch(cfg.url, { cache: "no-store" });
@@ -3444,6 +3450,14 @@ function makeBuffCalculator(cfg) {
         renderResult();
       }
     }, true);
+
+    // 창 너비가 바뀌면(PC↔폰 전환 포함) 폭맞춤 칸의 너비를 다시 잰다. 숨겨진 탭은 열 때 맞춘다
+    let resizeTimer = 0;
+    addEventListener("resize", () => {
+      if (!calc.loaded || !body?.offsetParent) return;
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => equalizeWidths(body), 120);
+    });
   }
 
   return { load, wire };
