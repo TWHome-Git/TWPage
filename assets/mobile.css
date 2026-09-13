@@ -913,3 +913,49 @@
     flex-wrap: wrap;
   }
 }
+
+/* ── 유용한 정보 카드 ── */
+@media (max-width: 720px) {
+  .info-cards {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+    padding: 12px 14px 16px;
+  }
+}
+
+/* ── 주간 시드 보상표 ── */
+@media (max-width: 720px) {
+  .seed-body {
+    gap: 12px;
+    padding: 12px 12px 16px;
+  }
+
+  .seed-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .seed-summary-item.is-grand {
+    grid-column: 1 / -1;
+  }
+
+  .seed-summary-item strong {
+    font-size: 18px;
+  }
+
+  .seed-zone {
+    padding: 12px;
+  }
+
+  .seed-zone-head {
+    flex-direction: column;
+  }
+
+  .seed-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .seed-card {
+    min-height: 48px;
+    padding: 7px 9px;
+  }
+}

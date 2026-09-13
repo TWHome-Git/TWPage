@@ -12157,3 +12157,311 @@ img.dmg-chk-icon {
   font-weight: 500;
   opacity: 0.85;
 }
+
+/* ── 테일즈 정보 > 유용한 정보 카드 ─────────────────────────── */
+.info-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+  padding: 18px 20px 24px;
+}
+
+.info-card {
+  position: relative;
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  padding: 18px 20px 20px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.info-card h3 {
+  margin: 0;
+  padding-right: 64px;
+  font-size: 16px;
+  letter-spacing: 0;
+}
+
+.info-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.info-card-badge {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--panel-strong);
+  color: var(--accent-strong);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.info-card.is-link {
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.info-card.is-link:hover {
+  border-color: var(--accent);
+  box-shadow: 0 6px 18px rgba(15, 111, 99, 0.12);
+}
+
+.info-card.is-link .info-card-badge {
+  color: #fff;
+  background: var(--accent);
+}
+
+/* ── 테일즈 정보 > 주간 시드 보상표 ───────────────────────────── */
+.seed-body {
+  display: grid;
+  gap: 18px;
+  padding: 16px 16px 20px;
+}
+
+/* 맨 위 요약: 일반 / 루비코나 / 합계 */
+.seed-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.seed-summary-item {
+  display: grid;
+  gap: 2px;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.seed-summary-item span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.seed-summary-item strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+}
+
+.seed-summary-item small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.seed-summary-item.is-grand {
+  border-color: var(--accent);
+  background: var(--panel-strong);
+}
+
+.seed-summary-item.is-grand strong {
+  color: var(--accent-strong);
+}
+
+/* 지역(일반 / 루비코나) 블록 */
+.seed-zone {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.seed-zone-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.seed-zone-title h3 {
+  margin: 0 0 4px;
+  font-size: 17px;
+}
+
+.seed-zone-title p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.seed-zone-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 6px;
+}
+
+.seed-zone-actions button {
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  background: #fff;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.seed-zone-actions button:hover {
+  color: var(--accent-strong);
+  border-color: var(--accent);
+}
+
+/* 지역 합계 — 버프 계산기의 결과 상자와 같은 결 */
+.seed-total {
+  display: grid;
+  gap: 4px;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f4f8f5;
+}
+
+.seed-total-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.seed-total-row strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.seed-total-row.is-total {
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px solid #dbe7df;
+  font-size: 15px;
+}
+
+.seed-total-row.is-total strong {
+  color: var(--accent);
+  font-size: 20px;
+}
+
+/* 지역 한도에 걸리면 선택 합계를 눌러 표시한다 */
+.seed-total.is-capped .seed-total-row:first-child strong {
+  color: var(--gold);
+}
+
+/* 그룹 */
+.seed-groups {
+  display: grid;
+  gap: 10px;
+}
+
+.seed-group {
+  padding: 10px 12px 12px;
+  border: 1px solid #e1e9e4;
+  border-radius: 10px;
+  background: var(--panel);
+}
+
+.seed-group-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.seed-group-head h4 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.seed-group-cap {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.seed-group-sum {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-left: auto;
+  color: var(--accent-strong);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.seed-group-sum small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* 그룹 한도에 걸리면 합계를 금색으로 */
+.seed-group.is-capped .seed-group-sum {
+  color: var(--gold);
+}
+
+/* 컨텐츠 카드 — 누르면 켜지고 색이 진해진다 */
+.seed-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 6px;
+}
+
+.seed-card {
+  display: grid;
+  gap: 3px;
+  min-height: 52px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  text-align: left;
+  color: var(--muted);
+  background: #fff;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+
+.seed-card:hover {
+  border-color: var(--accent);
+}
+
+.seed-card-name {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.seed-card-amount {
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.8;
+}
+
+.seed-card.is-active {
+  color: #fff;
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.seed-card.is-active .seed-card-amount {
+  opacity: 0.9;
+}
