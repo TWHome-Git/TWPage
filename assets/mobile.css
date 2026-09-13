@@ -20,6 +20,12 @@
     grid-template-columns: 1fr;
   }
 
+  /* 폰에서는 한 줄에 하나. 칸 너비(--span)는 무시한다 */
+  .buff-grid > .buff-cell,
+  .buff-grid > .buff-cell.is-first {
+    grid-column: 1 / -1;
+  }
+
   .buff-subtabs,
   .buff-body {
     padding-left: 12px;
