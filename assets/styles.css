@@ -12272,15 +12272,8 @@ img.dmg-chk-icon {
 }
 
 .seed-zone-title h3 {
-  margin: 0 0 4px;
-  font-size: 17px;
-}
-
-.seed-zone-title p {
   margin: 0;
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.5;
+  font-size: 17px;
 }
 
 .seed-zone-actions {

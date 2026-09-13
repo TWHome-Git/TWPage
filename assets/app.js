@@ -3469,7 +3469,6 @@ const SEED_ZONES = [
   {
     key: "general",
     title: "일반 지역",
-    note: "루비코나를 제외한 모든 컨텐츠. 그룹별 한도를 먼저 적용하고, 전체 합은 주간 66억까지 받는다.",
     cap: 66 * SEED_EOK,
     groups: [
       {
@@ -3535,7 +3534,6 @@ const SEED_ZONES = [
   {
     key: "rubicona",
     title: "루비코나 지역",
-    note: "환희·슬픔은 보스마다 하루 2억 × 7일, 일반·어려움 중 하나만. 일반 지역과 별도로 주간 28억까지 받는다.",
     cap: 28 * SEED_EOK,
     groups: [
       {
@@ -3702,7 +3700,7 @@ const seedCalc = (() => {
     return (
       `<section class="seed-zone" data-seed-zone="${zone.key}">` +
       `<header class="seed-zone-head">` +
-      `<div class="seed-zone-title"><h3>${escapeHtml(zone.title)}</h3><p>${escapeHtml(zone.note)}</p></div>` +
+      `<div class="seed-zone-title"><h3>${escapeHtml(zone.title)}</h3></div>` +
       `<div class="seed-zone-actions">` +
       `<button type="button" data-seed-all="${zone.key}">전체 선택</button>` +
       `<button type="button" data-seed-none="${zone.key}">전체 해제</button>` +
