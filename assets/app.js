@@ -21,7 +21,7 @@ const SNAPSHOT_URL = "./data/equipment-snapshot.json";
 // 기존 태그를 옮기면 안 된다. 캐시가 immutable이라 옛 이미지가 1년간 그대로 나간다.
 //   git tag v3.0.1 && git push origin v3.0.1
 const CDN_ROOT = "https://cdn.jsdelivr.net/gh/TWHome-Git/TWPage@";
-const CDN_AVATAR_ROOT = `${CDN_ROOT}v1.0.13/`;
+const CDN_AVATAR_ROOT = `${CDN_ROOT}v1.0.14/`;
 const CDN_EQUIP_ROOT = `${CDN_ROOT}v2.0.8/`;
 const CDN_ETC_ROOT = `${CDN_ROOT}v3.0.2/`;
 
@@ -363,6 +363,7 @@ const els = {
   extraPanels: document.querySelectorAll("[data-extra-panel]"),
   buffTabButtons: document.querySelectorAll("[data-buff-tab]"),
   buffPanels: document.querySelectorAll("[data-buff-panel]"),
+  seedBody: document.getElementById("seedBody"),
   expBaseBox: document.querySelector("#expBaseBox"),
   expResultBox: document.querySelector("#expResultBox"),
   expBuffBody: document.querySelector("#expBuffBody"),
@@ -3008,6 +3009,7 @@ function activateExtraTab(key) {
   });
   // 버프 탭은 처음 열릴 때 기본 하위 탭(경험치)을 그린다
   if (key === "buff") expBuff.load();
+  if (key === "seed") seedCalc.load();
 
   routeWrite();
 }
@@ -3429,6 +3431,292 @@ const rareBuff = makeBuffCalculator({
   formatTotal: (n) => `×${Math.round(n * 100) / 100}배`,
   errorText: "레어 버프 정보를 불러오지 못했습니다.",
 });
+
+// ══════════════════════════════════════════════════════════════
+//  테일즈 정보 > 주간 시드 보상표
+//  표는 TWChatOverlay의 WeeklySeedRewardService와 같다.
+//  카드를 눌러 켠 항목의 주간 시드를 그룹 한도 → 지역 한도(일반 66억 / 루비코나 28억) 순으로 잘라 합산한다.
+// ══════════════════════════════════════════════════════════════
+
+const SEED_EOK = 1e8;
+const SEED_MAN = 1e4;
+const SEED_SAVE_KEY = "tw-seed-weekly-save-v1";
+
+// 아페티리아는 한 주에 한 난이도만 도는 것으로 보고 일반/어려움을 같이 켜지 않는다 (excl 키가 같으면 하나만)
+const SEED_ZONES = [
+  {
+    key: "general",
+    title: "일반 지역",
+    note: "루비코나를 제외한 모든 컨텐츠. 그룹별 한도를 먼저 적용하고, 전체 합은 주간 66억까지 받는다.",
+    cap: 66 * SEED_EOK,
+    groups: [
+      {
+        name: "이클립스 지역",
+        cap: 5325 * SEED_MAN * 100,
+        items: [
+          ["로카고스", 245 * SEED_MAN * 100],
+          ["에토스", 245 * SEED_MAN * 100],
+          ["체리아", 245 * SEED_MAN * 100],
+          ["마티아", 245 * SEED_MAN * 100],
+          ["라이코스", 245 * SEED_MAN * 100],
+          ["티로로스", 245 * SEED_MAN * 100],
+          ["이클립스 토벌전", 840 * SEED_MAN * 100],
+          ["보급품 탈환", 210 * SEED_MAN * 100],
+          ["훈련소", 245 * SEED_MAN * 100],
+          ["최후의 결전", 20 * SEED_EOK],
+          ["아페티리아 (일반)", 735 * SEED_MAN * 100, { excl: "apetiria", defaultOff: true }],
+          ["아페티리아 (어려움)", 840 * SEED_MAN * 100, { excl: "apetiria" }],
+        ],
+      },
+      {
+        name: "이클립스 코어 마스터",
+        cap: 8 * SEED_EOK,
+        items: [
+          ["로카고스 코어 마스터", 280 * SEED_MAN * 100],
+          ["에토스 코어 마스터", 280 * SEED_MAN * 100],
+          ["체리아 코어 마스터", 280 * SEED_MAN * 100],
+          ["마티아 코어 마스터", 280 * SEED_MAN * 100],
+          ["라이코스 코어 마스터", 280 * SEED_MAN * 100],
+          ["티로로스 코어 마스터", 280 * SEED_MAN * 100],
+        ],
+      },
+      {
+        name: "어비스 코어 마스터",
+        cap: 7 * SEED_EOK,
+        items: [
+          ["심층Ⅰ 코어 마스터", 245 * SEED_MAN * 100],
+          ["심층Ⅱ 코어 마스터", 245 * SEED_MAN * 100],
+          ["심층Ⅲ 코어 마스터", 245 * SEED_MAN * 100],
+        ],
+      },
+      {
+        name: "머큐리얼 코어 마스터",
+        cap: 6 * SEED_EOK,
+        items: [
+          ["샐리온 코어 마스터", 210 * SEED_MAN * 100],
+          ["샐레아나 코어 마스터", 210 * SEED_MAN * 100],
+          ["실라이론 코어 마스터", 210 * SEED_MAN * 100],
+          ["실반 코어 마스터", 210 * SEED_MAN * 100],
+          ["루미너스 코어 마스터", 210 * SEED_MAN * 100],
+        ],
+      },
+      {
+        name: "머큐리얼 주간",
+        cap: 525 * SEED_MAN * 100,
+        items: [
+          ["샐리온", 105 * SEED_MAN * 100],
+          ["샐레아나", 105 * SEED_MAN * 100],
+          ["실라이론", 105 * SEED_MAN * 100],
+          ["실반", 105 * SEED_MAN * 100],
+          ["루미너스", 105 * SEED_MAN * 100],
+        ],
+      },
+      {
+        name: "어비스 지옥",
+        cap: 735 * SEED_MAN * 100,
+        items: [
+          ["어비스 - 심층Ⅰ", 245 * SEED_MAN * 100],
+          ["어비스 - 심층Ⅱ", 245 * SEED_MAN * 100],
+          ["어비스 - 심층Ⅲ", 245 * SEED_MAN * 100],
+        ],
+      },
+      {
+        name: "개별 컨텐츠",
+        cap: null, // 그룹 한도가 항목 합과 같아 따로 자르지 않는다
+        items: [
+          ["차원의 틈", 210 * SEED_MAN * 100],
+          ["신조의 둥지 어려움", 735 * SEED_MAN * 100],
+          ["오를리 방어전 지옥", 210 * SEED_MAN * 100],
+          ["카타콤 지옥", 50 * SEED_MAN * 100],
+        ],
+      },
+    ],
+  },
+  {
+    key: "rubicona",
+    title: "루비코나 지역",
+    note: "환희·슬픔은 보스·난이도마다 하루 2억 × 7일. 일반 지역과 별도로 주간 28억까지 받는다.",
+    cap: 28 * SEED_EOK,
+    groups: [
+      {
+        name: "환희 · 슬픔",
+        cap: null,
+        items: [
+          ["추종하는 환희 (일반)", 14 * SEED_EOK],
+          ["응시하는 슬픔 (일반)", 14 * SEED_EOK],
+          ["추종하는 환희 (어려움)", 14 * SEED_EOK],
+          ["응시하는 슬픔 (어려움)", 14 * SEED_EOK],
+        ],
+      },
+    ],
+  },
+];
+
+// "53억 2500만"처럼 억·만으로 끊고, 0인 자리는 뺀다
+function seedFmt(v) {
+  const amount = Math.floor(Math.abs(v));
+  const eok = Math.floor(amount / SEED_EOK);
+  const man = Math.floor((amount % SEED_EOK) / SEED_MAN);
+  const parts = [];
+  if (eok) parts.push(`${eok.toLocaleString("ko-KR")}억`);
+  if (man) parts.push(`${man.toLocaleString("ko-KR")}만`);
+  return parts.length ? parts.join(" ") : "0";
+}
+
+const seedCalc = (() => {
+  let loaded = false;
+  let active = new Set();
+
+  const allItems = () => SEED_ZONES.flatMap((z) => z.groups.flatMap((g) => g.items));
+  const zoneItems = (zoneKey) => SEED_ZONES.find((z) => z.key === zoneKey).groups.flatMap((g) => g.items);
+  const itemMeta = (name) => allItems().find((it) => it[0] === name)?.[2] || {};
+
+  function defaults() {
+    return new Set(allItems().filter((it) => !it[2]?.defaultOff).map((it) => it[0]));
+  }
+
+  function restore() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(SEED_SAVE_KEY) || "null");
+      if (!Array.isArray(saved)) return defaults();
+      const known = new Set(allItems().map((it) => it[0]));
+      return new Set(saved.filter((name) => known.has(name)));
+    } catch {
+      return defaults();
+    }
+  }
+
+  function save() {
+    try {
+      localStorage.setItem(SEED_SAVE_KEY, JSON.stringify([...active]));
+    } catch {
+      // 저장 공간 부족 등은 무시 (선택 기억은 편의일 뿐)
+    }
+  }
+
+  // 켜진 항목 기준 그룹별 소계와 지역 최종값
+  function compute(zone) {
+    const groups = zone.groups.map((g) => {
+      const sum = g.items.reduce((acc, it) => acc + (active.has(it[0]) ? it[1] : 0), 0);
+      const capped = g.cap == null ? sum : Math.min(sum, g.cap);
+      return { sum, capped };
+    });
+    const sum = groups.reduce((acc, g) => acc + g.capped, 0);
+    return { groups, sum, total: Math.min(sum, zone.cap) };
+  }
+
+  function toggle(name) {
+    if (active.has(name)) {
+      active.delete(name);
+    } else {
+      const excl = itemMeta(name).excl;
+      if (excl) {
+        for (const it of allItems()) {
+          if (it[2]?.excl === excl) active.delete(it[0]);
+        }
+      }
+      active.add(name);
+    }
+    save();
+    render();
+  }
+
+  function setZone(zoneKey, on) {
+    const items = zoneItems(zoneKey);
+    if (!on) {
+      items.forEach((it) => active.delete(it[0]));
+    } else {
+      // 전체 선택 때 서로 배타인 항목은 기본 쪽(defaultOff가 아닌 것)만 켠다
+      items.forEach((it) => {
+        if (it[2]?.defaultOff) active.delete(it[0]);
+        else active.add(it[0]);
+      });
+    }
+    save();
+    render();
+  }
+
+  function cardHtml(item) {
+    const [name, weekly] = item;
+    const on = active.has(name);
+    return (
+      `<button class="seed-card${on ? " is-active" : ""}" type="button" data-seed-item="${escapeHtml(name)}" aria-pressed="${on}">` +
+      `<span class="seed-card-name">${escapeHtml(name)}</span>` +
+      `<span class="seed-card-amount">${seedFmt(weekly)}</span>` +
+      `</button>`
+    );
+  }
+
+  function groupHtml(group, result) {
+    const capped = group.cap != null && result.sum > group.cap;
+    const capText = group.cap == null ? "" : `<span class="seed-group-cap">그룹 한도 ${seedFmt(group.cap)}</span>`;
+    return (
+      `<section class="seed-group${capped ? " is-capped" : ""}">` +
+      `<header class="seed-group-head">` +
+      `<h4>${escapeHtml(group.name)}</h4>${capText}` +
+      `<strong class="seed-group-sum">${seedFmt(result.capped)}${capped ? `<small>선택 ${seedFmt(result.sum)}</small>` : ""}</strong>` +
+      `</header>` +
+      `<div class="seed-cards">${group.items.map(cardHtml).join("")}</div>` +
+      `</section>`
+    );
+  }
+
+  function zoneHtml(zone) {
+    const r = compute(zone);
+    const capped = r.sum > zone.cap;
+    return (
+      `<section class="seed-zone" data-seed-zone="${zone.key}">` +
+      `<header class="seed-zone-head">` +
+      `<div class="seed-zone-title"><h3>${escapeHtml(zone.title)}</h3><p>${escapeHtml(zone.note)}</p></div>` +
+      `<div class="seed-zone-actions">` +
+      `<button type="button" data-seed-all="${zone.key}">전체 선택</button>` +
+      `<button type="button" data-seed-none="${zone.key}">전체 해제</button>` +
+      `</div>` +
+      `</header>` +
+      `<div class="seed-total${capped ? " is-capped" : ""}">` +
+      `<div class="seed-total-row"><span>선택 합계 (그룹 한도 적용)</span><strong>${seedFmt(r.sum)}</strong></div>` +
+      `<div class="seed-total-row"><span>주간 한도</span><strong>${seedFmt(zone.cap)}</strong></div>` +
+      `<div class="seed-total-row is-total"><span>주간 최대 획득</span><strong>${simIcon("시드.png", 22)}${seedFmt(r.total)}</strong></div>` +
+      `</div>` +
+      `<div class="seed-groups">${zone.groups.map((g, i) => groupHtml(g, r.groups[i])).join("")}</div>` +
+      `</section>`
+    );
+  }
+
+  function render() {
+    const box = els.seedBody;
+    if (!box) return;
+    const totals = SEED_ZONES.map((z) => compute(z).total);
+    const grand = totals.reduce((a, b) => a + b, 0);
+    const grandCap = SEED_ZONES.reduce((a, z) => a + z.cap, 0);
+    box.innerHTML =
+      `<div class="seed-summary">` +
+      SEED_ZONES.map((z, i) => `<div class="seed-summary-item"><span>${escapeHtml(z.title)}</span><strong>${seedFmt(totals[i])}</strong><small>한도 ${seedFmt(z.cap)}</small></div>`).join("") +
+      `<div class="seed-summary-item is-grand"><span>이번 주 합계</span><strong>${simIcon("시드.png", 24)}${seedFmt(grand)}</strong><small>한도 ${seedFmt(grandCap)}</small></div>` +
+      `</div>` +
+      SEED_ZONES.map(zoneHtml).join("");
+  }
+
+  function load() {
+    if (loaded) return;
+    loaded = true;
+    active = restore();
+    render();
+  }
+
+  function wire() {
+    els.seedBody?.addEventListener("click", (event) => {
+      const card = event.target.closest("[data-seed-item]");
+      if (card) return toggle(card.dataset.seedItem);
+      const all = event.target.closest("[data-seed-all]");
+      if (all) return setZone(all.dataset.seedAll, true);
+      const none = event.target.closest("[data-seed-none]");
+      if (none) return setZone(none.dataset.seedNone, false);
+    });
+  }
+
+  return { load, wire };
+})();
 
 // ══════════════════════════════════════════════════════════════
 //  TWChatOverlay 탭 — GitHub README + 최신 릴리스 다운로드
@@ -5063,6 +5351,7 @@ function wireEvents() {
   });
 
   expBuff.wire();
+  seedCalc.wire();
   rareBuff.wire();
 
   els.characterGrid?.addEventListener("click", (event) => {
