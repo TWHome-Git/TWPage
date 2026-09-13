@@ -3831,7 +3831,7 @@ const OK_EXTRAS = [
   { key: "stone", name: "장비 강화석 부가 옵션", icon: "장비강화석.png", unit: "%", options: [0, 45, 46, 47, 48], def: 45 },
   { key: "fever", name: "피버 추가 대미지 부가 옵션", icon: "피버.png", unit: "%", options: [0, 8, 9, 10, 11, 12, 13], def: 0, excl: "undead" },
   { key: "undead", name: "언데드 추가 대미지 부가 옵션", icon: "언데드.webp", unit: "%", options: [0, 11, 12, 13, 14, 15], def: 0, excl: "fever",
-    help: { title: "언데드 추가 대미지 부가 옵션", lines: ["카드 옵션 \"언데드\"를 이용하여 HP를 15% 미만으로 내린 후, 무기 부가 옵션을 사용함", "\"자신의 HP가 15% 미만이면 대상에게 11~15% 추가 피해를 줍니다\""] } },
+    help: { title: "언데드 추가 대미지 부가 옵션", lines: ["카드 옵션 \"언데드\"를 이용하여 HP를 15% 미만을 유지하고, 아래 무기 부가 옵션을 사용함", "\"자신의 HP가 15% 미만이면 대상에게 11~15% 추가 피해를 줍니다\""] } },
   { key: "title", name: "칭호 추가 대미지", icon: "칭호.png", unit: "%", options: [0, 15, 20], def: 0 },
   { key: "snipe", name: "저격 연마", icon: "저격연마.png", unit: "LV", options: [5, 6, 7, 8, 9, 10], def: 5, pct: { 0: 0, 1: 5, 2: 10, 3: 15, 4: 20, 5: 25, 6: 28, 7: 31, 8: 34, 9: 37, 10: 40 } },
   { key: "etc", name: "기타", unit: "%", def: 0 },
