@@ -534,6 +534,7 @@ function routeToHash(r) {
 // 주소를 지금 화면에 맞춘다. 뒤로가기 이력을 늘리지 않도록 replaceState를 쓴다.
 function routeWrite() {
   if (route.applying) return;
+  visitTrack();
   const hash = routeToHash(routeCurrent());
   if (!hash || hash === location.hash) return;
   history.replaceState(null, "", location.pathname + location.search + hash);
@@ -565,6 +566,36 @@ function routeApply(r) {
   } finally {
     route.applying = false;
   }
+  visitTrack();
+}
+
+// ── 방문 집계 (GoatCounter) ──
+// 해시 주소라 count.js의 자동 집계로는 전부 "/"로 잡힌다. 메인/하위 탭 단위(/eta/ranking)로 직접 보내고,
+// 항목(아바타 하나하나)까지는 보내지 않아 대시보드가 흩어지지 않게 한다. 같은 경로는 연속으로 다시 세지 않는다.
+const visit = { ready: false, last: "" };
+
+function visitTrack() {
+  if (!visit.ready) return;   // 부팅 중 기본 탭을 켜는 과정은 방문으로 세지 않는다
+  const r = routeCurrent();
+  if (!r) return;
+  const path = "/" + [r.main, r.sub].filter(Boolean).join("/");
+  if (path === visit.last) return;
+  visit.last = path;
+
+  const label = (attr, key) => document.querySelector(`[data-${attr}="${CSS.escape(key)}"]`)?.textContent.trim() || key;
+  const title = [label("main-tab", r.main), r.sub ? label(ROUTE_SUB[r.main]?.attr.replace(/[A-Z]/g, (c) => "-" + c.toLowerCase()) || "", r.sub) : ""]
+    .filter(Boolean).join(" · ");
+  const vars = { path, title };
+
+  const gc = window.goatcounter;
+  if (gc && typeof gc.count === "function") {
+    gc.count(vars);
+    return;
+  }
+  // count.js가 아직 안 내려왔으면 로드된 뒤 보낸다 (첫 화면)
+  document.querySelector("script[data-goatcounter]")?.addEventListener("load", () => {
+    if (typeof window.goatcounter?.count === "function") window.goatcounter.count(vars);
+  }, { once: true });
 }
 
 // 데이터가 준비된 뒤 미뤄 둔 항목을 연다. 각 DB 로딩이 끝날 때마다 불린다.
@@ -632,7 +663,9 @@ async function boot() {
   wireEvents();
   setAvatarViewMode(avatar.viewMode); // 저장된 선택을 버튼에 반영
   wireRoute();
+  visit.ready = true;
   routeApply(initialRoute);
+  visitTrack();               // 주소 없이 들어와도(홈) 첫 화면을 센다
   initDamageCalculator();
   initSimulators();
 
@@ -4082,11 +4115,37 @@ async function loadOverlayRelease() {
 // ── 홈 ──
 // 첫 화면. 메뉴 카드는 index.html에 적혀 있고, 여기서는 위쪽 요약 숫자만 채운다.
 // 인구 요약은 인구 추이 탭과 같은 집계 파일(37KB)을 쓰고, 오버레이 버전은 릴리스 API를 쓴다.
-const home = { stats: "idle", release: "idle" };
+const home = { stats: "idle", release: "idle", visits: "idle" };
 
 function loadHomeTab() {
   if (home.stats === "idle") loadHomeStats();
   if (home.release === "idle") loadHomeRelease();
+  if (home.visits === "idle") loadHomeVisits();
+}
+
+// GoatCounter 공개 카운터로 오늘·누적 고유 방문자를 받아 히어로 아래 한 줄로 보여준다.
+// 설정이 꺼져 있거나 응답이 없으면 그 줄을 숨긴 채로 둔다 (사이트 동작에는 영향 없음).
+const VISITS_COUNTER_URL = "https://holedis88.goatcounter.com/counter/TOTAL.json";
+
+async function loadHomeVisits() {
+  const el = document.querySelector("#homeVisits");
+  if (!el) return;
+  home.visits = "loading";
+  const d = new Date();
+  const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const num = (v) => Number(String(v ?? "").replace(/\D/g, ""));  // "7 219" 같은 표기를 숫자로
+  try {
+    const [total, day] = await Promise.all([
+      fetch(VISITS_COUNTER_URL).then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status))))),
+      fetch(`${VISITS_COUNTER_URL}?start=${today}`).then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status))))),
+    ]);
+    el.innerHTML = `오늘 방문 <strong>${num(day.count_unique).toLocaleString("ko-KR")}</strong><span class="home-visits-sep">·</span>누적 방문 <strong>${num(total.count_unique).toLocaleString("ko-KR")}</strong>`;
+    el.hidden = false;
+    home.visits = "ready";
+  } catch (error) {
+    console.info("방문자 수를 불러오지 못했습니다.", error);
+    home.visits = "error";
+  }
 }
 
 // 집계 파일에서 한 날짜·한 서버의 전체 인원 (캐릭터·레벨 구간 합)

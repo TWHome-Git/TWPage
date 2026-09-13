@@ -5917,6 +5917,25 @@ img.dmg-chk-icon {
   line-height: 1.65;
 }
 
+/* 오늘 · 누적 방문자 (GoatCounter 응답이 있을 때만 보인다) */
+.home-visits {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 0.01em;
+}
+
+.home-visits strong {
+  color: var(--ink);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.home-visits-sep {
+  margin: 0 8px;
+  opacity: 0.6;
+}
+
 .home-stats {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
