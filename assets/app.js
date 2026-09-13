@@ -4145,8 +4145,10 @@ async function loadHomeVisits() {
   const el = document.querySelector("#homeVisits");
   if (!el) return;
   home.visits = "loading";
+  // counter API의 start=날짜는 UTC 자정 기준이라 로컬(KST) 날짜를 넣으면
+  // 오전 9시 전엔 미래 날짜가 되어 0이 나온다. UTC 날짜로 맞춘다(KST 09시 리셋).
   const d = new Date();
-  const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const today = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
   const num = (v) => Number(String(v ?? "").replace(/\D/g, ""));  // "7 219" 같은 표기를 숫자로
   try {
     const [total, day] = await Promise.all([
