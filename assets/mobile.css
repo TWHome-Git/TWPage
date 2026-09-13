@@ -981,3 +981,18 @@
     height: 34px;
   }
 }
+
+/* ── 사냥터 1킬 계산기 ── */
+@media (max-width: 640px) {
+  .ok-body {
+    padding: 12px 12px 16px;
+  }
+
+  .ok-inputs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ok-grid.eta-calc-grid.is-main-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

@@ -364,6 +364,12 @@ const els = {
   buffTabButtons: document.querySelectorAll("[data-buff-tab]"),
   buffPanels: document.querySelectorAll("[data-buff-panel]"),
   seedBody: document.getElementById("seedBody"),
+  okGroundRow: document.querySelector("#okGroundRow"),
+  okEtaLevel: document.querySelector("#okEtaLevel"),
+  okHits: document.querySelector("#okHits"),
+  okExtraRow: document.querySelector("#okExtraRow"),
+  okWeapon: document.querySelector("#okWeapon"),
+  okResult: document.querySelector("#okResult"),
   expBaseBox: document.querySelector("#expBaseBox"),
   expResultBox: document.querySelector("#expResultBox"),
   expBuffBody: document.querySelector("#expBuffBody"),
@@ -3010,6 +3016,7 @@ function activateExtraTab(key) {
   // 버프 탭은 처음 열릴 때 기본 하위 탭(경험치)을 그린다
   if (key === "buff") expBuff.load();
   if (key === "seed") seedCalc.load();
+  if (key === "onekill") oneKillCalc.load();
 
   routeWrite();
 }
@@ -3509,7 +3516,8 @@ const SEED_ZONES = [
           [["로카고스", 245 * SEED_MAN * 100], ["에토스", 245 * SEED_MAN * 100], ["체리아", 245 * SEED_MAN * 100]],
           [["마티아", 245 * SEED_MAN * 100], ["라이코스", 245 * SEED_MAN * 100], ["티로로스", 245 * SEED_MAN * 100]],
           [["보급품 탈환", 210 * SEED_MAN * 100], ["훈련소", 245 * SEED_MAN * 100]],
-          [["이클립스 토벌전", 840 * SEED_MAN * 100], ["최후의 결전", 20 * SEED_EOK]],
+          // 최후의 결전은 판당 2억, 주 1~10판을 직접 고른다 (기본 10판 = 20억)
+          [["이클립스 토벌전", 840 * SEED_MAN * 100], ["최후의 결전", 20 * SEED_EOK, { count: { per: 2 * SEED_EOK, max: 10, min: 1 } }]],
           // 주 7판, 한 판 3클리어 (일반 3500만×3×7, 어려움 4000만×3×7)
           [["아페티리아 (일반)", 735 * SEED_MAN * 100, { excl: "apetiria", defaultOff: true }], ["아페티리아 (어려움)", 840 * SEED_MAN * 100, { excl: "apetiria" }]],
         ],
@@ -3570,10 +3578,25 @@ function seedFmt(v) {
 const seedCalc = (() => {
   let loaded = false;
   let active = new Set(); // 켜진 항목 이름
+  let counts = new Map(); // 판수를 고르는 항목의 판수 (이름 → n)
 
   const allItems = () => SEED_ZONES.flatMap((z) => z.groups.flatMap((g) => g.items));
   const zoneItems = (zoneKey) => SEED_ZONES.find((z) => z.key === zoneKey).groups.flatMap((g) => g.items);
   const findItem = (name) => allItems().find((it) => it[0] === name);
+  const countCfg = (item) => item[2]?.count || null;
+  const countOf = (item) => counts.get(item[0]) ?? countCfg(item)?.max ?? 1;
+  // 주간 시드: 판수 항목은 판당 × 판수, 나머지는 표의 주간값 그대로
+  const weeklyOf = (item) => (countCfg(item) ? countCfg(item).per * countOf(item) : item[1]);
+
+  function setCount(name, n) {
+    const item = findItem(name);
+    const cfg = item && countCfg(item);
+    if (!cfg) return;
+    counts.set(name, Math.max(cfg.min, Math.min(cfg.max, n)));
+    active.add(name); // 판수를 만지면 켜진 것으로 본다
+    save();
+    render();
+  }
 
   function defaults() {
     return new Set(allItems().filter((it) => !it[2]?.defaultOff).map((it) => it[0]));
@@ -3594,21 +3617,30 @@ const seedCalc = (() => {
     active = defaults();
     try {
       const saved = JSON.parse(localStorage.getItem(SEED_SAVE_KEY) || "null");
-      if (!Array.isArray(saved)) return;
+      // 예전 저장값은 켜진 이름 배열, 지금은 { active, counts }
+      const names = Array.isArray(saved) ? saved : Array.isArray(saved?.active) ? saved.active : null;
+      if (!names) return;
       active = new Set();
       // 저장 순서대로 켜되, 배타 규칙은 다시 적용한다 (규칙이 바뀐 뒤의 저장값 대비)
-      for (const name of saved) {
+      for (const name of names) {
         const item = findItem(name);
         if (item) activate(item);
       }
+      counts = new Map();
+      for (const [name, n] of Object.entries(saved?.counts || {})) {
+        const item = findItem(name);
+        const cfg = item && countCfg(item);
+        if (cfg && Number.isInteger(n)) counts.set(name, Math.max(cfg.min, Math.min(cfg.max, n)));
+      }
     } catch {
       active = defaults();
+      counts = new Map();
     }
   }
 
   function save() {
     try {
-      localStorage.setItem(SEED_SAVE_KEY, JSON.stringify([...active]));
+      localStorage.setItem(SEED_SAVE_KEY, JSON.stringify({ active: [...active], counts: Object.fromEntries(counts) }));
     } catch {
       // 저장 공간 부족 등은 무시 (선택 기억은 편의일 뿐)
     }
@@ -3622,8 +3654,8 @@ const seedCalc = (() => {
       let freeSum = 0;
       for (const it of g.items) {
         if (!active.has(it[0])) continue;
-        if (it[2]?.uncapped) freeSum += it[1];
-        else capSum += it[1];
+        if (it[2]?.uncapped) freeSum += weeklyOf(it);
+        else capSum += weeklyOf(it);
       }
       const over = g.cap != null && capSum > g.cap;
       const capped = (g.cap == null ? capSum : Math.min(capSum, g.cap)) + freeSum;
@@ -3658,21 +3690,31 @@ const seedCalc = (() => {
   }
 
   function cardHtml(item) {
-    const [name, weekly] = item;
+    const [name] = item;
     const on = active.has(name);
     const safe = escapeHtml(name);
     const icon = SEED_ICONS[name];
     const iconHtml = icon
       ? `<img class="seed-card-icon" src="${SEED_ICON_BASE}${encodeURIComponent(icon)}.webp" alt="" loading="lazy" decoding="async" />`
       : `<span class="seed-card-icon"></span>`;
+    // 판수 항목은 카드 안에 − n +를 둔다. 스테퍼 클릭은 카드 토글이 아니다 (wire에서 먼저 잡는다)
+    const cfg = countCfg(item);
+    const stepper = cfg
+      ? `<span class="seed-stepper" aria-label="${safe} 판수">` +
+        `<button type="button" data-seed-step="-1" data-seed-name="${safe}" aria-label="판수 줄이기">−</button>` +
+        `<span class="seed-count">${countOf(item)}판</span>` +
+        `<button type="button" data-seed-step="1" data-seed-name="${safe}" aria-label="판수 늘리기">+</button>` +
+        `</span>`
+      : "";
     return (
-      `<button class="seed-card${on ? " is-active" : ""}" type="button" data-seed-item="${safe}" aria-pressed="${on}">` +
+      `<div class="seed-card${on ? " is-active" : ""}" role="button" tabindex="0" data-seed-item="${safe}" aria-pressed="${on}">` +
       iconHtml +
       `<span class="seed-card-body">` +
       `<span class="seed-card-name">${safe}</span>` +
-      `<span class="seed-card-amount">${seedFmt(weekly)}</span>` +
+      `<span class="seed-card-amount">${seedFmt(weeklyOf(item))}${cfg ? `<small>판당 ${seedFmt(cfg.per)}</small>` : ""}</span>` +
       `</span>` +
-      `</button>`
+      stepper +
+      `</div>`
     );
   }
 
@@ -3738,13 +3780,235 @@ const seedCalc = (() => {
   }
 
   function wire() {
-    els.seedBody?.addEventListener("click", (event) => {
+    const box = els.seedBody;
+    if (!box) return;
+
+    box.addEventListener("click", (event) => {
+      const step = event.target.closest("[data-seed-step]");
+      if (step) {
+        const item = findItem(step.dataset.seedName);
+        if (item) setCount(item[0], countOf(item) + Number(step.dataset.seedStep));
+        return;
+      }
       const card = event.target.closest("[data-seed-item]");
       if (card) return toggle(card.dataset.seedItem);
       const all = event.target.closest("[data-seed-all]");
       if (all) return setZone(all.dataset.seedAll, true);
       const none = event.target.closest("[data-seed-none]");
       if (none) return setZone(none.dataset.seedNone, false);
+    });
+
+    // 카드가 div라 Enter/Space로도 켜고 끌 수 있게 한다
+    box.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      if (event.target.closest("button")) return;
+      const card = event.target.closest("[data-seed-item]");
+      if (!card) return;
+      event.preventDefault();
+      toggle(card.dataset.seedItem);
+    });
+  }
+
+  return { load, wire };
+})();
+
+// ══════════════════════════════════════════════════════════════
+//  테일즈 정보 > 사냥터 1킬 계산기 (레이아웃 초안)
+//  사냥터 몬스터 HP와 에타 레벨별 최대 대미지를 견주어 한 방(스킬 타수 합)에 잡히는지 본다.
+//  총 대미지 = (에타 레벨별 최대 대미지 × 타수 + 무기 추가 대미지) × (1 + 추가 대미지 % 합)
+//  무기 추가 대미지는 %가 아니라 상수로 더한다.
+// ══════════════════════════════════════════════════════════════
+
+// 사냥터. hp는 임시값이라 화면에서 직접 고칠 수 있게 둔다
+const OK_GROUNDS = [
+  { key: "siokahn", name: "시오칸하임 대장간", hp: 24500000 },
+  { key: "golgoda", name: "골고다 협곡 방어전 · 공허의 영역", hp: 300000000 }, // 두 곳 HP가 같아 버튼 하나로 묶는다
+];
+
+// 추가 대미지 입력칸. 배치 순서 그대로 (한 줄에 3개). options가 있으면 목록, 없으면 직접 입력.
+// pct 표가 있으면 값(LV)을 %로 바꾼다. icon은 대미지 계산기와 같은 images/ 파일.
+const OK_EXTRAS = [
+  { key: "stone", name: "장비 강화석 부가 옵션", icon: "장비강화석.png", unit: "%", options: [0, 45, 46, 47, 48], def: 45 },
+  { key: "fever", name: "피버 추가 대미지 부가 옵션", icon: "피버.png", unit: "%", options: [0, 8, 9, 10, 11, 12, 13], def: 0, excl: "undead" },
+  { key: "undead", name: "언데드 추가 대미지 부가 옵션", icon: "언데드.webp", unit: "%", options: [0, 11, 12, 13, 14, 15], def: 0, excl: "fever",
+    help: { title: "언데드 추가 대미지 부가 옵션", lines: ["카드 옵션 \"언데드\"를 이용하여 HP를 15% 미만으로 내린 후, 무기 부가 옵션을 사용함", "\"자신의 HP가 15% 미만이면 대상에게 11~15% 추가 피해를 줍니다\""] } },
+  { key: "title", name: "칭호 추가 대미지", icon: "칭호.png", unit: "%", options: [0, 15, 20], def: 0 },
+  { key: "snipe", name: "저격 연마", icon: "저격연마.png", unit: "LV", options: [5, 6, 7, 8, 9, 10], def: 5, pct: { 0: 0, 1: 5, 2: 10, 3: 15, 4: 20, 5: 25, 6: 28, 7: 31, 8: 34, 9: 37, 10: 40 } },
+  { key: "etc", name: "기타", unit: "%", def: 0 },
+];
+
+const OK_SAVE_KEY = "tw-onekill-save-v1";
+
+const oneKillCalc = (() => {
+  const state = { ground: OK_GROUNDS[0].key, hpOverride: {}, extras: {}, loaded: false };
+
+  const ground = () => OK_GROUNDS.find((g) => g.key === state.ground) || OK_GROUNDS[0];
+  const groundHp = () => Number(state.hpOverride[state.ground] ?? ground().hp) || 0;
+  const fmt = (n) => Math.round(n).toLocaleString("ko-KR");
+
+  // 에타 레벨표(dmg)에서 그 레벨의 최대 대미지를 읽는다
+  function etaMaxDamage(level) {
+    const row = (etaInfo.data?.levels || []).find((r) => Number(r.lv) === level);
+    return row ? Number(String(row.dmg).replace(/[^\d]/g, "")) || 0 : 0;
+  }
+
+  const extraValue = (ex) => Number(state.extras[ex.key] ?? ex.def ?? 0) || 0;
+
+  const weaponBonus = () => Number(els.okWeapon?.value) || 0;
+
+  // 추가 대미지 항목 합 (%). 무기 추가 대미지는 상수라 여기 넣지 않는다
+  function extraPercent() {
+    return OK_EXTRAS.reduce((sum, ex) => {
+      const raw = extraValue(ex);
+      return sum + (ex.pct ? (ex.pct[raw] ?? 0) : raw);
+    }, 0);
+  }
+
+  // (최대 대미지 × 타수 + 무기 추가 대미지) × (1 + 추가 대미지 합 %)
+  function okTotalDamage(level, hits) {
+    return (etaMaxDamage(level) * hits + weaponBonus()) * (1 + extraPercent() / 100);
+  }
+
+  function save() {
+    try { localStorage.setItem(OK_SAVE_KEY, JSON.stringify({ ground: state.ground, hp: state.hpOverride, extras: state.extras, level: els.okEtaLevel?.value, hits: els.okHits?.value, weapon: els.okWeapon?.value })); } catch { /* 저장은 편의일 뿐 */ }
+  }
+
+  function restore() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(OK_SAVE_KEY) || "null");
+      if (!saved) return;
+      if (OK_GROUNDS.some((g) => g.key === saved.ground)) state.ground = saved.ground;
+      state.hpOverride = saved.hp || {};
+      state.extras = saved.extras || {};
+      if (els.okEtaLevel && saved.level) els.okEtaLevel.value = saved.level;
+      if (els.okHits && saved.hits) els.okHits.value = saved.hits;
+      if (els.okWeapon && saved.weapon != null) els.okWeapon.value = saved.weapon;
+    } catch { /* 깨진 저장값은 무시 */ }
+  }
+
+  function renderGrounds() {
+    if (!els.okGroundRow) return;
+    els.okGroundRow.innerHTML = OK_GROUNDS.map((g) => `
+      <button type="button" class="buff-base-btn${g.key === state.ground ? " is-active" : ""}" data-ok-ground="${g.key}">${escapeHtml(g.name)}</button>
+    `).join("");
+  }
+
+  function renderExtras() {
+    if (!els.okExtraRow) return;
+    els.okExtraRow.innerHTML = OK_EXTRAS.map((ex) => {
+      const value = extraValue(ex);
+      // 피버와 언데드는 같이 못 쓴다. 상대가 0보다 크면 이쪽은 잠근다
+      const locked = ex.excl && extraValue(OK_EXTRAS.find((x) => x.key === ex.excl)) > 0;
+      const control = ex.options
+        ? `<select data-ok-extra="${ex.key}"${locked ? " disabled" : ""}>${ex.options.map((o) => `<option value="${o}"${o === value ? " selected" : ""}>${ex.pct ? `LV${o} - ${ex.pct[o]}%` : `${o}%`}</option>`).join("")}</select>`
+        : `<input type="number" min="0" step="1" inputmode="numeric" placeholder="0" data-ok-extra="${ex.key}" value="${escapeHtml(String(value))}" />`;
+      return `
+      <label class="field ok-field${locked ? " is-locked" : ""}">
+        <span class="ok-label">${ex.icon ? simIcon(ex.icon, 20) : ""}${escapeHtml(ex.name)}${ex.help ? ` <button type="button" class="eta-help-button" data-ok-help="${ex.key}" title="${escapeHtml(ex.help.title)} 안내" aria-label="${escapeHtml(ex.help.title)} 안내">?</button>` : ""}</span>
+        <span class="ok-unit-wrap">${control}${ex.pct ? "" : "<em>%</em>"}</span>
+      </label>`;
+    }).join("");
+  }
+
+  function renderResult() {
+    if (!els.okResult) return;
+    const level = Math.min(100, Math.max(1, Number(els.okEtaLevel?.value) || 0));
+    const hits = Number(els.okHits?.value) || 4;
+    const hp = groundHp();
+    const max = etaMaxDamage(level);
+    const total = okTotalDamage(level, hits);
+    const ratio = hp > 0 ? total / hp : 0;             // 한 번 공격이 HP의 몇 %인지
+    const kills = ratio > 0 ? Math.ceil(1 / ratio) : 0; // 몇 번 때려야 잡는지
+    const shortPct = hp > 0 ? Math.max(0, (hp - total) / hp) * 100 : 0;
+
+    let verdict = "";
+    if (!max) {
+      verdict = "에타 레벨을 1~100 사이로 넣어 주세요.";
+    } else if (kills <= 1) {
+      verdict = `<strong>1킬</strong><span>(${(ratio * 100).toFixed(1)}%) · 여유 ${fmt(total - hp)}</span>`;
+    } else {
+      verdict = `<strong>${kills > 5 ? "5킬 이상" : `${kills}킬`}</strong><span>(${(ratio * 100).toFixed(1)}%) · 1킬까지 ${fmt(hp - total)} 부족</span>`;
+      // 부족분이 10% 이내일 때만 채우는 길을 보여준다. 그보다 크면 수치가 비현실적이라 뺀다
+      if (shortPct <= 10) {
+        verdict += `<span class="ok-need">추가 대미지로 채우면 <b>+${Math.ceil((hp / (max * hits + weaponBonus()) - 1) * 100 - extraPercent())}%p</b> 더 필요</span>
+          <span class="ok-need">무기 추가 대미지로 채우면 <b>+${fmt(Math.ceil(hp / (1 + extraPercent() / 100) - max * hits - weaponBonus()))}</b> 더 필요</span>`;
+      }
+    }
+
+    els.okResult.innerHTML = `
+      <div class="eta-calc-grid ok-grid">
+        <div class="eta-calc-cell is-main">
+          <span>${escapeHtml(ground().name)} 몬스터 HP</span>
+          <strong class="ok-hp-edit"><input id="okHpInput" type="number" min="0" step="1" inputmode="numeric" value="${hp}" aria-label="몬스터 HP" /></strong>
+        </div>
+        <div class="eta-calc-cell is-main">
+          <span>예상 총 대미지 <small>에타 ${level} 최대 ${max ? fmt(max) : "-"} × ${hits}타${weaponBonus() ? ` + 무기 ${fmt(weaponBonus())}` : ""} · 추가 +${extraPercent()}%</small></span>
+          <strong>${max ? fmt(total) : "-"}</strong>
+        </div>
+      </div>
+      <div class="ok-verdict ${!max ? "" : kills <= 1 ? "is-ok" : "is-short"}">${verdict}</div>
+    `;
+  }
+
+  function renderAll() {
+    renderGrounds();
+    renderExtras();
+    renderResult();
+  }
+
+  async function load() {
+    if (state.loaded) return;
+    state.loaded = true;
+    restore();
+    renderAll();
+    if (!etaInfo.data) { await ensureEtaInfo(); renderResult(); }
+  }
+
+  function wire() {
+    els.okGroundRow?.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-ok-ground]");
+      if (!button) return;
+      state.ground = button.dataset.okGround;
+      save();
+      renderGrounds();
+      renderResult();
+    });
+    els.okEtaLevel?.addEventListener("input", () => { save(); renderResult(); });
+    els.okHits?.addEventListener("change", () => { save(); renderResult(); });
+    els.okWeapon?.addEventListener("input", () => { save(); renderResult(); });
+    // 목록(select)은 change, 직접 입력(input)은 input으로 온다. 둘 다 받는다
+    // [?] 버튼: 시뮬레이터 확률표 모달을 그대로 빌려 안내 문구를 띄운다
+    els.okExtraRow?.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-ok-help]");
+      if (!button) return;
+      event.preventDefault();
+      const ex = OK_EXTRAS.find((x) => x.key === button.dataset.okHelp);
+      if (!ex?.help) return;
+      openRateModal(ex.help.title, "", ex.help.lines.map((line) => `<p class="modal-text">${escapeHtml(line)}</p>`).join(""));
+    });
+    ["input", "change"].forEach((type) => els.okExtraRow?.addEventListener(type, (event) => {
+      const key = event.target.dataset?.okExtra;
+      if (!key) return;
+      state.extras[key] = event.target.value;
+      // 배타 상대가 있으면 0으로 되돌리고 잠금 상태를 다시 그린다
+      const ex = OK_EXTRAS.find((x) => x.key === key);
+      if (ex?.excl) {
+        if (Number(event.target.value) > 0) state.extras[ex.excl] = 0;
+        renderExtras();
+      }
+      save();
+      renderResult();
+    }));
+    // HP 칸은 결과 안에 있어 매번 다시 그려지므로, 입력 중에는 값만 바꾸고 판정 문구만 갱신한다
+    els.okResult?.addEventListener("input", (event) => {
+      if (event.target.id !== "okHpInput") return;
+      state.hpOverride[state.ground] = event.target.value;
+      save();
+      const verdict = els.okResult.querySelector(".ok-verdict");
+      const keep = document.activeElement;
+      renderResult();
+      if (keep?.id === "okHpInput") { const el = document.querySelector("#okHpInput"); el?.focus(); el?.setSelectionRange?.(el.value.length, el.value.length); }
+      void verdict;
     });
   }
 
@@ -5385,6 +5649,7 @@ function wireEvents() {
 
   expBuff.wire();
   seedCalc.wire();
+  oneKillCalc.wire();
   rareBuff.wire();
 
   els.characterGrid?.addEventListener("click", (event) => {

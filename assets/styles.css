@@ -12476,3 +12476,182 @@ img.dmg-chk-icon {
   filter: none;
   opacity: 1;
 }
+
+/* 판수를 고르는 카드(최후의 결전)의 − n + 스테퍼 */
+.seed-card {
+  user-select: none;
+}
+
+.seed-card:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(15, 111, 99, 0.25);
+}
+
+.seed-card-amount small {
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0.8;
+}
+
+.seed-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+
+.seed-stepper button {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--muted);
+  background: #fff;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.seed-stepper button:hover {
+  color: var(--accent-strong);
+  border-color: var(--accent);
+}
+
+.seed-count {
+  min-width: 34px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.seed-card.is-active .seed-stepper button {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.seed-card.is-active .seed-stepper button:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+/* ── 테일즈 정보 > 사냥터 1킬 계산기 ────────────────────────── */
+.ok-body {
+  padding: 16px 20px 22px;
+}
+
+.ok-inputs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px 14px;
+  margin: 0 0 10px;
+}
+
+/* 내 정보는 한 줄에 둘(에타 레벨 / 스킬 타수), 다음 줄에 무기 추가 대미지 하나 */
+.ok-inputs-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  max-width: 520px;
+}
+
+.ok-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ok-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.ok-field input,
+.ok-field select {
+  width: 100%;
+}
+
+/* 피버·언데드처럼 상대가 켜져 잠긴 칸 */
+.ok-field.is-locked {
+  opacity: 0.5;
+}
+
+.ok-unit-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ok-unit-wrap em {
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.ok-result {
+  margin-top: 16px;
+}
+
+.ok-grid .eta-calc-cell span small {
+  margin-left: 4px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.ok-hp-edit input {
+  width: 100%;
+  border: 1px dashed var(--line);
+  border-radius: 6px;
+  padding: 2px 6px;
+  font: inherit;
+  font-weight: 700;
+  background: #fff;
+}
+
+.ok-verdict {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 14px;
+  margin-top: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.ok-verdict strong {
+  font-size: 17px;
+}
+
+/* 부족할 때 두 가지 채우는 길을 나란히 */
+.ok-need {
+  flex-basis: 100%;
+  font-size: 13px;
+}
+
+.ok-need b {
+  font-weight: 700;
+}
+
+.ok-verdict.is-ok {
+  border-color: #b9dccb;
+  background: #eef7f1;
+  color: var(--accent-strong);
+}
+
+.ok-verdict.is-short {
+  border-color: #efc3bb;
+  background: #fdf1ef;
+  color: var(--danger);
+}
+
+.ok-note {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}

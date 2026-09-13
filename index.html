@@ -6,9 +6,9 @@
     <title>TW DB</title>
     <!-- 이미지 CDN. 첫 이미지 요청 전에 DNS+TLS를 미리 끝내둔다 -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
-    <link rel="stylesheet" href="./assets/styles.css?v=20260913-seed4" />
+    <link rel="stylesheet" href="./assets/styles.css?v=20260913-seed5" />
     <!-- 모바일 전용. media 속성 덕에 넓은 화면에서는 렌더링을 막지 않는다 -->
-    <link rel="stylesheet" href="./assets/mobile.css?v=20260913-seed4" media="(max-width: 720px)" />
+    <link rel="stylesheet" href="./assets/mobile.css?v=20260913-seed5" media="(max-width: 720px)" />
   </head>
   <body>
     <main class="app-shell">
@@ -38,6 +38,19 @@
         </div>
 
         <div class="home-grid">
+          <article class="home-card">
+            <a class="home-shot" href="#/extra/seed" tabindex="-1" aria-hidden="true"><img src="./images/home/info.jpg" width="720" height="405" alt="" loading="lazy" decoding="async" /></a>
+            <div class="home-menu">
+              <h2>테일즈 정보</h2>
+              <div class="home-chips">
+              <a class="home-chip" href="#/extra/seed">주간 시드</a>
+              <a class="home-chip" href="#/extra/onekill">사냥터 1킬 계산기</a>
+              <a class="home-chip" href="#/extra/hit">필요 명중 계산기</a>
+              <a class="home-chip" href="#/extra/buff">버프 아이템</a>
+              </div>
+            </div>
+          </article>
+
           <article class="home-card">
             <a class="home-shot" href="#/eta/ranking" tabindex="-1" aria-hidden="true"><img src="./images/home/eta.jpg" width="720" height="405" alt="" loading="lazy" decoding="async" /></a>
             <div class="home-menu">
@@ -102,16 +115,7 @@
             </div>
           </article>
 
-          <article class="home-card">
-            <a class="home-shot" href="#/extra/buff" tabindex="-1" aria-hidden="true"><img src="./images/home/info.jpg" width="720" height="405" alt="" loading="lazy" decoding="async" /></a>
-            <div class="home-menu">
-              <h2>테일즈 정보</h2>
-              <div class="home-chips">
-              <a class="home-chip" href="#/extra/buff">버프 아이템</a>
-              <a class="home-chip" href="#/extra/content">유용한 정보</a>
-              </div>
-            </div>
-          </article>
+
         </div>
       </section>
 
@@ -958,12 +962,37 @@
           </section>
 
           <section class="addon-content" data-extra-panel="onekill" hidden>
-            <div class="info-cards">
-              <article class="info-card">
-                <span class="info-card-badge">준비 중</span>
-                <h3>사냥터 1킬 계산기</h3>
-                <p>사냥터 몬스터의 체력 기준으로 한 방에 잡는 데 필요한 대미지를 계산합니다.</p>
-              </article>
+            <div class="ok-body">
+              <p class="buff-section-title">사냥터</p>
+              <div id="okGroundRow" class="buff-base-row"></div>
+
+              <p class="buff-section-title">내 정보</p>
+              <div class="ok-inputs ok-inputs-2">
+                <label class="field ok-field">
+                  <span>에타 레벨</span>
+                  <input id="okEtaLevel" type="number" min="1" max="100" step="1" inputmode="numeric" placeholder="1~100" value="1" />
+                </label>
+                <label class="field ok-field">
+                  <span>스킬 타수</span>
+                  <select id="okHits">
+                    <option value="4" selected>4타</option>
+                    <option value="5">5타</option>
+                    <option value="6">6타</option>
+                  </select>
+                </label>
+              </div>
+              <div class="ok-inputs ok-inputs-2">
+                <label class="field ok-field">
+                  <span>무기 추가 대미지</span>
+                  <input id="okWeapon" type="number" min="0" step="1" inputmode="numeric" placeholder="0" value="0" />
+                </label>
+              </div>
+
+              <p class="buff-section-title">추가 대미지</p>
+              <div id="okExtraRow" class="ok-inputs ok-inputs-3"></div>
+
+              <div id="okResult" class="ok-result" aria-live="polite"></div>
+              <p class="ok-note">총 대미지 = (에타 최대 대미지 × 타수 + 무기 추가 대미지) × (1 + 추가 대미지 % 합). 몬스터 HP는 칸에서 직접 고칠 수 있습니다.</p>
             </div>
           </section>
 
@@ -1032,7 +1061,7 @@
       </div>
     </template>
 
-    <script src="./assets/app.js?v=20260913-seed4" type="module"></script>
+    <script src="./assets/app.js?v=20260913-seed5" type="module"></script>
     <!-- GoatCounter 방문자 분석 (localhost 방문은 count.js가 기본으로 집계 제외) -->
     <script data-goatcounter="https://holedis88.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
   </body>
