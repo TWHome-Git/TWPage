@@ -3557,6 +3557,9 @@ function renderHomeStats() {
     cards.push(`<div class="home-stat"><span>에타 전체 인구</span><strong>${formatNumber(sum(d0))}</strong>${deltaHtml(sum(d0), d1 ? sum(d1) : null, "어제 대비")}</div>`);
   }
 
+  // 카드 순서: 전체 인구 / 순위 갱신일 / 하이아칸 / 네냐플 (2×2 격자에서 윗줄이 요약, 아랫줄이 서버별)
+  cards.push(`<div class="home-stat home-stat-date"><span>순위 갱신일</span><strong>${escapeHtml(latest)}</strong><small>매일 오전 10시 전후 갱신</small></div>`);
+
   servers.forEach((server) => {
     const own = dates.filter((d) => popTotalOf(d, server) != null);
     if (!own.length) return;
@@ -3568,7 +3571,6 @@ function renderHomeStats() {
     cards.push(`<div class="home-stat"><span>${escapeHtml(server)}</span><strong>${formatNumber(now)}</strong>${deltaHtml(now, d1 ? popTotalOf(d1, server) : null, "어제 대비")}${dw ? deltaHtml(now, popTotalOf(dw, server), "1주 대비") : ""}</div>`);
   });
 
-  cards.push(`<div class="home-stat home-stat-date"><span>순위 갱신일</span><strong>${escapeHtml(latest)}</strong><small>매일 오전 10시 전후 갱신</small></div>`);
   els.homeStats.innerHTML = cards.join("");
 }
 

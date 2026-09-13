@@ -2443,6 +2443,8 @@ img.dmg-chk-icon {
 
 .buff-cell-row > .buff-cell {
   flex: 0 1 auto;
+  /* 이름이 두 줄로 접힌 칸이 있어도 같은 줄의 칸 높이는 모두 같게 */
+  align-self: stretch;
 }
 
 .buff-cell-row .buff-item {
@@ -8518,6 +8520,8 @@ img.dmg-chk-icon {
 
 .buff-cell-row > .buff-cell {
   flex: 0 1 auto;
+  /* 이름이 두 줄로 접힌 칸이 있어도 같은 줄의 칸 높이는 모두 같게 */
+  align-self: stretch;
 }
 
 .buff-cell-row .buff-item {
