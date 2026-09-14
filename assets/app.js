@@ -4145,24 +4145,43 @@ function loadHomeTab() {
 const VISITS_PROXY_URL = "https://script.google.com/macros/s/AKfycbz5K3J47MMwwaJpj1YqAAg5EDOR2wOWjv9h_-oCxhDT3CjmHNmaH3yEkD1rjVsC2onbyA/exec";
 const VISITS_COUNTER_URL = "https://holedis88.goatcounter.com/counter/TOTAL.json";
 
+const VISITS_CACHE_KEY = "tw-visits-cache-v1";
+
 async function loadHomeVisits() {
   const el = document.querySelector("#homeVisits");
   if (!el) return;
   home.visits = "loading";
   const num = (v) => Number(String(v ?? "").replace(/\D/g, ""));  // "7 219" 같은 표기를 숫자로
   const fetchJson = (url) => fetch(url).then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))));
+  const kstDate = () => new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
   const render = (today, total) => {
-    el.innerHTML = `오늘 방문 <strong>${today.toLocaleString("ko-KR")}</strong><span class="home-visits-sep">·</span>누적 방문 <strong>${total.toLocaleString("ko-KR")}</strong>`;
+    const fmt = (v) => (typeof v === "number" ? v.toLocaleString("ko-KR") : v);
+    el.innerHTML = `오늘 방문 <strong>${fmt(today)}</strong><span class="home-visits-sep">·</span>누적 방문 <strong>${fmt(total)}</strong>`;
     el.hidden = false;
+  };
+  const done = (today, total) => {
+    render(today, total);
+    etaWriteCache(VISITS_CACHE_KEY, { date: kstDate(), today, total });
     home.visits = "ready";
   };
-  try {
-    const p = await fetchJson(VISITS_PROXY_URL);
-    if (p.today == null || p.error) throw new Error(p.error || "proxy empty");
-    render(num(p.today), num(p.total));
-    return;
-  } catch (error) {
-    console.info("방문자 프록시 실패, 공개 카운터로 대체합니다.", error);
+
+  // 값이 오기까지 1~2초 걸려 그동안 줄이 비어 보인다. 지난번 값을 먼저 보여주고 뒤에서 갱신한다.
+  // 오늘 수치는 같은 날(KST)일 때만 재사용하고, 날이 바뀌었으면 "-"로 둔다
+  const cached = etaReadCache(VISITS_CACHE_KEY);
+  if (cached && typeof cached.total === "number") {
+    render(cached.date === kstDate() && typeof cached.today === "number" ? cached.today : "-", cached.total);
+  }
+
+  // 프록시는 가끔 JSON 대신 구글 임시 오류 페이지(HTML)를 돌려준다. 한 번 더 시도한다
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    try {
+      const p = await fetchJson(VISITS_PROXY_URL);
+      if (p.today == null || p.error) throw new Error(p.error || "proxy empty");
+      done(num(p.today), num(p.total));
+      return;
+    } catch (error) {
+      console.info(`방문자 프록시 실패 (${attempt}/2)`, error);
+    }
   }
   try {
     const d = new Date();
@@ -4171,10 +4190,10 @@ async function loadHomeVisits() {
       fetchJson(VISITS_COUNTER_URL),
       fetchJson(`${VISITS_COUNTER_URL}?start=${today}`),
     ]);
-    render(num(day.count_unique), num(total.count_unique));
+    done(num(day.count_unique), num(total.count_unique));
   } catch (error) {
     console.info("방문자 수를 불러오지 못했습니다.", error);
-    home.visits = "error";
+    home.visits = cached ? "ready" : "error";
   }
 }
 
