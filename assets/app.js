@@ -8611,11 +8611,21 @@ loadDmgMonsters();
 
 // ══════════════════════════════════════════════════════════════
 //  문의 · 건의 게시판
-//  글은 구글 시트에 쌓이고, 읽기/쓰기 모두 Apps Script 웹앱을 거친다.
-//  (게시 CSV는 갱신이 몇 분 늦어, 방금 쓴 글이 안 보이는 문제가 있다)
+//  글은 구글 시트에 쌓인다. 읽기는 시트를 "웹에 게시"한 CSV로 받고, 쓰기만
+//  Apps Script 웹앱을 거친다. (읽기까지 Apps Script로 가면 호출마다 2~3초라
+//  목록을 열 때도, 글 하나를 누를 때도 그만큼 기다려야 했다)
+//  게시 CSV는 갱신이 몇 분 늦으므로 방금 쓴 글은 브라우저에 따로 기억해 끼워 넣고,
+//  마지막으로 받은 목록은 localStorage에 남겨 다음에 열 때 먼저 보여준다.
+//  BOARD_CSV_URL이 비어 있으면 예전처럼 읽기도 Apps Script로 간다.
 //  설치 방법은 저장소 루트의 board-apps-script.gs 주석에 적어 뒀다.
 // ══════════════════════════════════════════════════════════════
 const BOARD_API_URL = "https://script.google.com/macros/s/AKfycbyNioDGVAQp8KSIsgUkPwfVMRY8xtG7CAtaUSjWc0Hs4qiaSvKWxBGGcfEUfsUFWG2U/exec";
+// 게시판 시트를 파일 → 공유 → 웹에 게시 → "문의게시판" 시트, CSV로 게시한 주소
+const BOARD_CSV_URL = "";
+
+const BOARD_CACHE_KEY = "tw-board-cache-v1";      // 마지막으로 받은 목록
+const BOARD_PENDING_KEY = "tw-board-pending-v1";  // 방금 쓴 글. CSV에 나타날 때까지 끼워 넣는다
+const BOARD_PENDING_TTL_MS = 30 * 60 * 1000;      // 이만큼 지나도 CSV에 안 보이면 포기한다
 
 const BOARD_CATEGORIES = ["버그", "건의", "문의"];
 const BOARD_LIMITS = { title: 100, author: 20, content: 2000 };
@@ -8651,6 +8661,96 @@ function boardDate(iso) {
 // 줄바꿈만 살리고 나머지는 escape 한다. 방문자가 쓴 글이라 HTML을 그대로 넣으면 안 된다
 const boardText = (value) => escapeHtml(value || "").replace(/\n/g, "<br />");
 
+// 게시 CSV의 날짜는 시트에 보이는 글자 그대로 온다. 시트 로케일에 따라
+// "2026. 9. 14 오후 3:05:00" / "9/14/2026 15:05:00" / "2026-09-14 15:05:00" 중 하나라
+// 셋 다 받아서 ISO 문자열로 맞춘다. 못 알아보면 빈 값으로 두어 날짜만 비운다
+function boardParseDate(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  const time = (h, m, s, ampm) => {
+    let hour = Number(h);
+    if (ampm === "오후" || /^pm$/i.test(ampm || "")) hour = hour % 12 + 12;
+    if (ampm === "오전" || /^am$/i.test(ampm || "")) hour = hour % 12;
+    return [hour, Number(m), Number(s || 0)];
+  };
+  let m = text.match(/^(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\.?(?:\s*(오전|오후))?\s*(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if (m) return new Date(+m[1], +m[2] - 1, +m[3], ...time(m[5], m[6], m[7], m[4])).toISOString();
+  m = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?$/i);
+  if (m) return new Date(+m[3], +m[1] - 1, +m[2], ...time(m[4], m[5], m[6], m[7])).toISOString();
+  m = text.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if (m) return new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0)).toISOString();
+  const d = new Date(text);
+  return Number.isNaN(d.getTime()) ? "" : d.toISOString();
+}
+
+// 게시 CSV → 게시글 목록 (최신 글이 위). 열은 머리글 이름으로 찾고, 없으면 시트 순서를 믿는다
+function boardParseCsv(text) {
+  const rows = parseDelimited(text, ",");
+  if (!rows.length) return [];
+  const header = rows[0].map((h) => String(h || "").trim());
+  const col = (name, fallback) => {
+    const index = header.indexOf(name);
+    return index >= 0 ? index : fallback;
+  };
+  const at = (row, name, fallback) => String(row[col(name, fallback)] ?? "").trim();
+  const posts = [];
+  for (const row of rows.slice(1)) {
+    const id = Number(at(row, "번호", 0)) || 0;
+    if (!id) continue;
+    posts.push({
+      id,
+      createdAt: boardParseDate(at(row, "작성일", 1)),
+      category: at(row, "분류", 2),
+      title: at(row, "제목", 3),
+      author: at(row, "작성자", 4) || "익명",
+      content: at(row, "내용", 5),
+      answer: at(row, "답변", 6),
+      answeredAt: boardParseDate(at(row, "답변일", 7)),
+    });
+  }
+  return posts.sort((a, b) => b.id - a.id);
+}
+
+function boardReadJson(key) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+function boardWriteJson(key, value) {
+  try {
+    if (value == null) localStorage.removeItem(key);
+    else localStorage.setItem(key, JSON.stringify(value));
+  } catch (error) {
+    // 시크릿 창 등에서 저장이 막혀도 게시판 자체는 돌아가야 한다
+  }
+}
+
+function boardReadCache() {
+  const cached = boardReadJson(BOARD_CACHE_KEY);
+  return cached && Array.isArray(cached.posts) ? cached.posts : null;
+}
+
+// 방금 쓴 글 중 아직 CSV에 나타나지 않은 것만 남기고, 목록 맨 앞에 끼워 넣는다
+function boardMergePending(posts) {
+  const now = Date.now();
+  const known = new Set(posts.map((p) => p.id));
+  const pending = (boardReadJson(BOARD_PENDING_KEY) || [])
+    .filter((p) => p && p.id && !known.has(p.id) && now - (p.savedAt || 0) < BOARD_PENDING_TTL_MS);
+  boardWriteJson(BOARD_PENDING_KEY, pending.length ? pending : null);
+  if (!pending.length) return posts;
+  return [...pending.map((p) => ({ ...p, pending: true })), ...posts].sort((a, b) => b.id - a.id);
+}
+
+function boardRememberPending(post) {
+  const pending = (boardReadJson(BOARD_PENDING_KEY) || []).filter((p) => p && p.id !== post.id);
+  pending.push({ ...post, savedAt: Date.now() });
+  boardWriteJson(BOARD_PENDING_KEY, pending);
+}
+
 async function boardFetch(url, options) {
   const res = await fetch(url, options);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -8661,6 +8761,41 @@ async function boardFetch(url, options) {
 
 async function boardLoadList(force) {
   if (board.loaded && !force) return;
+  if (!BOARD_CSV_URL) return boardLoadListViaApi();
+
+  // 지난번 목록이 있으면 그걸 먼저 보여주고 뒤에서 조용히 새로 받는다
+  if (!board.loaded) {
+    const cached = boardReadCache();
+    if (cached) {
+      board.posts = boardMergePending(cached);
+      board.loaded = true;
+    }
+  }
+  board.busy = !board.loaded;
+  board.error = "";
+  boardRender();
+  try {
+    const res = await fetch(BOARD_CSV_URL, { cache: "no-store" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const posts = boardParseCsv(await res.text());
+    boardWriteJson(BOARD_CACHE_KEY, { savedAt: Date.now(), posts });
+    board.posts = boardMergePending(posts);
+    board.loaded = true;
+    // 글을 보고 있는 중이면 답변이 달렸을 수 있으니 같은 글로 바꿔 끼운다
+    if (board.view === "detail" && board.post) {
+      board.post = board.posts.find((p) => p.id === board.post.id) || board.post;
+    }
+  } catch (error) {
+    if (!board.loaded) board.error = "글 목록을 불러오지 못했습니다.";
+    console.warn("게시판 목록 로딩 실패", error);
+  } finally {
+    board.busy = false;
+    boardRender();
+  }
+}
+
+// BOARD_CSV_URL이 없을 때의 예전 경로. 목록에 본문이 없어 글을 열 때 한 번 더 받는다
+async function boardLoadListViaApi() {
   board.busy = true;
   board.error = "";
   boardRender();
@@ -8679,9 +8814,17 @@ async function boardLoadList(force) {
 
 async function boardOpenPost(id) {
   board.view = "detail";
+  board.error = "";
+  const local = board.posts.find((p) => String(p.id) === String(id));
+  if (local && local.content !== undefined) {
+    // CSV에는 본문까지 들어 있어 따로 받을 것이 없다
+    board.post = local;
+    board.busy = false;
+    boardRender();
+    return;
+  }
   board.post = null;
   board.busy = true;
-  board.error = "";
   boardRender();
   try {
     const data = await boardFetch(boardApi({ action: "post", id }));
@@ -8714,11 +8857,25 @@ async function boardSubmit(form) {
   boardRender();
   try {
     // application/json으로 보내면 CORS 프리플라이트가 뜨고 Apps Script가 그걸 못 받는다
-    await boardFetch(BOARD_API_URL, {
+    const data = await boardFetch(BOARD_API_URL, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify(draft),
     });
+    // 게시 CSV에 반영되기 전이라도 방금 쓴 글은 바로 보여야 한다
+    if (BOARD_CSV_URL && data.id) {
+      boardRememberPending({
+        id: Number(data.id),
+        createdAt: new Date().toISOString(),
+        category: draft.category,
+        title: draft.title,
+        author: draft.author || "익명",
+        content: draft.content,
+        answer: "",
+        answeredAt: "",
+      });
+      board.posts = boardMergePending(board.posts.filter((p) => !p.pending));
+    }
     board.draft = { category: "", title: "", author: "", content: "" };
     board.notice = "등록했습니다. 답변은 게시판에서 확인하실 수 있습니다.";
     board.view = "list";
