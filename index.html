@@ -6,7 +6,7 @@
     <title>TW DB</title>
     <!-- 이미지 CDN. 첫 이미지 요청 전에 DNS+TLS를 미리 끝내둔다 -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
-    <link rel="stylesheet" href="./assets/styles.css?v=20260914-layoutfix" />
+    <link rel="stylesheet" href="./assets/styles.css?v=20260914-onekill-mode" />
     <!-- 모바일 전용. media 속성 덕에 넓은 화면에서는 렌더링을 막지 않는다 -->
     <link rel="stylesheet" href="./assets/mobile.css?v=20260914-layoutfix" media="(max-width: 720px)" />
   </head>
@@ -968,10 +968,19 @@
               <div id="okGroundRow" class="buff-base-row"></div>
 
               <p class="buff-section-title">내 정보</p>
+              <!-- 기준: 에타 레벨표의 최대 대미지로 계산하거나, 1타 대미지를 직접 넣어 계산한다 -->
+              <div id="okModeRow" class="buff-base-row ok-mode-row" role="group" aria-label="계산 기준">
+                <button type="button" class="buff-base-btn is-active" data-ok-mode="level">에타 레벨 기준</button>
+                <button type="button" class="buff-base-btn" data-ok-mode="damage">대미지 기준</button>
+              </div>
               <div class="ok-inputs ok-inputs-2">
-                <label class="field ok-field">
+                <label class="field ok-field" data-ok-mode-field="level">
                   <span>에타 레벨</span>
                   <input id="okEtaLevel" type="number" min="1" max="100" step="1" inputmode="numeric" placeholder="1~100" value="1" />
+                </label>
+                <label class="field ok-field" data-ok-mode-field="damage" hidden>
+                  <span>1타 대미지</span>
+                  <input id="okDamage" type="number" min="0" step="1" inputmode="numeric" placeholder="예: 3160000" value="0" />
                 </label>
                 <label class="field ok-field">
                   <span>스킬 타수</span>
@@ -993,7 +1002,7 @@
               <div id="okExtraRow" class="ok-inputs ok-inputs-3"></div>
 
               <div id="okResult" class="ok-result" aria-live="polite"></div>
-              <p class="ok-note">총 대미지 = (에타 최대 대미지 × 타수 + 무기 추가 대미지) × (1 + 추가 대미지 % 합). 몬스터 HP는 칸에서 직접 고칠 수 있습니다.</p>
+              <p class="ok-note">총 대미지 = (1타 대미지 × 타수 + 무기 추가 대미지) × (1 + 추가 대미지 % 합). 1타 대미지는 에타 레벨표의 최대 대미지를 쓰거나(에타 레벨 기준) 직접 넣습니다(대미지 기준). 몬스터 HP는 칸에서 직접 고칠 수 있습니다.</p>
             </div>
           </section>
 
@@ -1062,7 +1071,7 @@
       </div>
     </template>
 
-    <script src="./assets/app.js?v=20260914-visits-people" type="module"></script>
+    <script src="./assets/app.js?v=20260914-onekill-mode" type="module"></script>
     <!-- GoatCounter 방문자 분석 (localhost 방문은 count.js가 기본으로 집계 제외)
          자동 집계를 끄고 app.js의 라우터가 탭 단위 경로(/eta/ranking 등)로 직접 보낸다 -->
     <script>window.goatcounter = { no_onload: true };</script>

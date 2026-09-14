@@ -6502,6 +6502,11 @@ img.dmg-chk-icon {
   padding: 16px 20px 22px;
 }
 
+/* 계산 기준 버튼 줄. 아래 입력 칸과 간격을 둔다 */
+.ok-mode-row {
+  margin: 0 0 10px;
+}
+
 .ok-inputs {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

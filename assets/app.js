@@ -365,7 +365,9 @@ const els = {
   buffPanels: document.querySelectorAll("[data-buff-panel]"),
   seedBody: document.getElementById("seedBody"),
   okGroundRow: document.querySelector("#okGroundRow"),
+  okModeRow: document.querySelector("#okModeRow"),
   okEtaLevel: document.querySelector("#okEtaLevel"),
+  okDamage: document.querySelector("#okDamage"),
   okHits: document.querySelector("#okHits"),
   okExtraRow: document.querySelector("#okExtraRow"),
   okWeapon: document.querySelector("#okWeapon"),
@@ -3907,7 +3909,8 @@ const OK_EXTRAS = [
 const OK_SAVE_KEY = "tw-onekill-save-v1";
 
 const oneKillCalc = (() => {
-  const state = { ground: OK_GROUNDS[0].key, hpOverride: {}, extras: {}, loaded: false };
+  // mode: "level" = 에타 레벨표의 최대 대미지로 계산 | "damage" = 1타 대미지를 직접 넣어 계산
+  const state = { ground: OK_GROUNDS[0].key, hpOverride: {}, extras: {}, mode: "level", loaded: false };
 
   const ground = () => OK_GROUNDS.find((g) => g.key === state.ground) || OK_GROUNDS[0];
   const groundHp = () => Number(state.hpOverride[state.ground] ?? ground().hp) || 0;
@@ -3917,6 +3920,14 @@ const oneKillCalc = (() => {
   function etaMaxDamage(level) {
     const row = (etaInfo.data?.levels || []).find((r) => Number(r.lv) === level);
     return row ? Number(String(row.dmg).replace(/[^\d]/g, "")) || 0 : 0;
+  }
+
+  const okLevel = () => Math.min(100, Math.max(1, Number(els.okEtaLevel?.value) || 0));
+
+  // 계산에 쓰는 1타 대미지. 기준에 따라 레벨표 값이거나 직접 넣은 값이다
+  function baseDamage() {
+    if (state.mode === "damage") return Math.max(0, Number(els.okDamage?.value) || 0);
+    return etaMaxDamage(okLevel());
   }
 
   const extraValue = (ex) => Number(state.extras[ex.key] ?? ex.def ?? 0) || 0;
@@ -3931,13 +3942,13 @@ const oneKillCalc = (() => {
     }, 0);
   }
 
-  // (최대 대미지 × 타수 + 무기 추가 대미지) × (1 + 추가 대미지 합 %)
-  function okTotalDamage(level, hits) {
-    return (etaMaxDamage(level) * hits + weaponBonus()) * (1 + extraPercent() / 100);
+  // (1타 대미지 × 타수 + 무기 추가 대미지) × (1 + 추가 대미지 합 %)
+  function okTotalDamage(base, hits) {
+    return (base * hits + weaponBonus()) * (1 + extraPercent() / 100);
   }
 
   function save() {
-    try { localStorage.setItem(OK_SAVE_KEY, JSON.stringify({ ground: state.ground, hp: state.hpOverride, extras: state.extras, level: els.okEtaLevel?.value, hits: els.okHits?.value, weapon: els.okWeapon?.value })); } catch { /* 저장은 편의일 뿐 */ }
+    try { localStorage.setItem(OK_SAVE_KEY, JSON.stringify({ ground: state.ground, hp: state.hpOverride, extras: state.extras, mode: state.mode, level: els.okEtaLevel?.value, damage: els.okDamage?.value, hits: els.okHits?.value, weapon: els.okWeapon?.value })); } catch { /* 저장은 편의일 뿐 */ }
   }
 
   function restore() {
@@ -3947,7 +3958,9 @@ const oneKillCalc = (() => {
       if (OK_GROUNDS.some((g) => g.key === saved.ground)) state.ground = saved.ground;
       state.hpOverride = saved.hp || {};
       state.extras = saved.extras || {};
+      if (saved.mode === "level" || saved.mode === "damage") state.mode = saved.mode;
       if (els.okEtaLevel && saved.level) els.okEtaLevel.value = saved.level;
+      if (els.okDamage && saved.damage != null) els.okDamage.value = saved.damage;
       if (els.okHits && saved.hits) els.okHits.value = saved.hits;
       if (els.okWeapon && saved.weapon != null) els.okWeapon.value = saved.weapon;
     } catch { /* 깨진 저장값은 무시 */ }
@@ -3958,6 +3971,16 @@ const oneKillCalc = (() => {
     els.okGroundRow.innerHTML = OK_GROUNDS.map((g) => `
       <button type="button" class="buff-base-btn${g.key === state.ground ? " is-active" : ""}" data-ok-ground="${g.key}">${escapeHtml(g.name)}</button>
     `).join("");
+  }
+
+  // 기준 버튼 활성 표시와, 기준에 맞는 입력 칸(에타 레벨 / 1타 대미지)만 보이기
+  function renderMode() {
+    els.okModeRow?.querySelectorAll("[data-ok-mode]").forEach((button) => {
+      button.classList.toggle("is-active", button.dataset.okMode === state.mode);
+    });
+    document.querySelectorAll("[data-ok-mode-field]").forEach((field) => {
+      field.hidden = field.dataset.okModeField !== state.mode;
+    });
   }
 
   function renderExtras() {
@@ -3979,18 +4002,19 @@ const oneKillCalc = (() => {
 
   function renderResult() {
     if (!els.okResult) return;
-    const level = Math.min(100, Math.max(1, Number(els.okEtaLevel?.value) || 0));
+    const level = okLevel();
     const hits = Number(els.okHits?.value) || 4;
     const hp = groundHp();
-    const max = etaMaxDamage(level);
-    const total = okTotalDamage(level, hits);
+    const max = baseDamage();
+    const total = okTotalDamage(max, hits);
+    const byDamage = state.mode === "damage";
     const ratio = hp > 0 ? total / hp : 0;             // 한 번 공격이 HP의 몇 %인지
     const kills = ratio > 0 ? Math.ceil(1 / ratio) : 0; // 몇 번 때려야 잡는지
     const shortPct = hp > 0 ? Math.max(0, (hp - total) / hp) * 100 : 0;
 
     let verdict = "";
     if (!max) {
-      verdict = "에타 레벨을 1~100 사이로 넣어 주세요.";
+      verdict = byDamage ? "1타 대미지를 넣어 주세요." : "에타 레벨을 1~100 사이로 넣어 주세요.";
     } else if (kills <= 1) {
       verdict = `<strong>1킬</strong><span>(${(ratio * 100).toFixed(1)}%) · 여유 ${fmt(total - hp)}</span>`;
     } else {
@@ -4009,7 +4033,7 @@ const oneKillCalc = (() => {
           <strong class="ok-hp-edit"><input id="okHpInput" type="number" min="0" step="1" inputmode="numeric" value="${hp}" aria-label="몬스터 HP" /></strong>
         </div>
         <div class="eta-calc-cell is-main">
-          <span>예상 총 대미지 <small>에타 ${level} 최대 ${max ? fmt(max) : "-"} × ${hits}타${weaponBonus() ? ` + 무기 ${fmt(weaponBonus())}` : ""} · 추가 +${extraPercent()}%</small></span>
+          <span>예상 총 대미지 <small>${byDamage ? `1타 ${max ? fmt(max) : "-"}` : `에타 ${level} 최대 ${max ? fmt(max) : "-"}`} × ${hits}타${weaponBonus() ? ` + 무기 ${fmt(weaponBonus())}` : ""} · 추가 +${extraPercent()}%</small></span>
           <strong>${max ? fmt(total) : "-"}</strong>
         </div>
       </div>
@@ -4019,6 +4043,7 @@ const oneKillCalc = (() => {
 
   function renderAll() {
     renderGrounds();
+    renderMode();
     renderExtras();
     renderResult();
   }
@@ -4040,7 +4065,16 @@ const oneKillCalc = (() => {
       renderGrounds();
       renderResult();
     });
+    els.okModeRow?.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-ok-mode]");
+      if (!button || button.dataset.okMode === state.mode) return;
+      state.mode = button.dataset.okMode;
+      save();
+      renderMode();
+      renderResult();
+    });
     els.okEtaLevel?.addEventListener("input", () => { save(); renderResult(); });
+    els.okDamage?.addEventListener("input", () => { save(); renderResult(); });
     els.okHits?.addEventListener("change", () => { save(); renderResult(); });
     els.okWeapon?.addEventListener("input", () => { save(); renderResult(); });
     // 목록(select)은 change, 직접 입력(input)은 input으로 온다. 둘 다 받는다
