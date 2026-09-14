@@ -215,7 +215,7 @@ const eta = {
   compareDays: 1, // 증감 기준: 1(1일 전) | 7(1주일 전) | 30(1달 전)
   category: "전체",
   query: "",
-  sort: "rank", // "rank" = 레벨·정수 순 | "gain" = 획득 정수 순
+  sort: "rank", // "rank" = 레벨·정수 순 | "essence" = 보유 정수 순 | "gain" = 획득 정수 순
   loaded: false,
   loading: false,
   index: null, // 날짜 → 커밋 SHA
@@ -2368,12 +2368,16 @@ function renderEtaRanking() {
   });
 
   // 획득 정수 순 정렬. 비교 데이터가 없는 행(NEW)은 뒤로 보내고, 순위 칸은 이 정렬 기준의 순번으로 바꾼다
-  const sortByGain = eta.sort === "gain";
-  if (sortByGain) {
+  if (eta.sort === "gain") {
     ranked.sort((a, b) => {
       if (a.gain == null || b.gain == null) return (a.gain == null) - (b.gain == null);
       return b.gain - a.gain || a.rank - b.rank;
     });
+    ranked = ranked.map((row, index) => ({ ...row, rank: index + 1 }));
+  }
+  // 보유 정수 순 정렬. 레벨과 상관없이 정수만 비교하고, 같으면 원래 순위(레벨·정수 순)를 따른다
+  if (eta.sort === "essence") {
+    ranked.sort((a, b) => b.essence - a.essence || a.rank - b.rank);
     ranked = ranked.map((row, index) => ({ ...row, rank: index + 1 }));
   }
   els.etaRankingHead?.querySelectorAll("[data-eta-sort]").forEach((head) => {
@@ -2418,7 +2422,8 @@ function etaShowMore() {
 function etaRowsHtml(rows) {
   const prevMap = eta.prevMap;
   const deltaTitle = eta.deltaTitle;
-  const sortByGain = eta.sort === "gain";
+  // 순위 칸이 다른 기준(획득 정수·보유 정수)의 순번일 때는 순위 변동을 뺀다
+  const reranked = eta.sort !== "rank";
 
   return rows.map((row) => {
     const deltaBadge = (diff) => diff > 0
@@ -2436,8 +2441,7 @@ function etaRowsHtml(rows) {
       if (!prev) {
         newHtml = `<span class="eta-new"${deltaTitle}>NEW</span>`;
       } else {
-        // 획득 정수 순으로 정렬하면 순위 칸이 다른 기준이라 순위 변동은 뺀다
-        if (!sortByGain) deltaHtml = deltaBadge(prev.rank - row.rank);
+        if (!reranked) deltaHtml = deltaBadge(prev.rank - row.rank);
         levelDeltaHtml = deltaBadge(row.level - prev.level);
         essenceDeltaHtml = deltaBadge(row.essence - prev.essence);
       }
