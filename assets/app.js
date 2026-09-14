@@ -4137,27 +4137,41 @@ function loadHomeTab() {
   if (home.visits === "idle") loadHomeVisits();
 }
 
-// GoatCounter 공개 카운터로 오늘·누적 고유 방문자를 받아 히어로 아래 한 줄로 보여준다.
-// 설정이 꺼져 있거나 응답이 없으면 그 줄을 숨긴 채로 둔다 (사이트 동작에는 영향 없음).
+// 오늘·누적 방문자를 히어로 아래 한 줄로 보여준다.
+// 1순위: Apps Script 프록시 — GoatCounter 인증 API로 KST 자정 기준 "오늘"을 구한다.
+//        (공개 counter API는 날짜를 UTC 자정으로만 끊을 수 있어 KST 자정을 표현 못 함)
+// 2순위(프록시 장애 시): 공개 counter API — 하루 경계가 KST 09시로 밀린 근사값.
+// 둘 다 실패하면 그 줄을 숨긴 채로 둔다 (사이트 동작에는 영향 없음).
+const VISITS_PROXY_URL = "https://script.google.com/macros/s/AKfycbz5K3J47MMwwaJpj1YqAAg5EDOR2wOWjv9h_-oCxhDT3CjmHNmaH3yEkD1rjVsC2onbyA/exec";
 const VISITS_COUNTER_URL = "https://holedis88.goatcounter.com/counter/TOTAL.json";
 
 async function loadHomeVisits() {
   const el = document.querySelector("#homeVisits");
   if (!el) return;
   home.visits = "loading";
-  // counter API의 start=날짜는 UTC 자정 기준이라 로컬(KST) 날짜를 넣으면
-  // 오전 9시 전엔 미래 날짜가 되어 0이 나온다. UTC 날짜로 맞춘다(KST 09시 리셋).
-  const d = new Date();
-  const today = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
   const num = (v) => Number(String(v ?? "").replace(/\D/g, ""));  // "7 219" 같은 표기를 숫자로
-  try {
-    const [total, day] = await Promise.all([
-      fetch(VISITS_COUNTER_URL).then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status))))),
-      fetch(`${VISITS_COUNTER_URL}?start=${today}`).then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status))))),
-    ]);
-    el.innerHTML = `오늘 방문 <strong>${num(day.count_unique).toLocaleString("ko-KR")}</strong><span class="home-visits-sep">·</span>누적 방문 <strong>${num(total.count_unique).toLocaleString("ko-KR")}</strong>`;
+  const fetchJson = (url) => fetch(url).then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))));
+  const render = (today, total) => {
+    el.innerHTML = `오늘 방문 <strong>${today.toLocaleString("ko-KR")}</strong><span class="home-visits-sep">·</span>누적 방문 <strong>${total.toLocaleString("ko-KR")}</strong>`;
     el.hidden = false;
     home.visits = "ready";
+  };
+  try {
+    const p = await fetchJson(VISITS_PROXY_URL);
+    if (p.today == null || p.error) throw new Error(p.error || "proxy empty");
+    render(num(p.today), num(p.total));
+    return;
+  } catch (error) {
+    console.info("방문자 프록시 실패, 공개 카운터로 대체합니다.", error);
+  }
+  try {
+    const d = new Date();
+    const today = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+    const [total, day] = await Promise.all([
+      fetchJson(VISITS_COUNTER_URL),
+      fetchJson(`${VISITS_COUNTER_URL}?start=${today}`),
+    ]);
+    render(num(day.count_unique), num(total.count_unique));
   } catch (error) {
     console.info("방문자 수를 불러오지 못했습니다.", error);
     home.visits = "error";
