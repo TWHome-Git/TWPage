@@ -117,6 +117,14 @@ curl -s "https://twhome-git.github.io/TWPage/index.html" | grep -o 'app.js?v=[^"
 - Google Sheets CSV 로딩이 실패하면 로컬 스냅샷 fallback도 실패해서 페이지가 완전히 비게 됩니다.
 - 안정성을 높이려면 `data/equipment-snapshot.json` 생성 스크립트를 추가하는 것이 좋습니다.
 
+### 문의·건의 게시판
+
+- 글은 같은 스프레드시트의 `문의게시판` 시트에 쌓입니다. **읽기**는 그 시트를 웹에 게시한 CSV(`BOARD_CSV_URL`)로 받고, **쓰기**만 Apps Script 웹앱(`BOARD_API_URL`, 소스는 `board-apps-script.gs`)을 거칩니다. 읽기까지 Apps Script로 가면 호출마다 2~3초라 목록·글 열기가 너무 느렸습니다(2026-09-14 변경).
+- 게시 CSV는 몇 분 늦게 갱신되므로 방금 쓴 글은 브라우저가 localStorage(`tw-board-pending-v1`)에 최대 30분 기억해 목록에 끼워 넣고, 마지막 목록은 `tw-board-cache-v1`에 남겨 다음에 열 때 먼저 보여줍니다.
+- **시트 시간대는 반드시 `(GMT+09:00) Seoul`** 이어야 합니다(파일 → 설정). Apps Script가 시트 시간대 기준으로 시각을 적고, 사이트는 CSV의 시각을 한국 시간으로 고정 해석합니다. 처음에는 태평양 시간대로 돼 있어 16시간 어긋났습니다.
+- 시트가 표(테이블)이면 작성일·답변일 열 유형은 "날짜 및 시간"으로 둡니다. "날짜" 유형은 시간이 붙은 값을 거부합니다. 답변일에 날짜만 적어도 사이트는 읽습니다.
+- 답변은 시트 G열에 적으면 되고, H열(답변일)은 `onEdit` 트리거가 자동으로 채웁니다.
+
 ## 7. CSV 컬럼 매핑
 
 `assets/app.js`의 `toRecord(row, index)` 기준입니다.
