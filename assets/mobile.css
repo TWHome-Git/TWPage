@@ -192,6 +192,19 @@
   }
 }
 
+/* 상단 탭: 손가락 터치 영역 권장 44px. 데스크톱 29px는 그대로 둔다 */
+@media (max-width: 720px) {
+  .tab-button {
+    min-height: 44px;
+  }
+
+  /* 계산기·시뮬레이터·정보 탭 4개를 한 줄에 두면 글자가 두 줄로 접힌다. 2×2로 둔다 */
+  .addon-subtabs {
+    grid-auto-flow: row;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 720px) {
   .overlay-actions-field {
     justify-items: stretch;
