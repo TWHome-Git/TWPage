@@ -570,32 +570,48 @@ function routeApply(r) {
 }
 
 // ── 방문 집계 (GoatCounter) ──
-// 해시 주소라 count.js의 자동 집계로는 전부 "/"로 잡힌다. 메인/하위 탭 단위(/eta/ranking)로 직접 보내고,
-// 항목(아바타 하나하나)까지는 보내지 않아 대시보드가 흩어지지 않게 한다. 같은 경로는 연속으로 다시 세지 않는다.
-const visit = { ready: false, last: "" };
+// 사람 수와 탭 통계를 따로 센다.
+//  - 첫 화면 한 번: 경로 "/"로 페이지뷰를 보낸다. GoatCounter는 세션당 경로별로 한 번만 "방문"으로 세므로
+//    이것이 사람(세션) 수에 가장 가깝다. 탭 단위 집계 전(2026-09-13 이전)에 count.js가 자동으로 세던
+//    것도 "/"라서 누적이 이어진다.
+//  - 탭 이동: 메인/하위 탭 단위 경로(/eta/ranking)를 "이벤트"로 보낸다. 대시보드에서 탭별 인기는 보이지만
+//    방문 수(홈의 오늘·누적)에는 들어가지 않는다. 항목(아바타 하나하나)까지는 보내지 않는다.
+// 해시 주소라 count.js의 자동 집계(no_onload로 꺼 둠)로는 전부 "/"로 잡히기 때문에 직접 보낸다.
+const visit = { ready: false, last: "", landed: false, queue: [] };
+
+// count.js가 아직 안 내려왔으면 모아 뒀다가 로드된 뒤 순서대로 보낸다 (첫 화면)
+function visitSend(vars) {
+  const gc = window.goatcounter;
+  if (gc && typeof gc.count === "function") {
+    gc.count(vars);
+    return;
+  }
+  if (!visit.queue.length) {
+    document.querySelector("script[data-goatcounter]")?.addEventListener("load", () => {
+      const pending = visit.queue.splice(0);
+      if (typeof window.goatcounter?.count === "function") pending.forEach((v) => window.goatcounter.count(v));
+    }, { once: true });
+  }
+  visit.queue.push(vars);
+}
 
 function visitTrack() {
   if (!visit.ready) return;   // 부팅 중 기본 탭을 켜는 과정은 방문으로 세지 않는다
   const r = routeCurrent();
   if (!r) return;
   const path = "/" + [r.main, r.sub].filter(Boolean).join("/");
-  if (path === visit.last) return;
+  if (path === visit.last) return;   // 같은 경로는 연속으로 다시 세지 않는다
   visit.last = path;
+
+  if (!visit.landed) {
+    visit.landed = true;
+    visitSend({ path: "/", title: "TW DB" });
+  }
 
   const label = (attr, key) => document.querySelector(`[data-${attr}="${CSS.escape(key)}"]`)?.textContent.trim() || key;
   const title = [label("main-tab", r.main), r.sub ? label(ROUTE_SUB[r.main]?.attr.replace(/[A-Z]/g, (c) => "-" + c.toLowerCase()) || "", r.sub) : ""]
     .filter(Boolean).join(" · ");
-  const vars = { path, title };
-
-  const gc = window.goatcounter;
-  if (gc && typeof gc.count === "function") {
-    gc.count(vars);
-    return;
-  }
-  // count.js가 아직 안 내려왔으면 로드된 뒤 보낸다 (첫 화면)
-  document.querySelector("script[data-goatcounter]")?.addEventListener("load", () => {
-    if (typeof window.goatcounter?.count === "function") window.goatcounter.count(vars);
-  }, { once: true });
+  visitSend({ path, title, event: true });
 }
 
 // 데이터가 준비된 뒤 미뤄 둔 항목을 연다. 각 DB 로딩이 끝날 때마다 불린다.
@@ -4141,13 +4157,14 @@ function loadHomeTab() {
   if (home.visits === "idle") loadHomeVisits();
 }
 
-// 오늘·누적 방문자를 히어로 아래 한 줄로 보여준다.
+// 오늘·누적 방문자를 히어로 아래 한 줄로 보여준다. 수치는 "/" 경로의 방문(세션) 수 = 사람 수에 가깝다.
 // 1순위: Apps Script 프록시 — GoatCounter 인증 API로 KST 자정 기준 "오늘"을 구한다.
 //        (공개 counter API는 날짜를 UTC 자정으로만 끊을 수 있어 KST 자정을 표현 못 함)
-// 2순위(프록시 장애 시): 공개 counter API — 하루 경계가 KST 09시로 밀린 근사값.
+// 2순위(프록시 장애 시): 공개 counter API — 하루 경계가 KST 09시로 밀리고 최대 4시간 캐시된 근사값.
 // 둘 다 실패하면 그 줄을 숨긴 채로 둔다 (사이트 동작에는 영향 없음).
 const VISITS_PROXY_URL = "https://script.google.com/macros/s/AKfycbz5K3J47MMwwaJpj1YqAAg5EDOR2wOWjv9h_-oCxhDT3CjmHNmaH3yEkD1rjVsC2onbyA/exec";
-const VISITS_COUNTER_URL = "https://holedis88.goatcounter.com/counter/TOTAL.json";
+// 공개 카운터는 "/" 경로(사람 수)만 본다. TOTAL은 탭 이벤트까지 합친 값이라 쓰지 않는다
+const VISITS_COUNTER_URL = "https://holedis88.goatcounter.com/counter//.json";
 
 const VISITS_CACHE_KEY = "tw-visits-cache-v1";
 
@@ -4194,7 +4211,7 @@ async function loadHomeVisits() {
       fetchJson(VISITS_COUNTER_URL),
       fetchJson(`${VISITS_COUNTER_URL}?start=${today}`),
     ]);
-    done(num(day.count_unique), num(total.count_unique));
+    done(num(day.count ?? day.count_unique), num(total.count ?? total.count_unique));
   } catch (error) {
     console.info("방문자 수를 불러오지 못했습니다.", error);
     home.visits = cached ? "ready" : "error";
