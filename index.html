@@ -981,7 +981,7 @@
                 </label>
                 <label class="field ok-field is-locked" data-ok-mode-field="damage">
                   <span>1타 대미지</span>
-                  <input id="okDamage" type="number" min="0" step="1" inputmode="numeric" placeholder="예: 3160000" value="0" disabled />
+                  <input id="okDamage" type="text" inputmode="numeric" autocomplete="off" placeholder="예: 3,160,000" value="" disabled />
                 </label>
               </div>
               <div class="ok-inputs ok-inputs-2">
@@ -995,7 +995,7 @@
                 </label>
                 <label class="field ok-field">
                   <span>무기 추가 대미지</span>
-                  <input id="okWeapon" type="number" min="0" step="1" inputmode="numeric" placeholder="0" value="0" />
+                  <input id="okWeapon" type="text" inputmode="numeric" autocomplete="off" placeholder="0" value="" />
                 </label>
               </div>
 
@@ -1072,7 +1072,7 @@
       </div>
     </template>
 
-    <script src="./assets/app.js?v=20260914-onekill-mode2" type="module"></script>
+    <script src="./assets/app.js?v=20260914-onekill-comma" type="module"></script>
     <!-- GoatCounter 방문자 분석 (localhost 방문은 count.js가 기본으로 집계 제외)
          자동 집계를 끄고 app.js의 라우터가 탭 단위 경로(/eta/ranking 등)로 직접 보낸다 -->
     <script>window.goatcounter = { no_onload: true };</script>

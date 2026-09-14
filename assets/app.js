@@ -3913,8 +3913,30 @@ const oneKillCalc = (() => {
   const state = { ground: OK_GROUNDS[0].key, hpOverride: {}, extras: {}, mode: "level", loaded: false };
 
   const ground = () => OK_GROUNDS.find((g) => g.key === state.ground) || OK_GROUNDS[0];
-  const groundHp = () => Number(state.hpOverride[state.ground] ?? ground().hp) || 0;
   const fmt = (n) => Math.round(n).toLocaleString("ko-KR");
+
+  // 큰 숫자 칸(1타 대미지·무기 추가 대미지·몬스터 HP)은 글자 칸으로 두고 쉼표를 자동으로 넣는다.
+  // 읽을 때는 숫자만 남기고, 보여줄 때는 세 자리마다 쉼표를 찍는다
+  const digits = (v) => Number(String(v ?? "").replace(/[^\d]/g, "")) || 0;
+  const withComma = (v) => (digits(v) ? digits(v).toLocaleString("ko-KR") : "");
+  const groundHp = () => digits(state.hpOverride[state.ground] ?? ground().hp);
+
+  // 입력 중에 쉼표를 다시 찍으면서 커서는 같은 숫자 자리에 둔다
+  function formatCommaInput(input) {
+    if (!input) return;
+    const raw = input.value;
+    const caret = input.selectionStart ?? raw.length;
+    const digitsBefore = raw.slice(0, caret).replace(/[^\d]/g, "").length;
+    const next = withComma(raw);
+    if (next === raw) return;
+    input.value = next;
+    let pos = 0, seen = 0;
+    while (pos < next.length && seen < digitsBefore) {
+      if (/\d/.test(next[pos])) seen += 1;
+      pos += 1;
+    }
+    try { input.setSelectionRange(pos, pos); } catch { /* 포커스가 없으면 무시 */ }
+  }
 
   // 에타 레벨표(dmg)에서 그 레벨의 최대 대미지를 읽는다
   function etaMaxDamage(level) {
@@ -3926,13 +3948,13 @@ const oneKillCalc = (() => {
 
   // 계산에 쓰는 1타 대미지. 기준에 따라 레벨표 값이거나 직접 넣은 값이다
   function baseDamage() {
-    if (state.mode === "damage") return Math.max(0, Number(els.okDamage?.value) || 0);
+    if (state.mode === "damage") return digits(els.okDamage?.value);
     return etaMaxDamage(okLevel());
   }
 
   const extraValue = (ex) => Number(state.extras[ex.key] ?? ex.def ?? 0) || 0;
 
-  const weaponBonus = () => Number(els.okWeapon?.value) || 0;
+  const weaponBonus = () => digits(els.okWeapon?.value);
 
   // 추가 대미지 항목 합 (%). 무기 추가 대미지는 상수라 여기 넣지 않는다
   function extraPercent() {
@@ -3948,7 +3970,7 @@ const oneKillCalc = (() => {
   }
 
   function save() {
-    try { localStorage.setItem(OK_SAVE_KEY, JSON.stringify({ ground: state.ground, hp: state.hpOverride, extras: state.extras, mode: state.mode, level: els.okEtaLevel?.value, damage: els.okDamage?.value, hits: els.okHits?.value, weapon: els.okWeapon?.value })); } catch { /* 저장은 편의일 뿐 */ }
+    try { localStorage.setItem(OK_SAVE_KEY, JSON.stringify({ ground: state.ground, hp: state.hpOverride, extras: state.extras, mode: state.mode, level: els.okEtaLevel?.value, damage: digits(els.okDamage?.value), hits: els.okHits?.value, weapon: digits(els.okWeapon?.value) })); } catch { /* 저장은 편의일 뿐 */ }
   }
 
   function restore() {
@@ -3960,9 +3982,9 @@ const oneKillCalc = (() => {
       state.extras = saved.extras || {};
       if (saved.mode === "level" || saved.mode === "damage") state.mode = saved.mode;
       if (els.okEtaLevel && saved.level) els.okEtaLevel.value = saved.level;
-      if (els.okDamage && saved.damage != null) els.okDamage.value = saved.damage;
+      if (els.okDamage && saved.damage != null) els.okDamage.value = withComma(saved.damage);
       if (els.okHits && saved.hits) els.okHits.value = saved.hits;
-      if (els.okWeapon && saved.weapon != null) els.okWeapon.value = saved.weapon;
+      if (els.okWeapon && saved.weapon != null) els.okWeapon.value = withComma(saved.weapon);
     } catch { /* 깨진 저장값은 무시 */ }
   }
 
@@ -4032,7 +4054,7 @@ const oneKillCalc = (() => {
       <div class="eta-calc-grid ok-grid">
         <div class="eta-calc-cell is-main">
           <span>${escapeHtml(ground().name)} 몬스터 HP</span>
-          <strong class="ok-hp-edit"><input id="okHpInput" type="number" min="0" step="1" inputmode="numeric" value="${hp}" aria-label="몬스터 HP" /></strong>
+          <strong class="ok-hp-edit"><input id="okHpInput" type="text" inputmode="numeric" autocomplete="off" value="${withComma(hp)}" aria-label="몬스터 HP" /></strong>
         </div>
         <div class="eta-calc-cell is-main">
           <span>예상 총 대미지 <small>${byDamage ? `1타 ${max ? fmt(max) : "-"}` : `에타 ${level} 최대 ${max ? fmt(max) : "-"}`} × ${hits}타${weaponBonus() ? ` + 무기 ${fmt(weaponBonus())}` : ""} · 추가 +${extraPercent()}%</small></span>
@@ -4076,9 +4098,9 @@ const oneKillCalc = (() => {
       renderResult();
     });
     els.okEtaLevel?.addEventListener("input", () => { save(); renderResult(); });
-    els.okDamage?.addEventListener("input", () => { save(); renderResult(); });
+    els.okDamage?.addEventListener("input", () => { formatCommaInput(els.okDamage); save(); renderResult(); });
     els.okHits?.addEventListener("change", () => { save(); renderResult(); });
-    els.okWeapon?.addEventListener("input", () => { save(); renderResult(); });
+    els.okWeapon?.addEventListener("input", () => { formatCommaInput(els.okWeapon); save(); renderResult(); });
     // 목록(select)은 change, 직접 입력(input)은 input으로 온다. 둘 다 받는다
     // [?] 버튼: 시뮬레이터 확률표 모달을 그대로 빌려 안내 문구를 띄운다
     els.okExtraRow?.addEventListener("click", (event) => {
@@ -4105,7 +4127,7 @@ const oneKillCalc = (() => {
     // HP 칸은 결과 안에 있어 매번 다시 그려지므로, 입력 중에는 값만 바꾸고 판정 문구만 갱신한다
     els.okResult?.addEventListener("input", (event) => {
       if (event.target.id !== "okHpInput") return;
-      state.hpOverride[state.ground] = event.target.value;
+      state.hpOverride[state.ground] = digits(event.target.value);
       save();
       const verdict = els.okResult.querySelector(".ok-verdict");
       const keep = document.activeElement;
