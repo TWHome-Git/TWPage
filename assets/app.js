@@ -3973,13 +3973,15 @@ const oneKillCalc = (() => {
     `).join("");
   }
 
-  // 기준 버튼 활성 표시와, 기준에 맞는 입력 칸(에타 레벨 / 1타 대미지)만 보이기
+  // 기준 버튼 활성 표시. 입력 칸(에타 레벨 / 1타 대미지)은 둘 다 두고 기준이 아닌 쪽만 잠근다
   function renderMode() {
     els.okModeRow?.querySelectorAll("[data-ok-mode]").forEach((button) => {
       button.classList.toggle("is-active", button.dataset.okMode === state.mode);
     });
     document.querySelectorAll("[data-ok-mode-field]").forEach((field) => {
-      field.hidden = field.dataset.okModeField !== state.mode;
+      const off = field.dataset.okModeField !== state.mode;
+      field.classList.toggle("is-locked", off);
+      field.querySelectorAll("input").forEach((input) => { input.disabled = off; });
     });
   }
 
