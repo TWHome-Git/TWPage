@@ -8621,7 +8621,7 @@ loadDmgMonsters();
 // ══════════════════════════════════════════════════════════════
 const BOARD_API_URL = "https://script.google.com/macros/s/AKfycbyNioDGVAQp8KSIsgUkPwfVMRY8xtG7CAtaUSjWc0Hs4qiaSvKWxBGGcfEUfsUFWG2U/exec";
 // 게시판 시트를 파일 → 공유 → 웹에 게시 → "문의게시판" 시트, CSV로 게시한 주소
-const BOARD_CSV_URL = "";
+const BOARD_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS78PnupM0NaJzkrkFCr2Llja9TJKrLcRZqeCqlCUV4GPGlsJd3xSIn3SQAvHwzy_tGtxDbTFtl8oZQ/pub?gid=568412821&single=true&output=csv";
 
 const BOARD_CACHE_KEY = "tw-board-cache-v1";      // 마지막으로 받은 목록
 const BOARD_PENDING_KEY = "tw-board-pending-v1";  // 방금 쓴 글. CSV에 나타날 때까지 끼워 넣는다
@@ -8655,7 +8655,10 @@ function boardDate(iso) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
   const pad = (n) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const day = `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())}`;
+  // 답변일은 시트에 날짜만 적히므로 0시 0분이면 시간을 붙이지 않는다
+  if (d.getHours() === 0 && d.getMinutes() === 0) return day;
+  return `${day} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 // 줄바꿈만 살리고 나머지는 escape 한다. 방문자가 쓴 글이라 HTML을 그대로 넣으면 안 된다
@@ -8663,22 +8666,32 @@ const boardText = (value) => escapeHtml(value || "").replace(/\n/g, "<br />");
 
 // 게시 CSV의 날짜는 시트에 보이는 글자 그대로 온다. 시트 로케일에 따라
 // "2026. 9. 14 오후 3:05:00" / "9/14/2026 15:05:00" / "2026-09-14 15:05:00" 중 하나라
-// 셋 다 받아서 ISO 문자열로 맞춘다. 못 알아보면 빈 값으로 두어 날짜만 비운다
+// 셋 다 받아서 ISO 문자열로 맞춘다. 못 알아보면 빈 값으로 두어 날짜만 비운다.
+// 시트에 적힌 시각은 시트 설정(파일 → 설정 → 시간대)의 시간대를 따르므로 그 시간대를
+// 한국(+09:00)으로 두고, 보는 사람의 브라우저 시간대와 무관하게 한국 시각으로 해석한다.
+const BOARD_SHEET_TZ = "+09:00";
+
 function boardParseDate(value) {
   const text = String(value || "").trim();
   if (!text) return "";
-  const time = (h, m, s, ampm) => {
+  const hour24 = (h, ampm) => {
     let hour = Number(h);
     if (ampm === "오후" || /^pm$/i.test(ampm || "")) hour = hour % 12 + 12;
     if (ampm === "오전" || /^am$/i.test(ampm || "")) hour = hour % 12;
-    return [hour, Number(m), Number(s || 0)];
+    return hour;
   };
-  let m = text.match(/^(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\.?(?:\s*(오전|오후))?\s*(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
-  if (m) return new Date(+m[1], +m[2] - 1, +m[3], ...time(m[5], m[6], m[7], m[4])).toISOString();
-  m = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?$/i);
-  if (m) return new Date(+m[3], +m[1] - 1, +m[2], ...time(m[4], m[5], m[6], m[7])).toISOString();
-  m = text.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?$/);
-  if (m) return new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0)).toISOString();
+  const pad = (n) => String(Number(n) || 0).padStart(2, "0");
+  const iso = (y, mo, d, h, mi, s) => {
+    const parsed = new Date(`${y}-${pad(mo)}-${pad(d)}T${pad(h)}:${pad(mi)}:${pad(s)}${BOARD_SHEET_TZ}`);
+    return Number.isNaN(parsed.getTime()) ? "" : parsed.toISOString();
+  };
+  // 답변일처럼 시간 없이 날짜만 적힌 값도 있어 시간 부분은 전부 선택이다 (없으면 0시)
+  let m = text.match(/^(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\.?(?:\s*(오전|오후))?(?:\s*(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+  if (m) return iso(m[1], m[2], m[3], hour24(m[5] || 0, m[4]), m[6], m[7]);
+  m = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?)?$/i);
+  if (m) return iso(m[3], m[1], m[2], hour24(m[4] || 0, m[7]), m[5], m[6]);
+  m = text.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+  if (m) return iso(m[1], m[2], m[3], m[4], m[5], m[6]);
   const d = new Date(text);
   return Number.isNaN(d.getTime()) ? "" : d.toISOString();
 }
