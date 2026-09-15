@@ -4206,7 +4206,9 @@ const HIT_BUFFS = [
   { key: "helmet", name: "투구 부가 옵션", kind: "fixed", input: "num", min: 0, max: 60, icon: "Exp/투구_부가.png" },
   { key: "card", name: "몬스터 카드 옵션", kind: "fixed", input: "num", min: 0, max: 70, icon: "Exp/카드.png" },
   { key: "petS", name: "펫 S 스킬", kind: "fixed", input: "num", min: 0, max: 70, icon: "펫_덱스.png" },
-  { key: "enhance", name: "능력 강화 (%)", kind: "multB", input: "num", min: 0, max: 20, def: 20, icon: "능력_강화.png" },
+  // 능력 강화는 레벨로 넣고 %로 바꾼다. LV1~5 = 1~5%, LV6~10 = 8·11·14·17·20% (2026-09-15 게임 실측)
+  { key: "enhance", name: "능력 강화 (LV)", kind: "multB", input: "num", min: 0, max: 10, def: 10, icon: "능력_강화.png",
+    levels: [0, 1, 2, 3, 4, 5, 8, 11, 14, 17, 20] },
   { key: "club", name: "클럽 효과", kind: "fixed", input: "num", min: 0, max: 7, def: 7, icon: "클럽_덱스.png" },
   { key: "clubS", name: "클럽 S효과", kind: "fixed", input: "check", value: 20, icon: "클럽S_덱스.png" },
   { key: "rune", name: "룬 스킬 (DEX)", kind: "fixed", input: "num", min: 0, max: 20, def: 20, icon: "룬_가벼운몸놀림.png" },
@@ -4238,7 +4240,9 @@ const hitCalc = (() => {
     if (buff.input === "check") return saved ? buff.value : 0;
     // 숫자 항목: 체크가 켜져 있을 때만, 범위 안으로 잘라서 쓴다
     if (!saved || typeof saved !== "object" || !saved.on) return 0;
-    return Math.min(buff.max, Math.max(buff.min, num(saved.value)));
+    const v = Math.min(buff.max, Math.max(buff.min, num(saved.value)));
+    // 레벨표가 있으면 레벨 → 효과값으로 바꾼다 (능력 강화)
+    return buff.levels ? (buff.levels[Math.round(v)] ?? 0) : v;
   }
 
   // 한 스탯의 기본 능력치·최종 능력치와 중간값
@@ -4352,7 +4356,7 @@ const hitCalc = (() => {
         ${isNum && on ? `
           <input class="buff-num" type="number" inputmode="numeric" min="${buff.min}" max="${buff.max}" step="1"
             placeholder="${buff.min}~${buff.max}" data-hit-num="${buff.key}" value="${escapeHtml(String(num(saved.value) || ""))}" />
-          <span class="buff-unit">${buff.kind === "multB" ? "%" : ""}</span>` : ""}
+          <span class="buff-unit">${buff.levels ? "LV" : buff.kind === "multB" ? "%" : ""}</span>` : ""}
       </div>`;
     };
     const groups = `<div class="buff-grid hit-grid">${HIT_BUFFS.map(cell).join("")}</div>`;
