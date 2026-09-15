@@ -4210,7 +4210,7 @@ const HIT_BUFFS = [
   { key: "rune", name: "룬 스킬 (DEX)", kind: "fixed", input: "num", min: 0, max: 20, def: 20, icon: "룬_가벼운몸놀림.png" },
   { key: "runeHit", name: "룬 스킬 (명중률)", kind: "hit", input: "num", min: 0, max: 20, def: 20, icon: "룬_예리한눈.png" },
   { key: "siena", name: "시에나의 기운 (DEX)", kind: "final", input: "num", min: 0, max: 999, icon: "시에나.png" },
-  { key: "encourage", name: "엔커리지", kind: "multB", input: "check", value: 10, icon: "엔커리지.png" },
+  { key: "encourage", name: "인커리지", kind: "multB", input: "check", value: 10, icon: "엔커리지.png" },
 ];
 
 const hitCalc = (() => {
