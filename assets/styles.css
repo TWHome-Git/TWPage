@@ -6796,6 +6796,17 @@ img.dmg-chk-icon {
   font-weight: 700;
 }
 
+/* 어빌리티·효과·기타: 장비 대신 수치를 직접 넣는 줄 */
+.hit-equip-table .is-manual .hit-name,
+.hit-manual-label {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.hit-equip-table .is-manual .hit-name {
+  padding-left: 14px;
+}
+
 .hit-table tfoot th,
 .hit-table tfoot td {
   border-bottom: 0;

@@ -4167,44 +4167,42 @@ const oneKillCalc = (() => {
 const HIT_SAVE_KEY = "tw-hit-save-v1";
 const HIT_GROUNDS_URL = "./assets/hit-grounds.json";
 const HIT_STATS = ["DEX"];   // 명중은 DEX만 본다 (AGI는 2026-09-15 제외)
-const HIT_SLOTS = ["무기", "갑옷", "손목", "투구", "머리", "몸", "손", "다리", "아티팩트"];
+// 장비 DB에서 고르는 부위와, 명중 수치를 직접 넣는 줄(manual)
+const HIT_SLOTS = [
+  { slot: "무기" }, { slot: "무기 어빌리티", manual: true },
+  { slot: "갑옷" }, { slot: "손목" }, { slot: "투구" }, { slot: "머리" }, { slot: "몸" },
+  { slot: "손" }, { slot: "손 어빌리티", manual: true },
+  { slot: "다리" },
+  { slot: "아티팩트" }, { slot: "효과", manual: true }, { slot: "기타", manual: true },
+];
 
 // 버프 정의. kind: pct(비율, 버프마다 버림) / fixed(고정값) / multA(배율 A, 곱) / multB(배율 B, %) / final(최종 고정치)
 // input: check(체크) / num(체크 + 숫자 하나, min~max)
-// excl: 같은 그룹은 택1 (하나를 켜면 다른 쪽이 꺼진다)
-// icon: images/ 아래 경로 (경험치 버프 계산기와 같은 CDN). 없는 것은 빈 자리로 둔다
+// excl: 같은 그룹은 택1 (하나를 켜면 다른 쪽이 잠긴다)
+// icon: images/ 아래 경로 (경험치 버프 계산기와 같은 CDN). 없는 것은 첫 글자 자리표시
+// 화면에는 이 순서대로 한 줄에 두 개씩 놓인다 (짝은 2026-09-15 사용자 지정)
 const HIT_BUFFS = [
-  { group: "비율 증가", note: "버프마다 소수점 버림", items: [
-    { key: "snowman", name: "눈사람 특제 포션", kind: "pct", input: "check", value: 30, icon: "눈사람.png", excl: "snow" },
-    { key: "illumi", name: "일루미네이션 축제 음료", kind: "pct", input: "check", value: 30, icon: "일루미.png", excl: "snow" },
-    { key: "isabelPct", name: "이자벨의 특선 묘약 (비율 능력치)", kind: "pct", input: "check", value: 50, icon: "" },
-  ] },
-  { group: "고정값 증가", items: [
-    { key: "trust", name: "개-신뢰의 물약", kind: "fixed", input: "num", min: 28, max: 33, icon: "신뢰.png" },
-    { key: "bless", name: "축복의 물약", kind: "fixed", input: "check", value: 20, icon: "축복.png", excl: "bless" },
-    { key: "isabelBless", name: "이자벨의 비법 (고정 능력치)", kind: "fixed", input: "check", value: 20, icon: "", excl: "bless" },
-    { key: "isabelFixed", name: "이자벨의 특선 묘약 (고정 능력치)", kind: "fixed", input: "check", value: 100, icon: "" },
-    { key: "fever", name: "피버 상태", kind: "fixed", input: "check", value: 30, icon: "피버.png" },
-    { key: "helmet", name: "투구 부가 옵션", kind: "fixed", input: "num", min: 0, max: 60, icon: "Exp/투구_부가.png" },
-    { key: "card", name: "몬스터 카드 옵션", kind: "fixed", input: "num", min: 0, max: 70, icon: "Exp/카드.png" },
-    { key: "club", name: "클럽 효과", kind: "fixed", input: "num", min: 0, max: 7, icon: "클럽.png" },
-    { key: "clubS", name: "클럽 S효과", kind: "fixed", input: "check", value: 20, icon: "클럽.png" },
-    { key: "petS", name: "펫 S 스킬", kind: "fixed", input: "num", min: 0, max: 50, icon: "" },
-    { key: "rune", name: "룬 스킬", kind: "fixed", input: "num", min: 0, max: 20, icon: "" },
-  ] },
-  { group: "능력치 배율 A", note: "모두 곱셈", items: [
-    { key: "exorcist", name: "퇴마사의 축복", kind: "multA", input: "check", value: 1.1, icon: "퇴마사.png" },
-    { key: "isabelMult", name: "이자벨의 비법 (비율 능력치)", kind: "multA", input: "check", value: 1.1, icon: "" },
-    { key: "holyWater", name: "축복의 성수", kind: "multA", input: "check", value: 1.1, icon: "" },
-  ] },
-  { group: "능력치 배율 B", items: [
-    { key: "enhance", name: "능력 강화 (%)", kind: "multB", input: "num", min: 0, max: 20, icon: "" },
-    { key: "encourage", name: "엔커리지", kind: "multB", input: "check", value: 10, icon: "" },
-  ] },
-  { group: "최종 고정치 증가", items: [
-    { key: "crown", name: "크라운", kind: "final", input: "num", min: 0, max: 300, icon: "" },
-    { key: "relicGoods", name: "신조의 성물", kind: "final", input: "num", min: 0, max: 300, icon: "" },
-  ] },
+  { key: "snowman", name: "눈사람 특제 포션", kind: "pct", input: "check", value: 30, icon: "눈사람.png", excl: "snow" },
+  { key: "illumi", name: "일루미네이션 축제 음료", kind: "pct", input: "check", value: 30, icon: "일루미.png", excl: "snow" },
+  { key: "isabelBless", name: "이자벨의 비법 (고정 능력치)", kind: "fixed", input: "check", value: 20, icon: "", excl: "bless" },
+  { key: "bless", name: "축복의 물약", kind: "fixed", input: "check", value: 20, icon: "축복.png", excl: "bless" },
+  { key: "isabelMult", name: "이자벨의 비법 (비율 능력치)", kind: "multA", input: "check", value: 1.1, icon: "", excl: "multA" },
+  { key: "exorcist", name: "퇴마사의 축복", kind: "multA", input: "check", value: 1.1, icon: "퇴마사.png", excl: "multA" },
+  { key: "isabelFixed", name: "특선 묘약 (고정 능력치)", kind: "fixed", input: "check", value: 100, icon: "" },
+  { key: "isabelPct", name: "특선 묘약 (비율 능력치)", kind: "pct", input: "check", value: 50, icon: "" },
+  { key: "trust", name: "개-신뢰의 물약", kind: "fixed", input: "num", min: 28, max: 33, icon: "신뢰.png" },
+  { key: "fever", name: "피버 상태", kind: "fixed", input: "check", value: 30, icon: "피버.png" },
+  { key: "crown", name: "크라운", kind: "final", input: "num", min: 0, max: 300, icon: "" },
+  { key: "relicGoods", name: "신조의 성물", kind: "final", input: "num", min: 0, max: 300, icon: "" },
+  { key: "helmet", name: "투구 부가 옵션", kind: "fixed", input: "num", min: 0, max: 60, icon: "Exp/투구_부가.png" },
+  { key: "card", name: "몬스터 카드 옵션", kind: "fixed", input: "num", min: 0, max: 70, icon: "Exp/카드.png" },
+  { key: "petS", name: "펫 S 스킬", kind: "fixed", input: "num", min: 0, max: 50, icon: "" },
+  { key: "rune", name: "룬 스킬", kind: "fixed", input: "num", min: 0, max: 20, icon: "" },
+  { key: "club", name: "클럽 효과", kind: "fixed", input: "num", min: 0, max: 7, icon: "클럽.png" },
+  { key: "clubS", name: "클럽 S효과", kind: "fixed", input: "check", value: 20, icon: "클럽.png" },
+  { key: "enhance", name: "능력 강화 (%)", kind: "multB", input: "num", min: 0, max: 20, icon: "" },
+  { key: "encourage", name: "엔커리지", kind: "multB", input: "check", value: 10, icon: "" },
+  { key: "holyWater", name: "축복의 성수", kind: "multA", input: "check", value: 1.1, icon: "" },
 ];
 
 const hitCalc = (() => {
@@ -4223,7 +4221,7 @@ const hitCalc = (() => {
   const q = (sel) => document.querySelector(sel);
   const fmt = (n) => Math.round(n).toLocaleString("ko-KR");
   const num = (v) => Number(v) || 0;
-  const findBuff = (key) => HIT_BUFFS.flatMap((g) => g.items).find((b) => b.key === key);
+  const findBuff = (key) => HIT_BUFFS.find((b) => b.key === key);
 
   function buffValue(buff) {
     const saved = hit.buffs[buff.key];
@@ -4237,7 +4235,7 @@ const hitCalc = (() => {
   function computeStat(stat) {
     const base = Math.max(0, num(hit.base[stat]));
     let pct = 0, fixed = 0, multA = 1, multB = 0, final = 0;
-    HIT_BUFFS.flatMap((g) => g.items).forEach((buff) => {
+    HIT_BUFFS.forEach((buff) => {
       const v = buffValue(buff);
       if (!v) return;
       if (buff.kind === "pct") pct += Math.floor(base * v / 100);
@@ -4262,13 +4260,16 @@ const hitCalc = (() => {
   }
 
   function equipRows() {
-    return HIT_SLOTS.map((slot) => {
-      const candidates = records().length ? buildEquipmentCandidates(slot, hit.type, hit.character) : ["수동 입력"];
+    return HIT_SLOTS.map(({ slot, manual }) => {
       const saved = hit.equip[slot] || {};
+      if (manual) {
+        const value = Math.max(0, num(saved.value));
+        return { slot, manual: true, value, sum: value };
+      }
+      const candidates = records().length ? buildEquipmentCandidates(slot, hit.type, hit.character) : ["수동 입력"];
       const name = candidates.includes(saved.name) ? saved.name : "수동 입력";
       const h = hitOf(name);
-      const enchant = Math.max(0, num(saved.enchant));
-      return { slot, candidates, name, hit: h.value, limit: h.limit, enchant, sum: h.value + enchant };
+      return { slot, candidates, name, hit: h.value, sum: h.value };
     });
   }
 
@@ -4304,7 +4305,7 @@ const hitCalc = (() => {
     : `<span class="buff-icon is-text" aria-hidden="true">${escapeHtml(buff.name.slice(0, 1))}</span>`;
 
   // 같은 excl 그룹의 다른 항목이 켜져 있으면 잠근다 (택1)
-  const isLockedBuff = (buff) => !!buff.excl && HIT_BUFFS.flatMap((g) => g.items)
+  const isLockedBuff = (buff) => !!buff.excl && HIT_BUFFS
     .some((other) => other.excl === buff.excl && other.key !== buff.key && hit.buffs[other.key] === true);
 
   // 버프 계산기와 같은 카드형 체크리스트. 체크 항목은 수치를 숨기고, 숫자 항목은 체크하면 입력 칸이 나온다
@@ -4328,11 +4329,7 @@ const hitCalc = (() => {
           <span class="buff-unit">${buff.kind === "multB" ? "%" : ""}</span>` : ""}
       </div>`;
     };
-    const groups = HIT_BUFFS.map((g) => `
-      <section class="hit-group">
-        <p class="hit-group-title">${escapeHtml(g.group)}${g.note ? ` <small>${escapeHtml(g.note)}</small>` : ""}</p>
-        <div class="buff-grid hit-grid">${g.items.map(cell).join("")}</div>
-      </section>`).join("");
+    const groups = `<div class="buff-grid hit-grid">${HIT_BUFFS.map(cell).join("")}</div>`;
 
     els.stat.innerHTML = `
       <div class="hit-base-row">
@@ -4364,20 +4361,23 @@ const hitCalc = (() => {
       </div>
       ${loading ? `<p class="ok-note">장비 DB를 불러오는 중입니다…</p>` : ""}
       <table class="hit-table hit-equip-table" aria-label="장비 명중 보정">
-        <thead><tr><th>부위</th><th>장비</th><th>명중</th><th>인챈트</th><th>합</th></tr></thead>
+        <thead><tr><th>부위</th><th>장비</th><th>명중</th></tr></thead>
         <tbody>
-          ${rows.map((r) => `
+          ${rows.map((r) => r.manual ? `
+            <tr class="is-manual">
+              <td class="hit-name">${escapeHtml(r.slot)}</td>
+              <td class="hit-manual-label">직접 입력</td>
+              <td class="hit-cell"><input type="number" inputmode="numeric" min="0" step="1" placeholder="0" data-hit-manual="${escapeHtml(r.slot)}" value="${r.value || ""}" /></td>
+            </tr>` : `
             <tr>
               <td class="hit-name">${escapeHtml(r.slot)}</td>
               <td><select data-hit-equip="${escapeHtml(r.slot)}">${r.candidates.map((c) => `<option value="${escapeHtml(c)}"${c === r.name ? " selected" : ""}>${escapeHtml(c)}</option>`).join("")}</select></td>
-              <td class="hit-cell is-val">${r.name === "수동 입력" ? "-" : fmt(r.hit)}</td>
-              <td class="hit-cell"><input type="number" inputmode="numeric" min="0" step="1" placeholder="0" title="${r.limit > r.hit ? `MAX : ${r.limit - r.hit}` : ""}" data-hit-enchant="${escapeHtml(r.slot)}" value="${r.enchant || ""}" /></td>
-              <td class="hit-cell is-val">${fmt(r.sum)}</td>
+              <td class="hit-cell is-val" data-hit-slot-sum="${escapeHtml(r.slot)}">${r.name === "수동 입력" ? "-" : fmt(r.hit)}</td>
             </tr>`).join("")}
         </tbody>
-        <tfoot><tr class="hit-total"><th colspan="4">장비 명중 보정 합계</th><td>${fmt(equipTotal())}</td></tr></tfoot>
+        <tfoot><tr class="hit-total"><th colspan="2">장비 명중 보정 합계</th><td>${fmt(equipTotal())}</td></tr></tfoot>
       </table>
-      <p class="ok-note">명중 값은 장비 DB의 중간값입니다. 인챈트 칸에 명중 인챈트를 넣으면 더합니다. "수동 입력"은 계산에서 뺍니다.</p>
+      <p class="ok-note">명중 값은 장비 DB의 중간값입니다. 어빌리티·효과·기타는 명중 수치를 직접 넣습니다. "수동 입력"은 계산에서 뺍니다.</p>
     `;
   }
 
@@ -4454,8 +4454,8 @@ const hitCalc = (() => {
       if (t.dataset.hitBase) { hit.base[t.dataset.hitBase] = num(t.value); }
       else if (t.dataset.hitNum) {
         hit.buffs[t.dataset.hitNum] = { on: true, value: num(t.value) };
-      } else if (t.dataset.hitEnchant != null) {
-        hit.equip[t.dataset.hitEnchant] = { ...(hit.equip[t.dataset.hitEnchant] || {}), enchant: num(t.value) };
+      } else if (t.dataset.hitManual != null) {
+        hit.equip[t.dataset.hitManual] = { value: num(t.value) };
       } else if (t.dataset.hitSiena != null) { hit.siena = num(t.value); }
       else return;
       save();
@@ -4471,7 +4471,7 @@ const hitCalc = (() => {
           ? { on: t.checked, value: num(hit.buffs[t.dataset.hitCheck]?.value) }
           : t.checked;
         if (t.checked && buff?.excl) {
-          HIT_BUFFS.flatMap((g) => g.items).forEach((other) => {
+          HIT_BUFFS.forEach((other) => {
             if (other.excl !== buff.excl || other.key === buff.key) return;
             hit.buffs[other.key] = other.input === "num" ? { on: false, value: num(hit.buffs[other.key]?.value) } : false;
           });
@@ -4504,11 +4504,6 @@ const hitCalc = (() => {
       const total = els.stat?.querySelector(`[data-hit-total="total-${st}"]`);
       if (basic) basic.textContent = fmt(r[st].basic);
       if (total) total.textContent = fmt(r[st].total);
-    });
-    equipRows().forEach((row) => {
-      const tr = els.equip?.querySelector(`[data-hit-enchant="${CSS.escape(row.slot)}"]`)?.closest("tr");
-      const cell = tr?.querySelector("td:last-child");
-      if (cell) cell.textContent = fmt(row.sum);
     });
     const total = els.equip?.querySelector("tfoot td");
     if (total) total.textContent = fmt(equipTotal());
