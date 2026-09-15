@@ -4180,7 +4180,7 @@ const HIT_SLOTS = [
 
 // 버프 정의. kind: pct(비율, 버프마다 버림) / fixed(고정값) / multA(배율 A, 곱) / multB(배율 B, %) / final(최종 고정치)
 //   hit: DEX가 아니라 명중 보정 수치에 더한다 (이자벨(명중) +10, 특선 묘약(명중) +20, 룬 스킬(명중률) 0~20). 이름은 명중률이지만 적용은 수치다
-// input: check(체크) / num(체크 + 숫자 하나, min~max)
+// input: check(체크) / num(체크 + 숫자 하나, min~max). def: 체크했을 때 처음 들어가는 값
 // excl: 같은 그룹은 택1 (하나를 켜면 다른 쪽이 잠긴다)
 // icon: images/ 아래 경로 (경험치 버프 계산기와 같은 CDN). 없는 것은 첫 글자 자리표시
 // 화면에는 이 순서대로 한 줄에 두 개씩 놓인다 (짝은 2026-09-15 사용자 지정)
@@ -4195,18 +4195,18 @@ const HIT_BUFFS = [
   { key: "isabelPct", name: "특선 묘약 (비율 능력치)", kind: "pct", input: "check", value: 50, icon: "이자벨_비율.png" },
   { key: "isabelHit", name: "이자벨 (명중)", kind: "hit", input: "check", value: 10, icon: "이자벨_명중.png" },
   { key: "isabelHitSpecial", name: "특선 묘약 (명중)", kind: "hit", input: "check", value: 20, icon: "이자벨_명중.png" },
-  { key: "trust", name: "개-신뢰의 물약", kind: "fixed", input: "num", min: 28, max: 33, icon: "신뢰.png" },
+  { key: "trust", name: "개-신뢰의 물약", kind: "fixed", input: "num", min: 28, max: 33, def: 33, icon: "신뢰.png" },
   { key: "fever", name: "피버 상태", kind: "fixed", input: "check", value: 30, icon: "피버.png" },
   { key: "crown", name: "크라운", kind: "final", input: "num", min: 0, max: 300, icon: "크라운.png" },
   { key: "relicGoods", name: "신조의 성물", kind: "final", input: "num", min: 0, max: 300, icon: "신조의_성물.png" },
   { key: "helmet", name: "투구 부가 옵션", kind: "fixed", input: "num", min: 0, max: 60, icon: "Exp/투구_부가.png" },
   { key: "card", name: "몬스터 카드 옵션", kind: "fixed", input: "num", min: 0, max: 70, icon: "Exp/카드.png" },
   { key: "petS", name: "펫 S 스킬", kind: "fixed", input: "num", min: 0, max: 50, icon: "펫_덱스.png" },
-  { key: "enhance", name: "능력 강화 (%)", kind: "multB", input: "num", min: 0, max: 20, icon: "능력_강화.png" },
-  { key: "club", name: "클럽 효과", kind: "fixed", input: "num", min: 0, max: 7, icon: "클럽_덱스.png" },
+  { key: "enhance", name: "능력 강화 (%)", kind: "multB", input: "num", min: 0, max: 20, def: 20, icon: "능력_강화.png" },
+  { key: "club", name: "클럽 효과", kind: "fixed", input: "num", min: 0, max: 7, def: 7, icon: "클럽_덱스.png" },
   { key: "clubS", name: "클럽 S효과", kind: "fixed", input: "check", value: 20, icon: "클럽S_덱스.png" },
-  { key: "rune", name: "룬 스킬 (DEX)", kind: "fixed", input: "num", min: 0, max: 20, icon: "룬_가벼운몸놀림.png" },
-  { key: "runeHit", name: "룬 스킬 (명중률)", kind: "hit", input: "num", min: 0, max: 20, icon: "룬_예리한눈.png" },
+  { key: "rune", name: "룬 스킬 (DEX)", kind: "fixed", input: "num", min: 0, max: 20, def: 20, icon: "룬_가벼운몸놀림.png" },
+  { key: "runeHit", name: "룬 스킬 (명중률)", kind: "hit", input: "num", min: 0, max: 20, def: 20, icon: "룬_예리한눈.png" },
   { key: "siena", name: "시에나의 기운 (DEX)", kind: "final", input: "num", min: 0, max: 999, icon: "시에나.png" },
   { key: "encourage", name: "엔커리지", kind: "multB", input: "check", value: 10, icon: "엔커리지.png" },
 ];
@@ -4484,7 +4484,7 @@ const hitCalc = (() => {
         const buff = findBuff(t.dataset.hitCheck);
         // 숫자 항목은 체크 상태와 값을 같이 들고 있는다 (체크를 꺼도 값은 남겨 다시 켤 때 그대로)
         hit.buffs[t.dataset.hitCheck] = buff?.input === "num"
-          ? { on: t.checked, value: num(hit.buffs[t.dataset.hitCheck]?.value) }
+          ? { on: t.checked, value: num(hit.buffs[t.dataset.hitCheck]?.value) || num(buff.def) }
           : t.checked;
         if (t.checked && buff?.excl) {
           HIT_BUFFS.forEach((other) => {
