@@ -4364,7 +4364,7 @@ const hitCalc = (() => {
           ${rows.map((r) => r.manual ? `
             <tr class="is-manual">
               <td class="hit-name">${escapeHtml(r.slot)}</td>
-              <td class="hit-manual-label">직접 입력</td>
+              <td class="hit-manual-label">수동 입력</td>
               <td class="hit-cell"><input type="number" inputmode="numeric" min="0" step="1" placeholder="0" data-hit-manual="${escapeHtml(r.slot)}" value="${r.value || ""}" /></td>
             </tr>` : `
             <tr>
@@ -4375,7 +4375,7 @@ const hitCalc = (() => {
         </tbody>
         <tfoot><tr class="hit-total"><th colspan="2">장비 명중 보정 합계</th><td>${fmt(equipTotal())}</td></tr></tfoot>
       </table>
-      <p class="ok-note">명중 값은 장비 DB의 중간값입니다. 어빌리티·효과·기타는 명중 수치를 직접 넣습니다. "수동 입력"은 계산에서 뺍니다.</p>
+      <p class="ok-note">명중 값은 장비 DB의 중간값입니다. 어빌리티·효과·기타는 명중 수치를 수동으로 넣습니다. 장비를 "수동 입력"으로 두면 그 부위는 계산에서 뺍니다.</p>
     `;
   }
 
