@@ -4204,8 +4204,8 @@ const HIT_BUFFS = [
   { key: "trust", name: "개-신뢰의 물약", kind: "fixed", input: "num", min: 28, max: 34, def: 34, icon: "신뢰.png" },
   { key: "fever", name: "피버 상태", kind: "fixed", input: "check", value: 30, icon: "피버.png" },
   // 통찰의 비약: 고정값 자리 (게임 실측 1,282 → 1,409). 대/특대는 택1
-  { key: "insight", name: "통찰의 비약 (대)", kind: "fixed", input: "check", value: 100, icon: "", excl: "insight" },
-  { key: "insightXL", name: "통찰의 비약 (특대)", kind: "fixed", input: "check", value: 200, icon: "", excl: "insight" },
+  { key: "insight", name: "통찰의 비약 (대)", kind: "fixed", input: "check", value: 100, icon: "통찰_대.png", excl: "insight" },
+  { key: "insightXL", name: "통찰의 비약 (특대)", kind: "fixed", input: "check", value: 200, icon: "통찰_특대.png", excl: "insight" },
   { key: "crown", name: "크라운", kind: "final", input: "num", min: 0, max: 300, icon: "크라운.png" },
   { key: "relicGoods", name: "신조의 성물", kind: "final", input: "num", min: 0, max: 300, icon: "신조의_성물.png" },
   { key: "helmet", name: "투구 부가 옵션", kind: "fixed", input: "num", min: 0, max: 60, icon: "Exp/투구_부가.png" },
