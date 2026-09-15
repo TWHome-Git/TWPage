@@ -4380,7 +4380,7 @@ const hitCalc = (() => {
             </tr>` : `
             <tr>
               <td class="hit-name">${escapeHtml(r.slot)}</td>
-              <td><select data-hit-equip="${escapeHtml(r.slot)}">${r.candidates.map((c) => `<option value="${escapeHtml(c)}"${c === r.name ? " selected" : ""}>${escapeHtml(c)}</option>`).join("")}</select></td>
+              <td><div class="equip-pick">${equipIconHtml(r.name)}<select data-hit-equip="${escapeHtml(r.slot)}">${r.candidates.map((c) => `<option value="${escapeHtml(c)}"${c === r.name ? " selected" : ""}>${escapeHtml(c)}</option>`).join("")}</select></div></td>
               <td class="hit-cell is-val" data-hit-slot-sum="${escapeHtml(r.slot)}">${r.name === "수동 입력" ? "-" : fmt(r.hit)}</td>
             </tr>`).join("")}
         </tbody>
@@ -5810,6 +5810,16 @@ function makeNumberInput(row, field, onCommit) {
 }
 
 // label: 폰에서 표를 카드로 펼 때 값 앞에 붙일 이름 (머리글이 안 보인다)
+// 계산기(계수·필요 명중)에서 고른 장비의 아이콘. 장비 DB 목록과 같은 이미지를 작게 보여준다.
+// 수동 입력이거나 이미지가 없으면 빈 자리만 남겨 줄이 흔들리지 않게 한다
+function equipIconHtml(name) {
+  const record = name && name !== "수동 입력" ? state.records.find((r) => r.name === name) : null;
+  const img = record?.imageFile
+    ? `<img src="${IMAGE_BASE}${encodeURIComponent(record.imageFile)}" alt="" loading="lazy" decoding="async" />`
+    : "";
+  return `<span class="equip-pick-icon${img ? "" : " is-empty"}">${img}</span>`;
+}
+
 function cellWith(node, className, label) {
   const td = document.createElement("td");
   if (className) td.className = className;
@@ -5911,7 +5921,12 @@ function renderCalculator() {
       if (row.slotName === "무기") updateStatLimitHintsFromWeapon();
       renderCalculator();
     });
-    tr.appendChild(cellWith(select, null, "아이템"));
+    // 고른 장비의 아이콘을 셀렉트 앞에 붙인다 (바꾸면 renderCalculator가 다시 그린다)
+    const pick = document.createElement("div");
+    pick.className = "equip-pick";
+    pick.innerHTML = equipIconHtml(row.selectedEquipment);
+    pick.appendChild(select);
+    tr.appendChild(cellWith(pick, null, "아이템"));
 
     tr.appendChild(cellWith(makeNumberInput(row, "attackValue"), null, primary));
     tr.appendChild(cellWith(makeNumberInput(row, "attackEnchant"), null, `강화 ${primary}`));

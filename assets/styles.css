@@ -681,6 +681,42 @@ select {
   cursor: pointer;
 }
 
+/* 고른 장비 아이콘 + 셀렉트 (계수 계산기·필요 명중 계산기 공용) */
+.equip-pick {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.equip-pick select {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.equip-pick-icon {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  border: 1px solid rgba(15, 111, 99, 0.24);
+  border-radius: 6px;
+  background: linear-gradient(145deg, #ffffff, #dfeae4);
+}
+
+.equip-pick-icon.is-empty {
+  border-style: dashed;
+  background: transparent;
+}
+
+.equip-pick-icon img {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
 .coefficient-table select:hover {
   border-color: var(--accent);
 }
