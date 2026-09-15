@@ -4179,6 +4179,7 @@ const HIT_SLOTS = [
 ];
 
 // 버프 정의. kind: pct(비율, 버프마다 버림) / fixed(고정값) / multA(배율 A, 곱) / multB(배율 B, %) / final(최종 고정치)
+//   hitPct: DEX가 아니라 최종 명중률에 %p로 더한다 (이자벨(명중) +10, 특선 묘약(명중) +20)
 // input: check(체크) / num(체크 + 숫자 하나, min~max)
 // excl: 같은 그룹은 택1 (하나를 켜면 다른 쪽이 잠긴다)
 // icon: images/ 아래 경로 (경험치 버프 계산기와 같은 CDN). 없는 것은 첫 글자 자리표시
@@ -4192,6 +4193,8 @@ const HIT_BUFFS = [
   { key: "exorcist", name: "퇴마사의 축복", kind: "multA", input: "check", value: 1.1, icon: "퇴마사.png", excl: "multA" },
   { key: "isabelFixed", name: "특선 묘약 (고정 능력치)", kind: "fixed", input: "check", value: 100, icon: "" },
   { key: "isabelPct", name: "특선 묘약 (비율 능력치)", kind: "pct", input: "check", value: 50, icon: "" },
+  { key: "isabelHit", name: "이자벨 (명중)", kind: "hitPct", input: "check", value: 10, icon: "" },
+  { key: "isabelHitSpecial", name: "특선 묘약 (명중)", kind: "hitPct", input: "check", value: 20, icon: "" },
   { key: "trust", name: "개-신뢰의 물약", kind: "fixed", input: "num", min: 28, max: 33, icon: "신뢰.png" },
   { key: "fever", name: "피버 상태", kind: "fixed", input: "check", value: 30, icon: "피버.png" },
   { key: "crown", name: "크라운", kind: "final", input: "num", min: 0, max: 300, icon: "" },
@@ -4244,11 +4247,15 @@ const hitCalc = (() => {
       else if (buff.kind === "multA") multA *= v;
       else if (buff.kind === "multB") multB += v;
       else if (buff.kind === "final") final += v;
+      // hitPct는 DEX 계산에 들어가지 않는다 (buffHitPct에서 따로 모은다)
     });
     const basic = Math.floor((base + pct + fixed) * multA);
     const total = basic + Math.floor(basic * multB / 100) + final;
     return { base, pct, fixed, multA, multB, final, basic, total };
   }
+
+  // 최종 명중률에 더하는 버프 %p 합 (이자벨(명중)·특선 묘약(명중))
+  const buffHitPct = () => HIT_BUFFS.reduce((sum, buff) => sum + (buff.kind === "hitPct" ? buffValue(buff) : 0), 0);
 
   // ── 장비 ──
   const records = () => state.records || [];   // 장비 DB (부팅 때 시트에서 읽는다)
@@ -4340,7 +4347,7 @@ const hitCalc = (() => {
       ${groups}
       <div class="hit-stat-total">
         <div><span>기본 능력치</span>${HIT_STATS.map((st) => `<b>${st} <em data-hit-total="basic-${st}">${fmt(r[st].basic)}</em></b>`).join("")}</div>
-        <div class="is-final"><span>최종 능력치</span>${HIT_STATS.map((st) => `<b>${st} <em data-hit-total="total-${st}">${fmt(r[st].total)}</em></b>`).join("")}</div>
+        <div class="is-final"><span>최종 능력치</span>${HIT_STATS.map((st) => `<b>${st} <em data-hit-total="total-${st}">${fmt(r[st].total)}</em></b>`).join("")}<small>명중률 <em data-hit-total="hitpct">+${fmt(buffHitPct())}%</em></small></div>
       </div>
       <p class="ok-note">기본 능력치 = [(기본 상태 + 비율 증가 + 고정값 증가) × 배율 A] · 최종 능력치 = 기본 능력치 + [기본 능력치 × 배율 B] + 최종 고정치</p>
     `;
@@ -4404,7 +4411,7 @@ const hitCalc = (() => {
       <div class="hit-result-grid">
         <div><span>최종 DEX</span><strong>${fmt(dex.total)}</strong></div>
         <div><span>장비 명중 보정</span><strong>${fmt(equipTotal())}</strong></div>
-        <div><span>명중률 보정</span><strong>+${fmt(equipPctTotal())}%</strong></div>
+        <div><span>명중률 보정 <small>장비 ${fmt(equipPctTotal())} + 버프 ${fmt(buffHitPct())}</small></span><strong>+${fmt(equipPctTotal() + buffHitPct())}%</strong></div>
         <div class="is-wide"><span>사냥터</span><strong>${ground ? escapeHtml(ground.name) : "선택 안 됨"}</strong></div>
       </div>
       <div class="ok-verdict hit-verdict"><span>명중 판정식이 정해지면 여기에 가능 / 불가와 부족분이 표시됩니다.</span></div>
@@ -4517,7 +4524,7 @@ const hitCalc = (() => {
     if (cells?.length >= 3) {
       cells[0].textContent = fmt(r.DEX.total);
       cells[1].textContent = fmt(equipTotal());
-      cells[2].textContent = `+${fmt(equipPctTotal())}%`;
+      cells[2].textContent = `+${fmt(equipPctTotal() + buffHitPct())}%`;
     }
   }
 

@@ -6749,6 +6749,22 @@ img.dmg-chk-icon {
   color: var(--accent);
 }
 
+.hit-stat-total small {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.hit-stat-total small em {
+  font-style: normal;
+}
+
+.hit-result-grid span small {
+  font-weight: 400;
+}
+
 /* 장비 표 */
 .hit-table {
   width: 100%;
