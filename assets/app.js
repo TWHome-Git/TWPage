@@ -4418,28 +4418,65 @@ const hitCalc = (() => {
     `;
   }
 
+  // 사냥터 키: 그룹이 있으면 "그룹/이름" (같은 이름이 다른 그룹에 있을 수 있다)
+  const groundKey = (g) => (g.group ? `${g.group}/${g.name}` : g.name);
+  const groundRange = (g) => (g.min === g.max ? fmt(g.min) : `${fmt(g.min)}~${fmt(g.max)}`);
+  const selectedGround = () => hit.grounds.find((g) => groundKey(g) === hit.ground) || null;
+
   function renderGrounds() {
     if (!els.ground) return;
     if (!hit.grounds.length) {
-      els.ground.innerHTML = `<p class="ok-note">사냥터 목록이 아직 없습니다. <code>assets/hit-grounds.json</code>에 목록을 넣으면 여기에 버튼으로 나옵니다.</p>`;
+      els.ground.innerHTML = `<p class="ok-note">사냥터 목록이 아직 없습니다.</p>`;
       return;
     }
-    els.ground.innerHTML = `<div class="buff-base-row hit-ground-row">${hit.grounds.map((g) => `
-      <button type="button" class="buff-base-btn${g.name === hit.ground ? " is-active" : ""}" data-hit-ground="${escapeHtml(g.name)}">${escapeHtml(g.name)}</button>`).join("")}</div>`;
+    // 리스트 박스. 그룹 순서는 파일 순서대로, 그룹 없는 항목은 "기타 사냥터"로 묶는다
+    const groups = [];
+    hit.grounds.forEach((g) => {
+      const title = g.group || "기타 사냥터";
+      let entry = groups.find((x) => x.title === title);
+      if (!entry) { entry = { title, items: [] }; groups.push(entry); }
+      entry.items.push(g);
+    });
+    const option = (g) => `<option value="${escapeHtml(groundKey(g))}"${groundKey(g) === hit.ground ? " selected" : ""}>${escapeHtml(g.name)} (${groundRange(g)})</option>`;
+    els.ground.innerHTML = `
+      <p class="ok-note hit-ground-note">이 명중 조건은 유저들이 조사한 명중 조건이므로 실제와 다를 수 있습니다.</p>
+      <label class="field ok-field hit-ground-field">
+        <span>사냥터 (필요 명중)</span>
+        <select data-hit-ground-select>
+          <option value=""${hit.ground ? "" : " selected"}>선택</option>
+          ${groups.map((grp) => `<optgroup label="${escapeHtml(grp.title)}">${grp.items.map(option).join("")}</optgroup>`).join("")}
+        </select>
+      </label>`;
   }
 
   function renderResult() {
     if (!els.result) return;
     const dex = computeStat("DEX");
-    const ground = hit.grounds.find((g) => g.name === hit.ground);
+    const ground = selectedGround();
+    const mine = dex.total + hitTotal();
+    let verdict = `<span>사냥터를 고르면 필요 명중과 비교합니다.</span>`;
+    let cls = "";
+    if (ground) {
+      // 범위의 윗값 이상이면 확실히 명중, 아랫값 미만이면 부족, 사이면 경계
+      if (mine >= ground.max) {
+        cls = "is-ok";
+        verdict = `<strong>명중 가능</strong><span>필요 ${groundRange(ground)} · 여유 ${fmt(mine - ground.max)}</span>`;
+      } else if (mine >= ground.min) {
+        cls = "is-edge";
+        verdict = `<strong>경계</strong><span>필요 ${groundRange(ground)} · 확실하려면 ${fmt(ground.max - mine)} 더 필요</span>`;
+      } else {
+        cls = "is-short";
+        verdict = `<strong>명중 부족</strong><span>필요 ${groundRange(ground)} · ${fmt(ground.min - mine)}${ground.min === ground.max ? "" : `~${fmt(ground.max - mine)}`} 부족</span>`;
+      }
+    }
     els.result.innerHTML = `
       <div class="hit-result-grid">
         <div><span>최종 DEX</span><strong>${fmt(dex.total)}</strong></div>
         <div><span>명중 보정 합계</span><strong>${fmt(hitTotal())}</strong></div>
-        <div class="is-wide is-sum"><span>최종 DEX + 명중 보정 합계</span><strong>${fmt(dex.total + hitTotal())}</strong></div>
-        <div class="is-wide"><span>사냥터</span><strong>${ground ? escapeHtml(ground.name) : "선택 안 됨"}</strong></div>
+        <div class="is-wide is-sum"><span>최종 DEX + 명중 보정 합계</span><strong>${fmt(mine)}</strong></div>
+        <div class="is-wide"><span>사냥터</span><strong>${ground ? `${escapeHtml(ground.group ? `${ground.group} · ` : "")}${escapeHtml(ground.name)} <small>필요 명중 ${groundRange(ground)}</small>` : "선택 안 됨"}</strong></div>
       </div>
-      <div class="ok-verdict hit-verdict"><span>명중 판정식이 정해지면 여기에 가능 / 불가와 부족분이 표시됩니다.</span></div>
+      <div class="ok-verdict hit-verdict ${cls}">${verdict}</div>
     `;
   }
 
@@ -4453,7 +4490,12 @@ const hitCalc = (() => {
   async function loadGrounds() {
     try {
       const data = await fetchJson(HIT_GROUNDS_URL);
-      hit.grounds = Array.isArray(data?.grounds) ? data.grounds.filter((g) => g && g.name) : [];
+      hit.grounds = Array.isArray(data?.grounds)
+        ? data.grounds.filter((g) => g && g.name).map((g) => ({
+            group: String(g.group || ""), name: String(g.name),
+            min: num(g.min), max: num(g.max) || num(g.min),
+          }))
+        : [];
     } catch (error) {
       console.info("사냥터 목록을 불러오지 못했습니다.", error);
       hit.grounds = [];
@@ -4522,12 +4564,11 @@ const hitCalc = (() => {
       }
     });
 
-    panel.addEventListener("click", (event) => {
-      const button = event.target.closest("[data-hit-ground]");
-      if (!button) return;
-      hit.ground = button.dataset.hitGround;
+    panel.addEventListener("change", (event) => {
+      const select = event.target.closest("[data-hit-ground-select]");
+      if (!select) return;
+      hit.ground = select.value;
       save();
-      renderGrounds();
       renderResult();
     });
   }
@@ -4545,12 +4586,7 @@ const hitCalc = (() => {
     if (total) total.textContent = fmt(hitTotal());
     const bonus = els.equip?.querySelector("[data-hit-buff-bonus]");
     if (bonus) bonus.textContent = fmt(buffHitBonus());
-    const cells = els.result?.querySelectorAll(".hit-result-grid > div > strong");
-    if (cells?.length >= 3) {
-      cells[0].textContent = fmt(r.DEX.total);
-      cells[1].textContent = fmt(hitTotal());
-      cells[2].textContent = fmt(r.DEX.total + hitTotal());
-    }
+    renderResult();
   }
 
   return { load, wire, refreshEquipment };

@@ -6981,3 +6981,22 @@ img.dmg-chk-icon {
   color: var(--muted);
   font-size: 12px;
 }
+
+/* 경계: 범위 아랫값은 넘었지만 윗값은 못 넘음 */
+.ok-verdict.is-edge {
+  border-color: rgba(191, 132, 0, 0.35);
+  background: rgba(255, 244, 214, 0.8);
+}
+
+.ok-verdict.is-edge strong {
+  color: #9a6a00;
+}
+
+/* 사냥터 리스트 박스와 안내 문구 */
+.hit-ground-note {
+  margin: 0 0 8px;
+}
+
+.hit-ground-field select {
+  width: 100%;
+}
