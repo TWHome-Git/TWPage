@@ -4199,7 +4199,7 @@ const HIT_BUFFS = [
   { key: "isabelPct", name: "특선 묘약 (비율 능력치)", kind: "pct", input: "check", value: 50, icon: "이자벨_비율.png" },
   { key: "isabelHit", name: "이자벨 (명중)", kind: "hit", input: "check", value: 10, icon: "이자벨_명중.png" },
   { key: "isabelHitSpecial", name: "특선 묘약 (명중)", kind: "hit", input: "check", value: 20, icon: "이자벨_명중.png" },
-  { key: "trust", name: "개-신뢰의 물약", kind: "fixed", input: "num", min: 28, max: 33, def: 33, icon: "신뢰.png" },
+  { key: "trust", name: "개-신뢰의 물약", kind: "fixed", input: "num", min: 28, max: 34, def: 34, icon: "신뢰.png" },
   { key: "fever", name: "피버 상태", kind: "fixed", input: "check", value: 30, icon: "피버.png" },
   { key: "crown", name: "크라운", kind: "final", input: "num", min: 0, max: 300, icon: "크라운.png" },
   { key: "relicGoods", name: "신조의 성물", kind: "final", input: "num", min: 0, max: 300, icon: "신조의_성물.png" },
