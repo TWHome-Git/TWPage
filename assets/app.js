@@ -4202,7 +4202,7 @@ const HIT_BUFFS = [
   { key: "clubS", name: "클럽 S효과", kind: "fixed", input: "check", value: 20, icon: "클럽.png" },
   { key: "enhance", name: "능력 강화 (%)", kind: "multB", input: "num", min: 0, max: 20, icon: "" },
   { key: "encourage", name: "엔커리지", kind: "multB", input: "check", value: 10, icon: "" },
-  { key: "holyWater", name: "축복의 성수", kind: "multA", input: "check", value: 1.1, icon: "" },
+  { key: "siena", name: "시에나의 기운 (DEX)", kind: "final", input: "num", min: 0, max: 999, icon: "기운.png" },
 ];
 
 const hitCalc = (() => {
@@ -4213,7 +4213,6 @@ const hitCalc = (() => {
     character: CHARACTER_NAMES[0],
     type: "",
     equip: {},                 // 슬롯 → { name, enchant }
-    siena: 0,                  // 시에나의 기운 명중률 +X
     grounds: [],
     ground: "",
   };
@@ -4280,7 +4279,7 @@ const hitCalc = (() => {
     try {
       localStorage.setItem(HIT_SAVE_KEY, JSON.stringify({
         base: hit.base, buffs: hit.buffs, character: hit.character, type: hit.type,
-        equip: hit.equip, siena: hit.siena, ground: hit.ground,
+        equip: hit.equip, ground: hit.ground,
       }));
     } catch { /* 저장은 편의일 뿐 */ }
   }
@@ -4294,7 +4293,6 @@ const hitCalc = (() => {
       if (CHARACTER_NAMES.includes(saved.character)) hit.character = saved.character;
       if (saved.type) hit.type = saved.type;
       if (saved.equip) hit.equip = saved.equip;
-      hit.siena = num(saved.siena);
       if (saved.ground) hit.ground = saved.ground;
     } catch { /* 깨진 저장값은 무시 */ }
   }
@@ -4399,7 +4397,6 @@ const hitCalc = (() => {
       <div class="hit-result-grid">
         <div><span>최종 DEX</span><strong>${fmt(dex.total)}</strong></div>
         <div><span>장비 명중 보정</span><strong>${fmt(equipTotal())}</strong></div>
-        <div><span>시에나의 기운 (명중률 +X)</span><strong><input type="number" inputmode="numeric" min="0" step="1" placeholder="0" data-hit-siena value="${hit.siena || ""}" /></strong></div>
         <div class="is-wide"><span>사냥터</span><strong>${ground ? escapeHtml(ground.name) : "선택 안 됨"}</strong></div>
       </div>
       <div class="ok-verdict hit-verdict"><span>명중 판정식이 정해지면 여기에 가능 / 불가와 부족분이 표시됩니다.</span></div>
@@ -4456,8 +4453,7 @@ const hitCalc = (() => {
         hit.buffs[t.dataset.hitNum] = { on: true, value: num(t.value) };
       } else if (t.dataset.hitManual != null) {
         hit.equip[t.dataset.hitManual] = { value: num(t.value) };
-      } else if (t.dataset.hitSiena != null) { hit.siena = num(t.value); }
-      else return;
+      } else return;
       save();
       refreshTotals();
     });
