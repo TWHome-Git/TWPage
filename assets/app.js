@@ -210,6 +210,7 @@ const eta = {
   servers: {}, // 서버명 → 랭킹 배열
   server: "",
   collectDate: null, // "yyyy-MM-dd"
+  lastUpdate: null, // 사이트(넥슨 에타 랭킹)의 "Last Update" 시각 "yyyy-MM-dd HH:mm:ss". 2026-09-15 이전 스냅샷에는 없음
   prevServers: null, // 비교 기준 데이터. 없으면 변동 표시 생략
   prevDate: null,
   compareDays: 1, // 증감 기준: 1(1일 전) | 7(1주일 전) | 30(1달 전)
@@ -236,14 +237,15 @@ function etaCurrentRows() {
 }
 
 // ── 에타 랭킹 로컬 캐시 ──
-// 데이터는 매일 오전 10시경 1회 갱신되므로, 같은 주기의 데이터를 이미 받아뒀다면
-// 페이지를 다시 열어도 네트워크 요청 없이 localStorage 캐시를 사용한다.
-const ETA_REFRESH_ANCHOR_HOUR = 10;
+// 데이터는 매일 1회, 넥슨 랭킹이 갱신되는 오전 8시대 직후(수집 포함 보통 09시 전) 갱신되므로,
+// 같은 주기의 데이터를 이미 받아뒀다면 페이지를 다시 열어도 네트워크 요청 없이 localStorage 캐시를 사용한다.
+// (2026-09-15 이전에는 10시경 갱신이라 기준이 10시였다)
+const ETA_REFRESH_ANCHOR_HOUR = 9;
 const ETA_LATEST_CACHE_KEY = "tw-eta-latest-cache-v1";
 const ETA_PREV_CACHE_KEY = "tw-eta-prev-cache-v1";
 const ETA_SNAPSHOT_CACHE_KEY = "tw-eta-snapshot-cache-v1";
 
-// 오전 10시 이후면 오늘, 이전이면 어제가 현재 갱신 주기의 기준일
+// 기준 시각(오전 9시) 이후면 오늘, 이전이면 어제가 현재 갱신 주기의 기준일
 function etaCycleDateString(now = new Date()) {
   const date = new Date(now);
   if (date.getHours() < ETA_REFRESH_ANCHOR_HOUR) date.setDate(date.getDate() - 1);
@@ -1158,7 +1160,8 @@ async function loadEtaRankings(url = ETA_RANKING_URL) {
       renderEtaServerTabs();
       renderEtaSidebar();
       renderEtaRanking();
-      els.etaUpdatedDate.textContent = `갱신일: ${eta.collectDate || "-"}`;
+      els.etaUpdatedDate.textContent = etaUpdatedLabel();
+      els.etaUpdatedDate.title = eta.lastUpdate ? `넥슨 에타 랭킹 Last Update ${eta.lastUpdate} (수집일 ${eta.collectDate || "-"})` : "";
     }
   }
 }
@@ -1226,6 +1229,13 @@ function applyEtaPayload(payload) {
     eta.server = Object.keys(eta.servers)[0] || "";
   }
   eta.collectDate = clean(payload?.CollectDate || payload?.Date || "").slice(0, 10) || null;
+  eta.lastUpdate = clean(payload?.LastUpdate || "") || null;
+}
+
+// 결과 띠의 갱신 표기. 사이트 갱신 시각이 있으면 그 시각(초 제외)을, 없으면 수집일만 보여준다.
+function etaUpdatedLabel() {
+  if (eta.lastUpdate) return `갱신: ${eta.lastUpdate.slice(0, 16)}`;
+  return `갱신일: ${eta.collectDate || "-"}`;
 }
 
 // ── 비교 기준 데이터 (변동 표시) ──
@@ -4330,7 +4340,7 @@ function renderHomeStats() {
   }
 
   // 카드 순서: 전체 인구 / 순위 갱신일 / 하이아칸 / 네냐플 (2×2 격자에서 윗줄이 요약, 아랫줄이 서버별)
-  cards.push(`<div class="home-stat home-stat-date"><span>순위 갱신일</span><strong>${escapeHtml(latest)}</strong><small>매일 오전 10시 전후 갱신</small></div>`);
+  cards.push(`<div class="home-stat home-stat-date"><span>순위 갱신일</span><strong>${escapeHtml(latest)}</strong><small>매일 오전 갱신</small></div>`);
 
   servers.forEach((server) => {
     const own = dates.filter((d) => popTotalOf(d, server) != null);
