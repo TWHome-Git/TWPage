@@ -197,6 +197,8 @@ const ABILITY_OPTIONS = [ABILITY_DEFAULT, ...ABILITY_TYPES];
 const ETA_RANKING_URL = "https://raw.githubusercontent.com/TWHome-Git/TWHomeDB/main/eta_ranking.json";
 // 날짜 → 커밋 SHA 인덱스. 과거 랭킹은 해당 커밋의 raw 파일로 조회한다.
 const ETA_INDEX_URL = "https://raw.githubusercontent.com/TWHome-Git/TWHomeDB/main/ranking_index.json";
+// 갱신 시각만 담은 작은 파일 { CollectDate, LastUpdate }. 홈 카드처럼 랭킹 전체가 필요 없는 곳에서 쓴다 (2026-09-15부터)
+const ETA_META_URL = "https://raw.githubusercontent.com/TWHome-Git/TWHomeDB/main/eta_meta.json";
 const etaSnapshotUrl = (sha) => `https://raw.githubusercontent.com/TWHome-Git/TWHomeDB/${sha}/eta_ranking.json`;
 const ETA_CHAR_IMAGE_BASE = `${CDN_ETC_ROOT}images/etachar/`;
 const ETA_CHARACTER_BY_CODE = {
@@ -4217,7 +4219,7 @@ async function loadOverlayRelease() {
 // ── 홈 ──
 // 첫 화면. 메뉴 카드는 index.html에 적혀 있고, 여기서는 위쪽 요약 숫자만 채운다.
 // 인구 요약은 인구 추이 탭과 같은 집계 파일(37KB)을 쓰고, 오버레이 버전은 릴리스 API를 쓴다.
-const home = { stats: "idle", release: "idle", visits: "idle" };
+const home = { stats: "idle", release: "idle", visits: "idle", lastUpdate: null }; // lastUpdate: 넥슨 랭킹 Last Update "yyyy-MM-dd HH:mm:ss"
 
 function loadHomeTab() {
   if (home.stats === "idle") loadHomeStats();
@@ -4297,10 +4299,26 @@ function popTotalOf(date, server) {
   return total;
 }
 
+// 넥슨 랭킹의 Last Update 시각. 실패해도 홈 카드는 날짜만으로 그린다.
+let etaMetaPromise = null;
+function loadEtaMeta() {
+  if (!etaMetaPromise) {
+    etaMetaPromise = fetch(ETA_META_URL, { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((meta) => {
+        home.lastUpdate = clean(meta?.LastUpdate || "") || null;
+      })
+      .catch((error) => {
+        console.warn("에타 갱신 시각 로딩 실패", error);
+      });
+  }
+  return etaMetaPromise;
+}
+
 async function loadHomeStats() {
   home.stats = "loading";
   try {
-    await loadEtaPopulation();
+    await Promise.all([loadEtaPopulation(), loadEtaMeta()]);
     renderHomeStats();
     home.stats = etaPop.days ? "loaded" : "idle";
   } catch (error) {
@@ -4340,7 +4358,11 @@ function renderHomeStats() {
   }
 
   // 카드 순서: 전체 인구 / 순위 갱신일 / 하이아칸 / 네냐플 (2×2 격자에서 윗줄이 요약, 아랫줄이 서버별)
-  cards.push(`<div class="home-stat home-stat-date"><span>순위 갱신일</span><strong>${escapeHtml(latest)}</strong><small>매일 오전 갱신</small></div>`);
+  // 넥슨 랭킹 갱신 시각이 있으면 그 날짜·시각을, 없으면 집계 마지막 날짜만 보여준다
+  const lastUpdate = home.lastUpdate || "";
+  const updateDate = lastUpdate.slice(0, 10) || latest;
+  const updateTime = lastUpdate.slice(11, 16);
+  cards.push(`<div class="home-stat home-stat-date"><span>순위 갱신일</span><strong>${escapeHtml(updateDate)}</strong><small>${updateTime ? `${escapeHtml(updateTime)} 갱신` : "매일 오전 갱신"}</small></div>`);
 
   servers.forEach((server) => {
     const own = dates.filter((d) => popTotalOf(d, server) != null);
