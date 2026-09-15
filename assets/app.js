@@ -4177,8 +4177,9 @@ const HIT_SLOTS = [
   { slot: "갑옷" }, { slot: "손목" }, { slot: "투구" }, { slot: "머리" }, { slot: "몸" },
   { slot: "손" }, { slot: "손 어빌리티", manual: true }, { slot: "손 부가옵션 명중률", manual: true },
   { slot: "다리" },
-  { slot: "아티팩트" }, { slot: "효과", manual: true }, { slot: "기타", manual: true },
+  { slot: "아티팩트" }, { slot: "효과", manual: true },
   { slot: "시에나 (명중률 %)", manual: true },
+  { slot: "기타", manual: true, negative: true },   // 감소 옵션도 넣을 수 있게 음수 허용
 ];
 
 // 버프 정의. kind: pct(비율, 버프마다 버림) / fixed(고정값) / multA(배율 A, 곱) / multB(배율 B, %) / final(최종 고정치)
@@ -4284,11 +4285,11 @@ const hitCalc = (() => {
   }
 
   function equipRows() {
-    return HIT_SLOTS.map(({ slot, manual }) => {
+    return HIT_SLOTS.map(({ slot, manual, negative }) => {
       const saved = hit.equip[slot] || {};
       if (manual) {
-        const value = Math.max(0, num(saved.value));
-        return { slot, manual: true, value, sum: value };
+        const value = negative ? num(saved.value) : Math.max(0, num(saved.value));
+        return { slot, manual: true, negative: !!negative, value, sum: value };
       }
       const candidates = records().length ? buildEquipmentCandidates(slot, hit.type, hit.character) : ["수동 입력"];
       const name = candidates.includes(saved.name) ? saved.name : "수동 입력";
@@ -4398,7 +4399,7 @@ const hitCalc = (() => {
             <tr class="is-manual">
               <td class="hit-name">${escapeHtml(r.slot)}</td>
               <td class="hit-manual-label">수동 입력</td>
-              <td class="hit-cell"><input type="number" inputmode="numeric" min="0" step="1" placeholder="0" data-hit-manual="${escapeHtml(r.slot)}" value="${r.value || ""}" /></td>
+              <td class="hit-cell"><input type="number" inputmode="${r.negative ? "text" : "numeric"}"${r.negative ? "" : ' min="0"'} step="1" placeholder="0" data-hit-manual="${escapeHtml(r.slot)}" value="${r.value || ""}" /></td>
             </tr>` : `
             <tr>
               <td class="hit-name">${escapeHtml(r.slot)}</td>
