@@ -4350,7 +4350,6 @@ const hitCalc = (() => {
         <div><span>기본 능력치</span>${HIT_STATS.map((st) => `<b>${st} <em data-hit-total="basic-${st}">${fmt(r[st].basic)}</em></b>`).join("")}</div>
         <div class="is-final"><span>최종 능력치</span>${HIT_STATS.map((st) => `<b>${st} <em data-hit-total="total-${st}">${fmt(r[st].total)}</em></b>`).join("")}</div>
       </div>
-      <p class="ok-note">기본 능력치 = [(기본 상태 + 비율 증가 + 고정값 증가) × 배율 A] · 최종 능력치 = 기본 능력치 + [기본 능력치 × 배율 B] + 최종 고정치</p>
     `;
   }
 
@@ -4390,7 +4389,6 @@ const hitCalc = (() => {
           <tr class="hit-total"><th colspan="2">명중 보정 합계</th><td data-hit-equip-total>${fmt(hitTotal())}</td></tr>
         </tfoot>
       </table>
-      <p class="ok-note">명중 값은 장비 DB의 중간값입니다. 어빌리티·효과·기타·손 부가옵션·시에나의 기운은 명중 보정 수치를 수동으로 넣습니다. 장비를 "수동 입력"으로 두면 그 부위는 계산에서 뺍니다.</p>
     `;
   }
 
