@@ -4458,15 +4458,16 @@ const hitCalc = (() => {
     let cls = "";
     if (ground) {
       // 범위의 윗값 이상이면 확실히 명중, 아랫값 미만이면 부족, 사이면 경계
+      const label = `${escapeHtml(ground.name)} 필요 ${groundRange(ground)}`;
       if (mine >= ground.max) {
         cls = "is-ok";
-        verdict = `<strong>명중 가능</strong><span>필요 ${groundRange(ground)} · 여유 ${fmt(mine - ground.max)}</span>`;
+        verdict = `<strong>명중 가능</strong><span>${label} · 여유 ${fmt(mine - ground.max)}</span>`;
       } else if (mine >= ground.min) {
         cls = "is-edge";
-        verdict = `<strong>경계</strong><span>필요 ${groundRange(ground)} · 확실하려면 ${fmt(ground.max - mine)} 더 필요</span>`;
+        verdict = `<strong>경계</strong><span>${label} · 확실하려면 ${fmt(ground.max - mine)} 더 필요</span>`;
       } else {
         cls = "is-short";
-        verdict = `<strong>명중 부족</strong><span>필요 ${groundRange(ground)} · ${fmt(ground.min - mine)}${ground.min === ground.max ? "" : `~${fmt(ground.max - mine)}`} 부족</span>`;
+        verdict = `<strong>명중 부족</strong><span>${label} · ${fmt(ground.min - mine)}${ground.min === ground.max ? "" : `~${fmt(ground.max - mine)}`} 부족</span>`;
       }
     }
     els.result.innerHTML = `
@@ -4474,7 +4475,6 @@ const hitCalc = (() => {
         <div><span>최종 DEX</span><strong>${fmt(dex.total)}</strong></div>
         <div><span>명중 보정 합계</span><strong>${fmt(hitTotal())}</strong></div>
         <div class="is-sum"><span>최종 DEX + 명중 보정 합계</span><strong>${fmt(mine)}</strong></div>
-        <div class="is-wide"><span>사냥터</span><strong>${ground ? `${escapeHtml(ground.group ? `${ground.group} · ` : "")}${escapeHtml(ground.name)} <small>필요 명중 ${groundRange(ground)}</small>` : "선택 안 됨"}</strong></div>
       </div>
       <div class="ok-verdict hit-verdict ${cls}">${verdict}</div>
     `;
