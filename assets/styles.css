@@ -6941,6 +6941,11 @@ img.dmg-chk-icon {
   grid-column: 1 / -1;
 }
 
+.hit-result-grid > div.is-sum strong {
+  color: var(--accent);
+  font-size: 20px;
+}
+
 .hit-result-grid span {
   display: block;
   color: var(--muted);

@@ -4416,6 +4416,7 @@ const hitCalc = (() => {
       <div class="hit-result-grid">
         <div><span>최종 DEX</span><strong>${fmt(dex.total)}</strong></div>
         <div><span>명중 보정 합계</span><strong>${fmt(hitTotal())}</strong></div>
+        <div class="is-wide is-sum"><span>최종 DEX + 명중 보정 합계</span><strong>${fmt(dex.total + hitTotal())}</strong></div>
         <div class="is-wide"><span>사냥터</span><strong>${ground ? escapeHtml(ground.name) : "선택 안 됨"}</strong></div>
       </div>
       <div class="ok-verdict hit-verdict"><span>명중 판정식이 정해지면 여기에 가능 / 불가와 부족분이 표시됩니다.</span></div>
@@ -4525,9 +4526,10 @@ const hitCalc = (() => {
     const bonus = els.equip?.querySelector("[data-hit-buff-bonus]");
     if (bonus) bonus.textContent = fmt(buffHitBonus());
     const cells = els.result?.querySelectorAll(".hit-result-grid > div > strong");
-    if (cells?.length >= 2) {
+    if (cells?.length >= 3) {
       cells[0].textContent = fmt(r.DEX.total);
       cells[1].textContent = fmt(hitTotal());
+      cells[2].textContent = fmt(r.DEX.total + hitTotal());
     }
   }
 
