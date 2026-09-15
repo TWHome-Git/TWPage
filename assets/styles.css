@@ -6718,6 +6718,12 @@ img.dmg-chk-icon {
   min-height: 38px;
 }
 
+/* 짝 배치를 맞추려고 비워 둔 칸 */
+.hit-grid .buff-cell.is-spacer {
+  border-color: transparent;
+  background: transparent;
+}
+
 .hit-grid .buff-item {
   gap: 5px;
 }

@@ -4187,6 +4187,8 @@ const HIT_SLOTS = [
 const HIT_BUFFS = [
   { key: "snowman", name: "눈사람 특제 포션", kind: "pct", input: "check", value: 30, icon: "눈사람.png", excl: "snow" },
   { key: "illumi", name: "일루미네이션 축제 음료", kind: "pct", input: "check", value: 30, icon: "일루미.png", excl: "snow" },
+  { key: "twSpirit", name: "테일즈위버의 기운", kind: "pct", input: "check", value: 10, icon: "기운.png" },
+  { spacer: true },   // 짝 배치를 유지하려고 이 줄 오른쪽은 비운다
   { key: "isabelBless", name: "이자벨 (고정 능력치)", kind: "fixed", input: "check", value: 20, icon: "이자벨_고정.png", excl: "bless" },
   { key: "bless", name: "축복의 물약", kind: "fixed", input: "check", value: 20, icon: "축복.png", excl: "bless" },
   { key: "isabelMult", name: "이자벨 (비율 능력치)", kind: "multA", input: "check", value: 1.1, icon: "이자벨_비율.png", excl: "multA" },
@@ -4227,6 +4229,7 @@ const hitCalc = (() => {
   const fmt = (n) => Math.round(n).toLocaleString("ko-KR");
   const num = (v) => Number(v) || 0;
   const findBuff = (key) => HIT_BUFFS.find((b) => b.key === key);
+  const realBuffs = () => HIT_BUFFS.filter((b) => !b.spacer);
 
   function buffValue(buff) {
     const saved = hit.buffs[buff.key];
@@ -4240,7 +4243,7 @@ const hitCalc = (() => {
   function computeStat(stat) {
     const base = Math.max(0, num(hit.base[stat]));
     let pct = 0, fixed = 0, multA = 1, multB = 0, final = 0;
-    HIT_BUFFS.forEach((buff) => {
+    realBuffs().forEach((buff) => {
       const v = buffValue(buff);
       if (!v) return;
       if (buff.kind === "pct") pct += Math.floor(base * v / 100);
@@ -4256,7 +4259,7 @@ const hitCalc = (() => {
   }
 
   // 명중 보정 수치에 더하는 버프 합 (이자벨(명중)·특선 묘약(명중))
-  const buffHitBonus = () => HIT_BUFFS.reduce((sum, buff) => sum + (buff.kind === "hit" ? buffValue(buff) : 0), 0);
+  const buffHitBonus = () => realBuffs().reduce((sum, buff) => sum + (buff.kind === "hit" ? buffValue(buff) : 0), 0);
 
   // ── 장비 ──
   const records = () => state.records || [];   // 장비 DB (부팅 때 시트에서 읽는다)
@@ -4321,7 +4324,7 @@ const hitCalc = (() => {
     : `<span class="buff-icon is-text" aria-hidden="true">${escapeHtml(buff.name.slice(0, 1))}</span>`;
 
   // 같은 excl 그룹의 다른 항목이 켜져 있으면 잠근다 (택1)
-  const isLockedBuff = (buff) => !!buff.excl && HIT_BUFFS
+  const isLockedBuff = (buff) => !!buff.excl && realBuffs()
     .some((other) => other.excl === buff.excl && other.key !== buff.key && hit.buffs[other.key] === true);
 
   // 버프 계산기와 같은 카드형 체크리스트. 체크 항목은 수치를 숨기고, 숫자 항목은 체크하면 입력 칸이 나온다
@@ -4329,6 +4332,7 @@ const hitCalc = (() => {
     if (!els.stat) return;
     const r = { DEX: computeStat("DEX") };
     const cell = (buff) => {
+      if (buff.spacer) return `<div class="buff-cell is-spacer" aria-hidden="true"></div>`;
       const saved = hit.buffs[buff.key];
       const isNum = buff.input === "num";
       const on = isNum ? !!(saved && typeof saved === "object" && saved.on) : !!saved;
@@ -4487,7 +4491,7 @@ const hitCalc = (() => {
           ? { on: t.checked, value: num(hit.buffs[t.dataset.hitCheck]?.value) || num(buff.def) }
           : t.checked;
         if (t.checked && buff?.excl) {
-          HIT_BUFFS.forEach((other) => {
+          realBuffs().forEach((other) => {
             if (other.excl !== buff.excl || other.key === buff.key) return;
             hit.buffs[other.key] = other.input === "num" ? { on: false, value: num(hit.buffs[other.key]?.value) } : false;
           });
