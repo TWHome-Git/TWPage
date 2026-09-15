@@ -4159,16 +4159,17 @@ const oneKillCalc = (() => {
 //  왼쪽: 능력치 계산(DEX) / 가운데: 장비 명중 보정 합계 / 오른쪽: 사냥터 선택 + 결과
 //
 //  능력치 공식 (2026-09-15 사용자 제공, 같은 날 게임 실측으로 보정)
-//    기본 능력치 = [(기본 상태 + 비율 증가 + [고정값 증가 × 1.1]) × 배율 A]   ※ 비율 증가는 버프마다 소수점 버림, 배율 A는 모두 곱셈
+//    기본 능력치 = [(기본 상태 + 기운 비율 + [(비율 증가 + 고정값 증가) × 1.1]) × 배율 A]   ※ 비율 증가는 버프마다 소수점 버림, 배율 A는 모두 곱셈
 //    최종 능력치 = 기본 능력치 + [기본 능력치 × 배율 B] + 최종 고정치
-//    고정값 ×1.1은 게임 실측(펫 30: 525/485, 룬 20: 413)에서 확인된 값이다. 출처는 미확인이라 상수로 둔다
+//    ×1.1은 게임 실측(펫 30: 525/485, 룬 20: 413, 일루미: 1020→1142)에서 확인된 값이다. 테일즈위버의 기운만 ×1.1을
+//    타지 않았다(기운 자체가 ×1.1의 출처일 가능성 있음). 출처 미확인이라 상수로 둔다
 //  장비 명중은 장비 DB의 "명중" 열(중간값)과 명중 인챈트를 부위별로 더한다.
 //  사냥터 목록은 assets/hit-grounds.json, 최종 판정식은 아직 정해지지 않아 결과 칸은 재료만 보여준다.
 // ══════════════════════════════════════════════════════════════
 const HIT_SAVE_KEY = "tw-hit-save-v1";
 const HIT_GROUNDS_URL = "./assets/hit-grounds.json";
 const HIT_STATS = ["DEX"];   // 명중은 DEX만 본다 (AGI는 2026-09-15 제외)
-const HIT_FIXED_MULT = 1.1;  // 고정값 증가 합에 곱해지는 배율 (게임 실측)
+const HIT_FIXED_MULT = 1.1;  // 비율 증가(기운 제외) + 고정값 증가 합에 곱해지는 배율 (게임 실측)
 // 장비 DB에서 고르는 부위와, 명중 수치를 수동으로 넣는 줄(manual).
 // "명중률"이라 적힌 줄도 실제 적용은 명중 보정 수치라 같은 합계에 더한다
 const HIT_SLOTS = [
@@ -4189,7 +4190,7 @@ const HIT_SLOTS = [
 const HIT_BUFFS = [
   { key: "snowman", name: "눈사람 특제 포션", kind: "pct", input: "check", value: 30, icon: "눈사람.png", excl: "snow" },
   { key: "illumi", name: "일루미네이션 축제 음료", kind: "pct", input: "check", value: 30, icon: "일루미.png", excl: "snow" },
-  { key: "twSpirit", name: "테일즈위버의 기운", kind: "pct", input: "check", value: 10, icon: "기운.png" },
+  { key: "twSpirit", name: "테일즈위버의 기운", kind: "pct", input: "check", value: 10, icon: "기운.png", outsideMult: true },
   { spacer: true },   // 짝 배치를 유지하려고 이 줄 오른쪽은 비운다
   { key: "isabelBless", name: "이자벨 (고정 능력치)", kind: "fixed", input: "check", value: 20, icon: "이자벨_고정.png", excl: "bless" },
   { key: "bless", name: "축복의 물약", kind: "fixed", input: "check", value: 20, icon: "축복.png", excl: "bless" },
@@ -4248,21 +4249,22 @@ const hitCalc = (() => {
   // 한 스탯의 기본 능력치·최종 능력치와 중간값
   function computeStat(stat) {
     const base = Math.max(0, num(hit.base[stat]));
-    let pct = 0, fixed = 0, multA = 1, multB = 0, final = 0;
+    let pct = 0, pctOutside = 0, fixed = 0, multA = 1, multB = 0, final = 0;
     realBuffs().forEach((buff) => {
       const v = buffValue(buff);
       if (!v) return;
-      if (buff.kind === "pct") pct += Math.floor(base * v / 100);
+      if (buff.kind === "pct" && buff.outsideMult) pctOutside += Math.floor(base * v / 100);
+      else if (buff.kind === "pct") pct += Math.floor(base * v / 100);
       else if (buff.kind === "fixed") fixed += v;
       else if (buff.kind === "multA") multA *= v;
       else if (buff.kind === "multB") multB += v;
       else if (buff.kind === "final") final += v;
       // hit는 DEX 계산에 들어가지 않는다 (buffHitBonus에서 명중 보정으로 모은다)
     });
-    const fixedApplied = Math.floor(fixed * HIT_FIXED_MULT);
-    const basic = Math.floor((base + pct + fixedApplied) * multA);
+    const bonusApplied = Math.floor((pct + fixed) * HIT_FIXED_MULT);
+    const basic = Math.floor((base + pctOutside + bonusApplied) * multA);
     const total = basic + Math.floor(basic * multB / 100) + final;
-    return { base, pct, fixed, fixedApplied, multA, multB, final, basic, total };
+    return { base, pct, pctOutside, fixed, bonusApplied, multA, multB, final, basic, total };
   }
 
   // 명중 보정 수치에 더하는 버프 합 (이자벨(명중)·특선 묘약(명중))
@@ -4335,7 +4337,7 @@ const hitCalc = (() => {
     .some((other) => other.excl === buff.excl && other.key !== buff.key && hit.buffs[other.key] === true);
 
   // 계산 과정 한 줄. 게임 능력치 창과 단계별로 대조할 때 쓴다
-  const hitStepsText = (x) => `(${fmt(x.base)} + 비율 ${fmt(x.pct)} + 고정 ${fmt(x.fixed)}×${HIT_FIXED_MULT}=${fmt(x.fixedApplied)}) × A ${String(Math.round(x.multA * 100) / 100)} = 기본 ${fmt(x.basic)} → 기본 + 기본 × B ${x.multB}% (${fmt(Math.floor(x.basic * x.multB / 100))}) + 최종 고정 ${fmt(x.final)} = ${fmt(x.total)}`;
+  const hitStepsText = (x) => `(${fmt(x.base)} + 기운 ${fmt(x.pctOutside)} + (비율 ${fmt(x.pct)} + 고정 ${fmt(x.fixed)})×${HIT_FIXED_MULT}=${fmt(x.bonusApplied)}) × A ${String(Math.round(x.multA * 100) / 100)} = 기본 ${fmt(x.basic)} → 기본 + 기본 × B ${x.multB}% (${fmt(Math.floor(x.basic * x.multB / 100))}) + 최종 고정 ${fmt(x.final)} = ${fmt(x.total)}`;
 
   // 버프 계산기와 같은 카드형 체크리스트. 체크 항목은 수치를 숨기고, 숫자 항목은 체크하면 입력 칸이 나온다
   function renderStats() {
