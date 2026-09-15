@@ -6931,9 +6931,10 @@ img.dmg-chk-icon {
   margin-bottom: 10px;
 }
 
+/* 최종 DEX · 명중 보정 합계 · 둘의 합을 한 줄에, 사냥터는 아래 한 줄 */
 .hit-result-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -6948,9 +6949,12 @@ img.dmg-chk-icon {
   grid-column: 1 / -1;
 }
 
+.hit-result-grid > div.is-sum {
+  border-color: rgba(15, 111, 99, 0.35);
+}
+
 .hit-result-grid > div.is-sum strong {
   color: var(--accent);
-  font-size: 20px;
 }
 
 .hit-result-grid span {

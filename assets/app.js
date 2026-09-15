@@ -4473,7 +4473,7 @@ const hitCalc = (() => {
       <div class="hit-result-grid">
         <div><span>최종 DEX</span><strong>${fmt(dex.total)}</strong></div>
         <div><span>명중 보정 합계</span><strong>${fmt(hitTotal())}</strong></div>
-        <div class="is-wide is-sum"><span>최종 DEX + 명중 보정 합계</span><strong>${fmt(mine)}</strong></div>
+        <div class="is-sum"><span>최종 DEX + 명중 보정 합계</span><strong>${fmt(mine)}</strong></div>
         <div class="is-wide"><span>사냥터</span><strong>${ground ? `${escapeHtml(ground.group ? `${ground.group} · ` : "")}${escapeHtml(ground.name)} <small>필요 명중 ${groundRange(ground)}</small>` : "선택 안 됨"}</strong></div>
       </div>
       <div class="ok-verdict hit-verdict ${cls}">${verdict}</div>

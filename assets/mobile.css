@@ -1024,4 +1024,8 @@
   .hit-grid {
     grid-template-columns: 1fr;
   }
+
+  .hit-result-grid {
+    grid-template-columns: 1fr;
+  }
 }
