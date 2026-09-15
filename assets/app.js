@@ -4201,7 +4201,7 @@ const HIT_BUFFS = [
   { key: "relicGoods", name: "신조의 성물", kind: "final", input: "num", min: 0, max: 300, icon: "신조의_성물.png" },
   { key: "helmet", name: "투구 부가 옵션", kind: "fixed", input: "num", min: 0, max: 60, icon: "Exp/투구_부가.png" },
   { key: "card", name: "몬스터 카드 옵션", kind: "fixed", input: "num", min: 0, max: 70, icon: "Exp/카드.png" },
-  { key: "petS", name: "펫 S 스킬", kind: "fixed", input: "num", min: 0, max: 50, icon: "펫_덱스.png" },
+  { key: "petS", name: "펫 S 스킬", kind: "fixed", input: "num", min: 0, max: 70, icon: "펫_덱스.png" },
   { key: "enhance", name: "능력 강화 (%)", kind: "multB", input: "num", min: 0, max: 20, def: 20, icon: "능력_강화.png" },
   { key: "club", name: "클럽 효과", kind: "fixed", input: "num", min: 0, max: 7, def: 7, icon: "클럽_덱스.png" },
   { key: "clubS", name: "클럽 S효과", kind: "fixed", input: "check", value: 20, icon: "클럽S_덱스.png" },
