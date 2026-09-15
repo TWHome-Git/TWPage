@@ -6798,15 +6798,6 @@ img.dmg-chk-icon {
   color: var(--accent);
 }
 
-/* 계산 과정 한 줄 */
-.hit-steps {
-  margin: 8px 0 0;
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 1.5;
-  word-break: keep-all;
-}
-
 .hit-stat-total small {
   display: block;
   margin-top: 2px;

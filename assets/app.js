@@ -4216,6 +4216,9 @@ const HIT_BUFFS = [
   { key: "runeHit", name: "룬 스킬 (명중률)", kind: "hit", input: "num", min: 0, max: 20, def: 20, icon: "룬_예리한눈.png" },
   { key: "siena", name: "시에나의 기운 (DEX)", kind: "final", input: "num", min: 0, max: 999, icon: "시에나.png" },
   { key: "encourage", name: "인커리지", kind: "multB", input: "check", value: 10, icon: "엔커리지.png" },
+  // 목록에 없는 배율 뒤 고정 효과(예: 시에나의 "모든 스탯 +19"). 배율 A·B를 타지 않는다
+  { key: "finalEtc", name: "기타 (최종 고정)", kind: "final", input: "num", min: 0, max: 999, icon: "" },
+  { spacer: true },
 ];
 
 const hitCalc = (() => {
@@ -4336,9 +4339,6 @@ const hitCalc = (() => {
   const isLockedBuff = (buff) => !!buff.excl && realBuffs()
     .some((other) => other.excl === buff.excl && other.key !== buff.key && hit.buffs[other.key] === true);
 
-  // 계산 과정 한 줄. 게임 능력치 창과 단계별로 대조할 때 쓴다
-  const hitStepsText = (x) => `(${fmt(x.base)} + 기운 ${fmt(x.pctOutside)} + (비율 ${fmt(x.pct)} + 고정 ${fmt(x.fixed)})×${HIT_FIXED_MULT}=${fmt(x.bonusApplied)}) × A ${String(Math.round(x.multA * 100) / 100)} = 기본 ${fmt(x.basic)} → 기본 + 기본 × B ${x.multB}% (${fmt(Math.floor(x.basic * x.multB / 100))}) + 최종 고정 ${fmt(x.final)} = ${fmt(x.total)}`;
-
   // 버프 계산기와 같은 카드형 체크리스트. 체크 항목은 수치를 숨기고, 숫자 항목은 체크하면 입력 칸이 나온다
   function renderStats() {
     if (!els.stat) return;
@@ -4372,7 +4372,6 @@ const hitCalc = (() => {
         <div><span>기본 능력치</span>${HIT_STATS.map((st) => `<b>${st} <em data-hit-total="basic-${st}">${fmt(r[st].basic)}</em></b>`).join("")}</div>
         <div class="is-final"><span>최종 능력치</span>${HIT_STATS.map((st) => `<b>${st} <em data-hit-total="total-${st}">${fmt(r[st].total)}</em></b>`).join("")}</div>
       </div>
-      <p class="hit-steps" data-hit-steps>${hitStepsText(r.DEX)}</p>
     `;
   }
 
@@ -4538,8 +4537,6 @@ const hitCalc = (() => {
       if (basic) basic.textContent = fmt(r[st].basic);
       if (total) total.textContent = fmt(r[st].total);
     });
-    const steps = els.stat?.querySelector("[data-hit-steps]");
-    if (steps) steps.textContent = hitStepsText(r.DEX);
     const total = els.equip?.querySelector("[data-hit-equip-total]");
     if (total) total.textContent = fmt(hitTotal());
     const bonus = els.equip?.querySelector("[data-hit-buff-bonus]");
