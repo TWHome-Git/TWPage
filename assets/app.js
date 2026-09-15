@@ -710,6 +710,7 @@ async function boot() {
 
   populateCategorySelect();
   applyFilters();
+  hitCalc.refreshEquipment();   // 필요 명중 계산기를 먼저 열어 뒀으면 장비 후보를 채운다
 
   if (calc.active) refreshAllRows();
   else restoreLastCharacter();
@@ -3084,6 +3085,7 @@ function activateExtraTab(key) {
   if (key === "buff") expBuff.load();
   if (key === "seed") seedCalc.load();
   if (key === "onekill") oneKillCalc.load();
+  if (key === "hit") hitCalc.load();
 
   routeWrite();
 }
@@ -4150,6 +4152,374 @@ const oneKillCalc = (() => {
   }
 
   return { load, wire };
+})();
+
+// ══════════════════════════════════════════════════════════════
+//  테일즈 정보 > 필요 명중 계산기
+//  왼쪽: 능력치 계산(DEX) / 가운데: 장비 명중 보정 합계 / 오른쪽: 사냥터 선택 + 결과
+//
+//  능력치 공식 (2026-09-15 사용자 제공)
+//    기본 능력치 = [(기본 상태 + 비율 증가 + 고정값 증가) × 배율 A]   ※ 비율 증가는 버프마다 소수점 버림, 배율 A는 모두 곱셈
+//    최종 능력치 = 기본 능력치 + [기본 능력치 × 배율 B] + 최종 고정치
+//  장비 명중은 장비 DB의 "명중" 열(중간값)과 명중 인챈트를 부위별로 더한다.
+//  사냥터 목록은 assets/hit-grounds.json, 최종 판정식은 아직 정해지지 않아 결과 칸은 재료만 보여준다.
+// ══════════════════════════════════════════════════════════════
+const HIT_SAVE_KEY = "tw-hit-save-v1";
+const HIT_GROUNDS_URL = "./assets/hit-grounds.json";
+const HIT_STATS = ["DEX"];   // 명중은 DEX만 본다 (AGI는 2026-09-15 제외)
+const HIT_SLOTS = ["무기", "갑옷", "손목", "투구", "머리", "몸", "손", "다리", "아티팩트"];
+
+// 버프 정의. kind: pct(비율, 버프마다 버림) / fixed(고정값) / multA(배율 A, 곱) / multB(배율 B, %) / final(최종 고정치)
+// input: check(체크) / num(체크 + 숫자 하나, min~max)
+// excl: 같은 그룹은 택1 (하나를 켜면 다른 쪽이 꺼진다)
+// icon: images/ 아래 경로 (경험치 버프 계산기와 같은 CDN). 없는 것은 빈 자리로 둔다
+const HIT_BUFFS = [
+  { group: "비율 증가", note: "버프마다 소수점 버림", items: [
+    { key: "snowman", name: "눈사람 특제 포션", kind: "pct", input: "check", value: 30, icon: "눈사람.png", excl: "snow" },
+    { key: "illumi", name: "일루미네이션 축제 음료", kind: "pct", input: "check", value: 30, icon: "일루미.png", excl: "snow" },
+    { key: "isabelPct", name: "이자벨의 특선 묘약 (비율 능력치)", kind: "pct", input: "check", value: 50, icon: "" },
+  ] },
+  { group: "고정값 증가", items: [
+    { key: "trust", name: "개-신뢰의 물약", kind: "fixed", input: "num", min: 28, max: 33, icon: "신뢰.png" },
+    { key: "bless", name: "축복의 물약", kind: "fixed", input: "check", value: 20, icon: "축복.png", excl: "bless" },
+    { key: "isabelBless", name: "이자벨의 비법 (고정 능력치)", kind: "fixed", input: "check", value: 20, icon: "", excl: "bless" },
+    { key: "isabelFixed", name: "이자벨의 특선 묘약 (고정 능력치)", kind: "fixed", input: "check", value: 100, icon: "" },
+    { key: "fever", name: "피버 상태", kind: "fixed", input: "check", value: 30, icon: "피버.png" },
+    { key: "helmet", name: "투구 부가 옵션", kind: "fixed", input: "num", min: 0, max: 60, icon: "Exp/투구_부가.png" },
+    { key: "card", name: "몬스터 카드 옵션", kind: "fixed", input: "num", min: 0, max: 70, icon: "Exp/카드.png" },
+    { key: "club", name: "클럽 효과", kind: "fixed", input: "num", min: 0, max: 7, icon: "클럽.png" },
+    { key: "clubS", name: "클럽 S효과", kind: "fixed", input: "check", value: 20, icon: "클럽.png" },
+    { key: "petS", name: "펫 S 스킬", kind: "fixed", input: "num", min: 0, max: 50, icon: "" },
+    { key: "rune", name: "룬 스킬", kind: "fixed", input: "num", min: 0, max: 20, icon: "" },
+  ] },
+  { group: "능력치 배율 A", note: "모두 곱셈", items: [
+    { key: "exorcist", name: "퇴마사의 축복", kind: "multA", input: "check", value: 1.1, icon: "퇴마사.png" },
+    { key: "isabelMult", name: "이자벨의 비법 (비율 능력치)", kind: "multA", input: "check", value: 1.1, icon: "" },
+    { key: "holyWater", name: "축복의 성수", kind: "multA", input: "check", value: 1.1, icon: "" },
+  ] },
+  { group: "능력치 배율 B", items: [
+    { key: "enhance", name: "능력 강화 (%)", kind: "multB", input: "num", min: 0, max: 20, icon: "" },
+    { key: "encourage", name: "엔커리지", kind: "multB", input: "check", value: 10, icon: "" },
+  ] },
+  { group: "최종 고정치 증가", items: [
+    { key: "crown", name: "크라운", kind: "final", input: "num", min: 0, max: 300, icon: "" },
+    { key: "relicGoods", name: "신조의 성물", kind: "final", input: "num", min: 0, max: 300, icon: "" },
+  ] },
+];
+
+const hitCalc = (() => {
+  const hit = {
+    loaded: false,
+    base: { DEX: 310 },   // 기본 상태 초기값 (2026-09-15 사용자 지정)
+    buffs: {},                 // check 항목: true/false, num 항목: { on, value }
+    character: CHARACTER_NAMES[0],
+    type: "",
+    equip: {},                 // 슬롯 → { name, enchant }
+    siena: 0,                  // 시에나의 기운 명중률 +X
+    grounds: [],
+    ground: "",
+  };
+  const els = {};
+  const q = (sel) => document.querySelector(sel);
+  const fmt = (n) => Math.round(n).toLocaleString("ko-KR");
+  const num = (v) => Number(v) || 0;
+  const findBuff = (key) => HIT_BUFFS.flatMap((g) => g.items).find((b) => b.key === key);
+
+  function buffValue(buff) {
+    const saved = hit.buffs[buff.key];
+    if (buff.input === "check") return saved ? buff.value : 0;
+    // 숫자 항목: 체크가 켜져 있을 때만, 범위 안으로 잘라서 쓴다
+    if (!saved || typeof saved !== "object" || !saved.on) return 0;
+    return Math.min(buff.max, Math.max(buff.min, num(saved.value)));
+  }
+
+  // 한 스탯의 기본 능력치·최종 능력치와 중간값
+  function computeStat(stat) {
+    const base = Math.max(0, num(hit.base[stat]));
+    let pct = 0, fixed = 0, multA = 1, multB = 0, final = 0;
+    HIT_BUFFS.flatMap((g) => g.items).forEach((buff) => {
+      const v = buffValue(buff);
+      if (!v) return;
+      if (buff.kind === "pct") pct += Math.floor(base * v / 100);
+      else if (buff.kind === "fixed") fixed += v;
+      else if (buff.kind === "multA") multA *= v;
+      else if (buff.kind === "multB") multB += v;
+      else if (buff.kind === "final") final += v;
+    });
+    const basic = Math.floor((base + pct + fixed) * multA);
+    const total = basic + Math.floor(basic * multB / 100) + final;
+    return { base, pct, fixed, multA, multB, final, basic, total };
+  }
+
+  // ── 장비 ──
+  const records = () => state.records || [];   // 장비 DB (부팅 때 시트에서 읽는다)
+  const recordByName = (name) => records().find((r) => r.name === name);
+
+  function hitOf(name) {
+    const rec = name && name !== "수동 입력" ? recordByName(name) : null;
+    const s = rec?.stats?.["명중"];
+    return s ? { value: num(s.max), limit: num(s.limit) } : { value: 0, limit: 0 };
+  }
+
+  function equipRows() {
+    return HIT_SLOTS.map((slot) => {
+      const candidates = records().length ? buildEquipmentCandidates(slot, hit.type, hit.character) : ["수동 입력"];
+      const saved = hit.equip[slot] || {};
+      const name = candidates.includes(saved.name) ? saved.name : "수동 입력";
+      const h = hitOf(name);
+      const enchant = Math.max(0, num(saved.enchant));
+      return { slot, candidates, name, hit: h.value, limit: h.limit, enchant, sum: h.value + enchant };
+    });
+  }
+
+  const equipTotal = () => equipRows().reduce((sum, r) => sum + r.sum, 0);
+
+  // ── 저장 ──
+  function save() {
+    try {
+      localStorage.setItem(HIT_SAVE_KEY, JSON.stringify({
+        base: hit.base, buffs: hit.buffs, character: hit.character, type: hit.type,
+        equip: hit.equip, siena: hit.siena, ground: hit.ground,
+      }));
+    } catch { /* 저장은 편의일 뿐 */ }
+  }
+
+  function restore() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(HIT_SAVE_KEY) || "null");
+      if (!saved) return;
+      if (saved.base) hit.base = { DEX: num(saved.base.DEX) || 310 };
+      if (saved.buffs) hit.buffs = saved.buffs;
+      if (CHARACTER_NAMES.includes(saved.character)) hit.character = saved.character;
+      if (saved.type) hit.type = saved.type;
+      if (saved.equip) hit.equip = saved.equip;
+      hit.siena = num(saved.siena);
+      if (saved.ground) hit.ground = saved.ground;
+    } catch { /* 깨진 저장값은 무시 */ }
+  }
+
+  // ── 렌더 ──
+  const hitIcon = (buff) => buff.icon
+    ? `<span class="buff-icon"><img src="${BUFF_ICON_BASE}${encodeImagePath(buff.icon)}" alt="" loading="lazy" decoding="async" /></span>`
+    : `<span class="buff-icon is-text" aria-hidden="true">${escapeHtml(buff.name.slice(0, 1))}</span>`;
+
+  // 같은 excl 그룹의 다른 항목이 켜져 있으면 잠근다 (택1)
+  const isLockedBuff = (buff) => !!buff.excl && HIT_BUFFS.flatMap((g) => g.items)
+    .some((other) => other.excl === buff.excl && other.key !== buff.key && hit.buffs[other.key] === true);
+
+  // 버프 계산기와 같은 카드형 체크리스트. 체크 항목은 수치를 숨기고, 숫자 항목은 체크하면 입력 칸이 나온다
+  function renderStats() {
+    if (!els.stat) return;
+    const r = { DEX: computeStat("DEX") };
+    const cell = (buff) => {
+      const saved = hit.buffs[buff.key];
+      const isNum = buff.input === "num";
+      const on = isNum ? !!(saved && typeof saved === "object" && saved.on) : !!saved;
+      const locked = isLockedBuff(buff);
+      return `<div class="buff-cell">
+        <label class="buff-item${locked ? " is-locked" : ""}">
+          <input type="checkbox" class="buff-check" data-hit-check="${buff.key}"${on ? " checked" : ""}${locked ? " disabled" : ""} />
+          ${hitIcon(buff)}
+          <span class="buff-name">${escapeHtml(buff.name)}</span>
+        </label>
+        ${isNum && on ? `
+          <input class="buff-num" type="number" inputmode="numeric" min="${buff.min}" max="${buff.max}" step="1"
+            placeholder="${buff.min}~${buff.max}" data-hit-num="${buff.key}" value="${escapeHtml(String(num(saved.value) || ""))}" />
+          <span class="buff-unit">${buff.kind === "multB" ? "%" : ""}</span>` : ""}
+      </div>`;
+    };
+    const groups = HIT_BUFFS.map((g) => `
+      <section class="hit-group">
+        <p class="hit-group-title">${escapeHtml(g.group)}${g.note ? ` <small>${escapeHtml(g.note)}</small>` : ""}</p>
+        <div class="buff-grid hit-grid">${g.items.map(cell).join("")}</div>
+      </section>`).join("");
+
+    els.stat.innerHTML = `
+      <div class="hit-base-row">
+        ${HIT_STATS.map((st) => `<label class="field ok-field"><span>기본 ${st}</span><input type="number" inputmode="numeric" min="0" step="1" placeholder="0" data-hit-base="${st}" value="${hit.base[st] || ""}" /></label>`).join("")}
+      </div>
+      ${groups}
+      <div class="hit-stat-total">
+        <div><span>기본 능력치</span>${HIT_STATS.map((st) => `<b>${st} <em data-hit-total="basic-${st}">${fmt(r[st].basic)}</em></b>`).join("")}</div>
+        <div class="is-final"><span>최종 능력치</span>${HIT_STATS.map((st) => `<b>${st} <em data-hit-total="total-${st}">${fmt(r[st].total)}</em></b>`).join("")}</div>
+      </div>
+      <p class="ok-note">기본 능력치 = [(기본 상태 + 비율 증가 + 고정값 증가) × 배율 A] · 최종 능력치 = 기본 능력치 + [기본 능력치 × 배율 B] + 최종 고정치</p>
+    `;
+  }
+
+  function renderEquip() {
+    if (!els.equip) return;
+    const types = resolveCalculatorTypes(hit.character);
+    if (!types.includes(hit.type)) hit.type = types[0];
+    const rows = equipRows();
+    const loading = !records().length;
+    els.equip.innerHTML = `
+      <div class="hit-equip-head">
+        <label class="field ok-field"><span>캐릭터</span>
+          <select data-hit-character>${CHARACTER_NAMES.map((n) => `<option value="${escapeHtml(n)}"${n === hit.character ? " selected" : ""}>${escapeHtml(n)}</option>`).join("")}</select>
+        </label>
+        <label class="field ok-field"><span>계산 타입</span>
+          <select data-hit-type>${types.map((t) => `<option value="${t}"${t === hit.type ? " selected" : ""}>${escapeHtml(CALC_TYPE_DISPLAY[t] || t)}</option>`).join("")}</select>
+        </label>
+      </div>
+      ${loading ? `<p class="ok-note">장비 DB를 불러오는 중입니다…</p>` : ""}
+      <table class="hit-table hit-equip-table" aria-label="장비 명중 보정">
+        <thead><tr><th>부위</th><th>장비</th><th>명중</th><th>인챈트</th><th>합</th></tr></thead>
+        <tbody>
+          ${rows.map((r) => `
+            <tr>
+              <td class="hit-name">${escapeHtml(r.slot)}</td>
+              <td><select data-hit-equip="${escapeHtml(r.slot)}">${r.candidates.map((c) => `<option value="${escapeHtml(c)}"${c === r.name ? " selected" : ""}>${escapeHtml(c)}</option>`).join("")}</select></td>
+              <td class="hit-cell is-val">${r.name === "수동 입력" ? "-" : fmt(r.hit)}</td>
+              <td class="hit-cell"><input type="number" inputmode="numeric" min="0" step="1" placeholder="0" title="${r.limit > r.hit ? `MAX : ${r.limit - r.hit}` : ""}" data-hit-enchant="${escapeHtml(r.slot)}" value="${r.enchant || ""}" /></td>
+              <td class="hit-cell is-val">${fmt(r.sum)}</td>
+            </tr>`).join("")}
+        </tbody>
+        <tfoot><tr class="hit-total"><th colspan="4">장비 명중 보정 합계</th><td>${fmt(equipTotal())}</td></tr></tfoot>
+      </table>
+      <p class="ok-note">명중 값은 장비 DB의 중간값입니다. 인챈트 칸에 명중 인챈트를 넣으면 더합니다. "수동 입력"은 계산에서 뺍니다.</p>
+    `;
+  }
+
+  function renderGrounds() {
+    if (!els.ground) return;
+    if (!hit.grounds.length) {
+      els.ground.innerHTML = `<p class="ok-note">사냥터 목록이 아직 없습니다. <code>assets/hit-grounds.json</code>에 목록을 넣으면 여기에 버튼으로 나옵니다.</p>`;
+      return;
+    }
+    els.ground.innerHTML = `<div class="buff-base-row hit-ground-row">${hit.grounds.map((g) => `
+      <button type="button" class="buff-base-btn${g.name === hit.ground ? " is-active" : ""}" data-hit-ground="${escapeHtml(g.name)}">${escapeHtml(g.name)}</button>`).join("")}</div>`;
+  }
+
+  function renderResult() {
+    if (!els.result) return;
+    const dex = computeStat("DEX");
+    const ground = hit.grounds.find((g) => g.name === hit.ground);
+    els.result.innerHTML = `
+      <div class="hit-result-grid">
+        <div><span>최종 DEX</span><strong>${fmt(dex.total)}</strong></div>
+        <div><span>장비 명중 보정</span><strong>${fmt(equipTotal())}</strong></div>
+        <div><span>시에나의 기운 (명중률 +X)</span><strong><input type="number" inputmode="numeric" min="0" step="1" placeholder="0" data-hit-siena value="${hit.siena || ""}" /></strong></div>
+        <div class="is-wide"><span>사냥터</span><strong>${ground ? escapeHtml(ground.name) : "선택 안 됨"}</strong></div>
+      </div>
+      <div class="ok-verdict hit-verdict"><span>명중 판정식이 정해지면 여기에 가능 / 불가와 부족분이 표시됩니다.</span></div>
+    `;
+  }
+
+  function renderAll() {
+    renderStats();
+    renderEquip();
+    renderGrounds();
+    renderResult();
+  }
+
+  async function loadGrounds() {
+    try {
+      const data = await fetchJson(HIT_GROUNDS_URL);
+      hit.grounds = Array.isArray(data?.grounds) ? data.grounds.filter((g) => g && g.name) : [];
+    } catch (error) {
+      console.info("사냥터 목록을 불러오지 못했습니다.", error);
+      hit.grounds = [];
+    }
+  }
+
+  async function load() {
+    if (hit.loaded) return;
+    hit.loaded = true;
+    els.stat = q("#hitStatArea");
+    els.equip = q("#hitEquipArea");
+    els.ground = q("#hitGroundArea");
+    els.result = q("#hitResultArea");
+    restore();
+    renderAll();
+    await loadGrounds();
+    renderGrounds();
+    renderResult();
+  }
+
+  // 장비 DB가 늦게 도착했을 때 (부팅 중 시트 로딩이 끝나면 불린다)
+  function refreshEquipment() {
+    if (!hit.loaded) return;
+    renderEquip();
+    renderResult();
+  }
+
+  function wire() {
+    const panel = q('[data-extra-panel="hit"]');
+    if (!panel) return;
+
+    // 입력값은 상태에 넣고, 바뀐 영역만 다시 그린다. 숫자 칸은 포커스를 잃지 않게 표 전체를 다시 그리지 않는다
+    panel.addEventListener("input", (event) => {
+      const t = event.target;
+      if (t.dataset.hitBase) { hit.base[t.dataset.hitBase] = num(t.value); }
+      else if (t.dataset.hitNum) {
+        hit.buffs[t.dataset.hitNum] = { on: true, value: num(t.value) };
+      } else if (t.dataset.hitEnchant != null) {
+        hit.equip[t.dataset.hitEnchant] = { ...(hit.equip[t.dataset.hitEnchant] || {}), enchant: num(t.value) };
+      } else if (t.dataset.hitSiena != null) { hit.siena = num(t.value); }
+      else return;
+      save();
+      refreshTotals();
+    });
+
+    panel.addEventListener("change", (event) => {
+      const t = event.target;
+      if (t.dataset.hitCheck) {
+        const buff = findBuff(t.dataset.hitCheck);
+        // 숫자 항목은 체크 상태와 값을 같이 들고 있는다 (체크를 꺼도 값은 남겨 다시 켤 때 그대로)
+        hit.buffs[t.dataset.hitCheck] = buff?.input === "num"
+          ? { on: t.checked, value: num(hit.buffs[t.dataset.hitCheck]?.value) }
+          : t.checked;
+        if (t.checked && buff?.excl) {
+          HIT_BUFFS.flatMap((g) => g.items).forEach((other) => {
+            if (other.excl !== buff.excl || other.key === buff.key) return;
+            hit.buffs[other.key] = other.input === "num" ? { on: false, value: num(hit.buffs[other.key]?.value) } : false;
+          });
+        }
+        save(); renderStats(); renderResult();
+      }
+      else if (t.dataset.hitCharacter != null) { hit.character = t.value; hit.type = ""; hit.equip = {}; save(); renderEquip(); renderResult(); }
+      else if (t.dataset.hitType != null) { hit.type = t.value; hit.equip = {}; save(); renderEquip(); renderResult(); }
+      else if (t.dataset.hitEquip != null) {
+        hit.equip[t.dataset.hitEquip] = { ...(hit.equip[t.dataset.hitEquip] || {}), name: t.value };
+        save(); renderEquip(); renderResult();
+      }
+    });
+
+    panel.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-hit-ground]");
+      if (!button) return;
+      hit.ground = button.dataset.hitGround;
+      save();
+      renderGrounds();
+      renderResult();
+    });
+  }
+
+  // 숫자 입력 중에는 합계 칸만 갱신한다 (표를 다시 그리면 커서가 빠진다)
+  function refreshTotals() {
+    const r = { DEX: computeStat("DEX") };
+    HIT_STATS.forEach((st) => {
+      const basic = els.stat?.querySelector(`[data-hit-total="basic-${st}"]`);
+      const total = els.stat?.querySelector(`[data-hit-total="total-${st}"]`);
+      if (basic) basic.textContent = fmt(r[st].basic);
+      if (total) total.textContent = fmt(r[st].total);
+    });
+    equipRows().forEach((row) => {
+      const tr = els.equip?.querySelector(`[data-hit-enchant="${CSS.escape(row.slot)}"]`)?.closest("tr");
+      const cell = tr?.querySelector("td:last-child");
+      if (cell) cell.textContent = fmt(row.sum);
+    });
+    const total = els.equip?.querySelector("tfoot td");
+    if (total) total.textContent = fmt(equipTotal());
+    const cells = els.result?.querySelectorAll(".hit-result-grid > div > strong");
+    if (cells?.length >= 2) {
+      cells[0].textContent = fmt(r.DEX.total);
+      cells[1].textContent = fmt(equipTotal());
+    }
+  }
+
+  return { load, wire, refreshEquipment };
 })();
 
 // ══════════════════════════════════════════════════════════════
@@ -5869,6 +6239,7 @@ function wireEvents() {
   expBuff.wire();
   seedCalc.wire();
   oneKillCalc.wire();
+  hitCalc.wire();
   rareBuff.wire();
 
   els.characterGrid?.addEventListener("click", (event) => {

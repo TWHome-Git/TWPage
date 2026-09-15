@@ -1009,3 +1009,18 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* 필요 명중 계산기: 폰에서는 능력치 → 장비 → 사냥터 → 결과 순으로 한 열 */
+@media (max-width: 720px) {
+  .hit-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .hit-equip-head {
+    grid-template-columns: 1fr;
+  }
+
+  .hit-grid {
+    grid-template-columns: 1fr;
+  }
+}

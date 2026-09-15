@@ -6618,3 +6618,250 @@ img.dmg-chk-icon {
   color: var(--muted);
   font-size: 12px;
 }
+
+/* ── 테일즈 정보 > 필요 명중 계산기 ────────────────────────── */
+/* 왼쪽 능력치 · 가운데 장비 · 오른쪽(사냥터 위, 결과 아래) 세 열 */
+.hit-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.2fr) minmax(0, 0.7fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.hit-side {
+  display: grid;
+  gap: 14px;
+}
+
+.hit-box {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  padding: 12px 14px 14px;
+}
+
+.hit-box .buff-section-title {
+  margin-top: 0;
+}
+
+.hit-base-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 220px;
+  gap: 8px 12px;
+  margin-bottom: 10px;
+}
+
+.hit-group + .hit-group {
+  margin-top: 8px;
+}
+
+.hit-group-title {
+  margin: 0 0 4px;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.hit-group-title small {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+/* 버프 계산기의 카드(.buff-cell)를 그대로 쓰되, 상자가 좁아 두 칸씩 놓는다 */
+.hit-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.hit-grid .buff-cell {
+  gap: 6px;
+  padding: 4px 6px;
+  min-height: 38px;
+}
+
+.hit-grid .buff-item {
+  gap: 5px;
+}
+
+.hit-grid .buff-icon {
+  width: 22px;
+  height: 22px;
+  flex-basis: 22px;
+  font-size: 11px;
+}
+
+.hit-grid .buff-icon img {
+  max-width: 22px;
+  max-height: 22px;
+}
+
+.hit-grid .buff-name {
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.hit-grid .buff-num {
+  width: 54px;
+  min-height: 26px;
+  padding: 0 4px;
+  font-size: 12px;
+}
+
+.hit-grid .buff-unit:empty {
+  display: none;
+}
+
+.hit-stat-total {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));   /* 기본 / 최종 */
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.hit-stat-total > div {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: rgba(247, 250, 247, 0.9);
+}
+
+.hit-stat-total span {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.hit-stat-total b {
+  display: block;
+  margin-top: 2px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.hit-stat-total b em {
+  font-style: normal;
+  font-size: 15px;
+}
+
+.hit-stat-total .is-final b em {
+  color: var(--accent);
+}
+
+/* 장비 표 */
+.hit-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.hit-table th,
+.hit-table td {
+  padding: 4px 6px;
+  border-bottom: 1px solid rgba(23, 33, 31, 0.08);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.hit-table thead th {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.hit-cell {
+  width: 64px;
+  text-align: center;
+}
+
+.hit-name {
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.hit-cell input,
+.hit-equip-table select {
+  width: 100%;
+  padding: 3px 6px;
+  font-size: 12px;
+}
+
+.hit-cell input {
+  text-align: right;
+}
+
+.hit-cell.is-val {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.hit-table tfoot th,
+.hit-table tfoot td {
+  border-bottom: 0;
+  font-weight: 700;
+}
+
+.hit-total th,
+.hit-total td {
+  color: var(--accent);
+  font-size: 13px;
+  text-align: center;
+}
+
+.hit-total th {
+  text-align: right;
+}
+
+.hit-equip-head {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+  margin-bottom: 10px;
+}
+
+.hit-result-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.hit-result-grid > div {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: rgba(247, 250, 247, 0.9);
+}
+
+.hit-result-grid > div.is-wide {
+  grid-column: 1 / -1;
+}
+
+.hit-result-grid span {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.hit-result-grid strong {
+  display: block;
+  margin-top: 2px;
+  font-size: 16px;
+}
+
+.hit-result-grid strong input {
+  width: 100%;
+  padding: 3px 6px;
+  font-size: 14px;
+  text-align: right;
+}
+
+.hit-verdict {
+  margin-top: 10px;
+}
+
+.hit-verdict span {
+  color: var(--muted);
+  font-size: 12px;
+}
