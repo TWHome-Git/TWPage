@@ -4216,8 +4216,8 @@ const HIT_BUFFS = [
   { key: "runeHit", name: "룬 스킬 (명중률)", kind: "hit", input: "num", min: 0, max: 20, def: 20, icon: "룬_예리한눈.png" },
   { key: "siena", name: "시에나의 기운 (DEX)", kind: "final", input: "num", min: 0, max: 999, icon: "시에나.png" },
   { key: "encourage", name: "인커리지", kind: "multB", input: "check", value: 10, icon: "엔커리지.png" },
-  // 목록에 없는 배율 뒤 고정 효과(예: 시에나의 "모든 스탯 +19"). 배율 A·B를 타지 않는다
-  { key: "finalEtc", name: "기타 (최종 고정)", kind: "final", input: "num", min: 0, max: 999, icon: "" },
+  // 시에나의 기운 "모든 스탯 +N". DEX 항목과 별개로 배율 뒤에 더해진다
+  { key: "sienaAll", name: "시에나의 기운 (모든 스탯)", kind: "final", input: "num", min: 0, max: 999, icon: "시에나.png" },
   { spacer: true },
 ];
 
