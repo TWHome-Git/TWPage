@@ -6656,16 +6656,18 @@ img.dmg-chk-icon {
 }
 
 /* ── 테일즈 정보 > 필요 명중 계산기 ────────────────────────── */
-/* 왼쪽 능력치 · 가운데 장비 · 오른쪽(사냥터 위, 결과 아래) 세 열 */
+/* 위: 능력치(넓게) · 장비 두 열, 아래: 사냥터 · 결과 두 열 */
 .hit-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.2fr) minmax(0, 0.7fr);
+  grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
   gap: 14px;
   align-items: start;
 }
 
 .hit-side {
+  grid-column: 1 / -1;
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
 }
 
@@ -6732,15 +6734,20 @@ img.dmg-chk-icon {
   max-height: 22px;
 }
 
+/* 이름은 한 줄로. 상자를 넓혀 대부분 다 보이고, 그래도 넘치면 말줄임 */
 .hit-grid .buff-name {
   font-size: 12px;
   line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
+/* "28~33" 같은 범위 안내가 다 보이게 */
 .hit-grid .buff-num {
-  width: 54px;
+  width: 68px;
   min-height: 26px;
-  padding: 0 4px;
+  padding: 0 6px;
   font-size: 12px;
 }
 
