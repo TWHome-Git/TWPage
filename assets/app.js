@@ -4175,7 +4175,7 @@ const HIT_SLOTS = [
   { slot: "손" }, { slot: "손 어빌리티", manual: true }, { slot: "손 부가옵션 명중률", manual: true },
   { slot: "다리" },
   { slot: "아티팩트" }, { slot: "효과", manual: true }, { slot: "기타", manual: true },
-  { slot: "시에나의 기운 (명중률 %)", manual: true },
+  { slot: "시에나 (명중률 %)", manual: true },
 ];
 
 // 버프 정의. kind: pct(비율, 버프마다 버림) / fixed(고정값) / multA(배율 A, 곱) / multB(배율 B, %) / final(최종 고정치)
@@ -4304,7 +4304,13 @@ const hitCalc = (() => {
       if (saved.buffs) hit.buffs = saved.buffs;
       if (CHARACTER_NAMES.includes(saved.character)) hit.character = saved.character;
       if (saved.type) hit.type = saved.type;
-      if (saved.equip) hit.equip = saved.equip;
+      if (saved.equip) {
+        hit.equip = saved.equip;
+        // 줄 이름을 바꾼 뒤(2026-09-15)에도 예전에 넣은 값이 이어지게 한다
+        if (hit.equip["시에나의 기운 (명중률 %)"] && !hit.equip["시에나 (명중률 %)"]) {
+          hit.equip["시에나 (명중률 %)"] = hit.equip["시에나의 기운 (명중률 %)"];
+        }
+      }
       if (saved.ground) hit.ground = saved.ground;
     } catch { /* 깨진 저장값은 무시 */ }
   }
