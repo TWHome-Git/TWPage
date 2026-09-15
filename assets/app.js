@@ -4167,13 +4167,15 @@ const oneKillCalc = (() => {
 const HIT_SAVE_KEY = "tw-hit-save-v1";
 const HIT_GROUNDS_URL = "./assets/hit-grounds.json";
 const HIT_STATS = ["DEX"];   // 명중은 DEX만 본다 (AGI는 2026-09-15 제외)
-// 장비 DB에서 고르는 부위와, 명중 수치를 직접 넣는 줄(manual)
+// 장비 DB에서 고르는 부위와, 명중 수치를 수동으로 넣는 줄(manual).
+// pct 줄은 명중 수치가 아니라 명중률(%)이라 합계에 섞지 않고 따로 모은다
 const HIT_SLOTS = [
   { slot: "무기" }, { slot: "무기 어빌리티", manual: true },
   { slot: "갑옷" }, { slot: "손목" }, { slot: "투구" }, { slot: "머리" }, { slot: "몸" },
-  { slot: "손" }, { slot: "손 어빌리티", manual: true },
+  { slot: "손" }, { slot: "손 어빌리티", manual: true }, { slot: "손 부가옵션 명중률", manual: true, pct: true },
   { slot: "다리" },
   { slot: "아티팩트" }, { slot: "효과", manual: true }, { slot: "기타", manual: true },
+  { slot: "시에나의 기운 (명중률 %)", manual: true, pct: true },
 ];
 
 // 버프 정의. kind: pct(비율, 버프마다 버림) / fixed(고정값) / multA(배율 A, 곱) / multB(배율 B, %) / final(최종 고정치)
@@ -4184,9 +4186,9 @@ const HIT_SLOTS = [
 const HIT_BUFFS = [
   { key: "snowman", name: "눈사람 특제 포션", kind: "pct", input: "check", value: 30, icon: "눈사람.png", excl: "snow" },
   { key: "illumi", name: "일루미네이션 축제 음료", kind: "pct", input: "check", value: 30, icon: "일루미.png", excl: "snow" },
-  { key: "isabelBless", name: "이자벨의 비법 (고정 능력치)", kind: "fixed", input: "check", value: 20, icon: "", excl: "bless" },
+  { key: "isabelBless", name: "이자벨 (고정 능력치)", kind: "fixed", input: "check", value: 20, icon: "", excl: "bless" },
   { key: "bless", name: "축복의 물약", kind: "fixed", input: "check", value: 20, icon: "축복.png", excl: "bless" },
-  { key: "isabelMult", name: "이자벨의 비법 (비율 능력치)", kind: "multA", input: "check", value: 1.1, icon: "", excl: "multA" },
+  { key: "isabelMult", name: "이자벨 (비율 능력치)", kind: "multA", input: "check", value: 1.1, icon: "", excl: "multA" },
   { key: "exorcist", name: "퇴마사의 축복", kind: "multA", input: "check", value: 1.1, icon: "퇴마사.png", excl: "multA" },
   { key: "isabelFixed", name: "특선 묘약 (고정 능력치)", kind: "fixed", input: "check", value: 100, icon: "" },
   { key: "isabelPct", name: "특선 묘약 (비율 능력치)", kind: "pct", input: "check", value: 50, icon: "" },
@@ -4259,11 +4261,11 @@ const hitCalc = (() => {
   }
 
   function equipRows() {
-    return HIT_SLOTS.map(({ slot, manual }) => {
+    return HIT_SLOTS.map(({ slot, manual, pct }) => {
       const saved = hit.equip[slot] || {};
       if (manual) {
         const value = Math.max(0, num(saved.value));
-        return { slot, manual: true, value, sum: value };
+        return { slot, manual: true, pct: !!pct, value, sum: pct ? 0 : value };
       }
       const candidates = records().length ? buildEquipmentCandidates(slot, hit.type, hit.character) : ["수동 입력"];
       const name = candidates.includes(saved.name) ? saved.name : "수동 입력";
@@ -4273,6 +4275,8 @@ const hitCalc = (() => {
   }
 
   const equipTotal = () => equipRows().reduce((sum, r) => sum + r.sum, 0);
+  // 명중률(%) 줄의 합. 수치 합계와는 단위가 달라 따로 보여준다
+  const equipPctTotal = () => equipRows().reduce((sum, r) => sum + (r.pct ? r.value : 0), 0);
 
   // ── 저장 ──
   function save() {
@@ -4362,10 +4366,10 @@ const hitCalc = (() => {
         <thead><tr><th>부위</th><th>장비</th><th>명중</th></tr></thead>
         <tbody>
           ${rows.map((r) => r.manual ? `
-            <tr class="is-manual">
+            <tr class="is-manual${r.pct ? " is-pct" : ""}">
               <td class="hit-name">${escapeHtml(r.slot)}</td>
               <td class="hit-manual-label">수동 입력</td>
-              <td class="hit-cell"><input type="number" inputmode="numeric" min="0" step="1" placeholder="0" data-hit-manual="${escapeHtml(r.slot)}" value="${r.value || ""}" /></td>
+              <td class="hit-cell"><span class="hit-manual-wrap"><input type="number" inputmode="numeric" min="0" step="1" placeholder="0" data-hit-manual="${escapeHtml(r.slot)}" value="${r.value || ""}" />${r.pct ? "<em>%</em>" : ""}</span></td>
             </tr>` : `
             <tr>
               <td class="hit-name">${escapeHtml(r.slot)}</td>
@@ -4373,9 +4377,12 @@ const hitCalc = (() => {
               <td class="hit-cell is-val" data-hit-slot-sum="${escapeHtml(r.slot)}">${r.name === "수동 입력" ? "-" : fmt(r.hit)}</td>
             </tr>`).join("")}
         </tbody>
-        <tfoot><tr class="hit-total"><th colspan="2">장비 명중 보정 합계</th><td>${fmt(equipTotal())}</td></tr></tfoot>
+        <tfoot>
+          <tr class="hit-total"><th colspan="2">장비 명중 보정 합계</th><td data-hit-equip-total>${fmt(equipTotal())}</td></tr>
+          <tr class="hit-total is-pct"><th colspan="2">명중률 보정 합계</th><td data-hit-equip-pct>+${fmt(equipPctTotal())}%</td></tr>
+        </tfoot>
       </table>
-      <p class="ok-note">명중 값은 장비 DB의 중간값입니다. 어빌리티·효과·기타는 명중 수치를 수동으로 넣습니다. 장비를 "수동 입력"으로 두면 그 부위는 계산에서 뺍니다.</p>
+      <p class="ok-note">명중 값은 장비 DB의 중간값입니다. 어빌리티·효과·기타는 명중 수치를, 손 부가옵션·시에나의 기운은 명중률(%)을 수동으로 넣습니다. 장비를 "수동 입력"으로 두면 그 부위는 계산에서 뺍니다.</p>
     `;
   }
 
@@ -4397,6 +4404,7 @@ const hitCalc = (() => {
       <div class="hit-result-grid">
         <div><span>최종 DEX</span><strong>${fmt(dex.total)}</strong></div>
         <div><span>장비 명중 보정</span><strong>${fmt(equipTotal())}</strong></div>
+        <div><span>명중률 보정</span><strong>+${fmt(equipPctTotal())}%</strong></div>
         <div class="is-wide"><span>사냥터</span><strong>${ground ? escapeHtml(ground.name) : "선택 안 됨"}</strong></div>
       </div>
       <div class="ok-verdict hit-verdict"><span>명중 판정식이 정해지면 여기에 가능 / 불가와 부족분이 표시됩니다.</span></div>
@@ -4501,12 +4509,15 @@ const hitCalc = (() => {
       if (basic) basic.textContent = fmt(r[st].basic);
       if (total) total.textContent = fmt(r[st].total);
     });
-    const total = els.equip?.querySelector("tfoot td");
+    const total = els.equip?.querySelector("[data-hit-equip-total]");
     if (total) total.textContent = fmt(equipTotal());
+    const pct = els.equip?.querySelector("[data-hit-equip-pct]");
+    if (pct) pct.textContent = `+${fmt(equipPctTotal())}%`;
     const cells = els.result?.querySelectorAll(".hit-result-grid > div > strong");
-    if (cells?.length >= 2) {
+    if (cells?.length >= 3) {
       cells[0].textContent = fmt(r.DEX.total);
       cells[1].textContent = fmt(equipTotal());
+      cells[2].textContent = `+${fmt(equipPctTotal())}%`;
     }
   }
 

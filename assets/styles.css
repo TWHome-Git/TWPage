@@ -6805,6 +6805,36 @@ img.dmg-chk-icon {
 
 .hit-equip-table .is-manual .hit-name {
   padding-left: 14px;
+  white-space: normal;
+}
+
+/* 명중률(%) 줄: 입력 칸 옆에 단위 */
+.hit-manual-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+/* % 줄은 단위가 붙어 칸을 조금 넓힌다 */
+.hit-equip-table .is-pct .hit-cell {
+  width: 80px;
+}
+
+.hit-manual-wrap input {
+  min-width: 52px;
+}
+
+.hit-manual-wrap em {
+  color: var(--muted);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.hit-total.is-pct th,
+.hit-total.is-pct td {
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .hit-table tfoot th,
