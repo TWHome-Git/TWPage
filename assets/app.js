@@ -4179,7 +4179,7 @@ const HIT_SLOTS = [
 ];
 
 // 버프 정의. kind: pct(비율, 버프마다 버림) / fixed(고정값) / multA(배율 A, 곱) / multB(배율 B, %) / final(최종 고정치)
-//   hit: DEX가 아니라 명중 보정 수치에 더한다 (이자벨(명중) +10, 특선 묘약(명중) +20). 이름은 명중률이지만 적용은 수치다
+//   hit: DEX가 아니라 명중 보정 수치에 더한다 (이자벨(명중) +10, 특선 묘약(명중) +20, 룬 스킬(명중률) 0~20). 이름은 명중률이지만 적용은 수치다
 // input: check(체크) / num(체크 + 숫자 하나, min~max)
 // excl: 같은 그룹은 택1 (하나를 켜면 다른 쪽이 잠긴다)
 // icon: images/ 아래 경로 (경험치 버프 계산기와 같은 CDN). 없는 것은 첫 글자 자리표시
@@ -4202,10 +4202,11 @@ const HIT_BUFFS = [
   { key: "helmet", name: "투구 부가 옵션", kind: "fixed", input: "num", min: 0, max: 60, icon: "Exp/투구_부가.png" },
   { key: "card", name: "몬스터 카드 옵션", kind: "fixed", input: "num", min: 0, max: 70, icon: "Exp/카드.png" },
   { key: "petS", name: "펫 S 스킬", kind: "fixed", input: "num", min: 0, max: 50, icon: "펫_덱스.png" },
-  { key: "rune", name: "룬 스킬", kind: "fixed", input: "num", min: 0, max: 20, icon: "룬_예리한눈.png" },
+  { key: "enhance", name: "능력 강화 (%)", kind: "multB", input: "num", min: 0, max: 20, icon: "능력_강화.png" },
   { key: "club", name: "클럽 효과", kind: "fixed", input: "num", min: 0, max: 7, icon: "클럽_덱스.png" },
   { key: "clubS", name: "클럽 S효과", kind: "fixed", input: "check", value: 20, icon: "클럽S_덱스.png" },
-  { key: "enhance", name: "능력 강화 (%)", kind: "multB", input: "num", min: 0, max: 20, icon: "능력_강화.png" },
+  { key: "rune", name: "룬 스킬 (DEX)", kind: "fixed", input: "num", min: 0, max: 20, icon: "룬_가벼운몸놀림.png" },
+  { key: "runeHit", name: "룬 스킬 (명중률)", kind: "hit", input: "num", min: 0, max: 20, icon: "룬_예리한눈.png" },
   { key: "encourage", name: "엔커리지", kind: "multB", input: "check", value: 10, icon: "엔커리지.png" },
   { key: "siena", name: "시에나의 기운 (DEX)", kind: "final", input: "num", min: 0, max: 999, icon: "시에나.png" },
 ];
@@ -4385,7 +4386,7 @@ const hitCalc = (() => {
             </tr>`).join("")}
         </tbody>
         <tfoot>
-          <tr class="hit-total is-sub"><th colspan="2">버프 명중 보정 <small>이자벨·특선 묘약 (명중)</small></th><td data-hit-buff-bonus>${fmt(buffHitBonus())}</td></tr>
+          <tr class="hit-total is-sub"><th colspan="2">버프 명중 보정 <small>이자벨·특선 묘약·룬 (명중)</small></th><td data-hit-buff-bonus>${fmt(buffHitBonus())}</td></tr>
           <tr class="hit-total"><th colspan="2">명중 보정 합계</th><td data-hit-equip-total>${fmt(hitTotal())}</td></tr>
         </tfoot>
       </table>
