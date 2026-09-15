@@ -4168,18 +4168,18 @@ const HIT_SAVE_KEY = "tw-hit-save-v1";
 const HIT_GROUNDS_URL = "./assets/hit-grounds.json";
 const HIT_STATS = ["DEX"];   // 명중은 DEX만 본다 (AGI는 2026-09-15 제외)
 // 장비 DB에서 고르는 부위와, 명중 수치를 수동으로 넣는 줄(manual).
-// pct 줄은 명중 수치가 아니라 명중률(%)이라 합계에 섞지 않고 따로 모은다
+// "명중률"이라 적힌 줄도 실제 적용은 명중 보정 수치라 같은 합계에 더한다
 const HIT_SLOTS = [
   { slot: "무기" }, { slot: "무기 어빌리티", manual: true },
   { slot: "갑옷" }, { slot: "손목" }, { slot: "투구" }, { slot: "머리" }, { slot: "몸" },
-  { slot: "손" }, { slot: "손 어빌리티", manual: true }, { slot: "손 부가옵션 명중률", manual: true, pct: true },
+  { slot: "손" }, { slot: "손 어빌리티", manual: true }, { slot: "손 부가옵션 명중률", manual: true },
   { slot: "다리" },
   { slot: "아티팩트" }, { slot: "효과", manual: true }, { slot: "기타", manual: true },
-  { slot: "시에나의 기운 (명중률 %)", manual: true, pct: true },
+  { slot: "시에나의 기운 (명중률 %)", manual: true },
 ];
 
 // 버프 정의. kind: pct(비율, 버프마다 버림) / fixed(고정값) / multA(배율 A, 곱) / multB(배율 B, %) / final(최종 고정치)
-//   hitPct: DEX가 아니라 최종 명중률에 %p로 더한다 (이자벨(명중) +10, 특선 묘약(명중) +20)
+//   hit: DEX가 아니라 명중 보정 수치에 더한다 (이자벨(명중) +10, 특선 묘약(명중) +20). 이름은 명중률이지만 적용은 수치다
 // input: check(체크) / num(체크 + 숫자 하나, min~max)
 // excl: 같은 그룹은 택1 (하나를 켜면 다른 쪽이 잠긴다)
 // icon: images/ 아래 경로 (경험치 버프 계산기와 같은 CDN). 없는 것은 첫 글자 자리표시
@@ -4193,8 +4193,8 @@ const HIT_BUFFS = [
   { key: "exorcist", name: "퇴마사의 축복", kind: "multA", input: "check", value: 1.1, icon: "퇴마사.png", excl: "multA" },
   { key: "isabelFixed", name: "특선 묘약 (고정 능력치)", kind: "fixed", input: "check", value: 100, icon: "이자벨_고정.png" },
   { key: "isabelPct", name: "특선 묘약 (비율 능력치)", kind: "pct", input: "check", value: 50, icon: "이자벨_비율.png" },
-  { key: "isabelHit", name: "이자벨 (명중)", kind: "hitPct", input: "check", value: 10, icon: "이자벨_명중.png" },
-  { key: "isabelHitSpecial", name: "특선 묘약 (명중)", kind: "hitPct", input: "check", value: 20, icon: "이자벨_명중.png" },
+  { key: "isabelHit", name: "이자벨 (명중)", kind: "hit", input: "check", value: 10, icon: "이자벨_명중.png" },
+  { key: "isabelHitSpecial", name: "특선 묘약 (명중)", kind: "hit", input: "check", value: 20, icon: "이자벨_명중.png" },
   { key: "trust", name: "개-신뢰의 물약", kind: "fixed", input: "num", min: 28, max: 33, icon: "신뢰.png" },
   { key: "fever", name: "피버 상태", kind: "fixed", input: "check", value: 30, icon: "피버.png" },
   { key: "crown", name: "크라운", kind: "final", input: "num", min: 0, max: 300, icon: "크라운.png" },
@@ -4247,15 +4247,15 @@ const hitCalc = (() => {
       else if (buff.kind === "multA") multA *= v;
       else if (buff.kind === "multB") multB += v;
       else if (buff.kind === "final") final += v;
-      // hitPct는 DEX 계산에 들어가지 않는다 (buffHitPct에서 따로 모은다)
+      // hit는 DEX 계산에 들어가지 않는다 (buffHitBonus에서 명중 보정으로 모은다)
     });
     const basic = Math.floor((base + pct + fixed) * multA);
     const total = basic + Math.floor(basic * multB / 100) + final;
     return { base, pct, fixed, multA, multB, final, basic, total };
   }
 
-  // 최종 명중률에 더하는 버프 %p 합 (이자벨(명중)·특선 묘약(명중))
-  const buffHitPct = () => HIT_BUFFS.reduce((sum, buff) => sum + (buff.kind === "hitPct" ? buffValue(buff) : 0), 0);
+  // 명중 보정 수치에 더하는 버프 합 (이자벨(명중)·특선 묘약(명중))
+  const buffHitBonus = () => HIT_BUFFS.reduce((sum, buff) => sum + (buff.kind === "hit" ? buffValue(buff) : 0), 0);
 
   // ── 장비 ──
   const records = () => state.records || [];   // 장비 DB (부팅 때 시트에서 읽는다)
@@ -4268,11 +4268,11 @@ const hitCalc = (() => {
   }
 
   function equipRows() {
-    return HIT_SLOTS.map(({ slot, manual, pct }) => {
+    return HIT_SLOTS.map(({ slot, manual }) => {
       const saved = hit.equip[slot] || {};
       if (manual) {
         const value = Math.max(0, num(saved.value));
-        return { slot, manual: true, pct: !!pct, value, sum: pct ? 0 : value };
+        return { slot, manual: true, value, sum: value };
       }
       const candidates = records().length ? buildEquipmentCandidates(slot, hit.type, hit.character) : ["수동 입력"];
       const name = candidates.includes(saved.name) ? saved.name : "수동 입력";
@@ -4282,8 +4282,8 @@ const hitCalc = (() => {
   }
 
   const equipTotal = () => equipRows().reduce((sum, r) => sum + r.sum, 0);
-  // 명중률(%) 줄의 합. 수치 합계와는 단위가 달라 따로 보여준다
-  const equipPctTotal = () => equipRows().reduce((sum, r) => sum + (r.pct ? r.value : 0), 0);
+  // 명중 보정 합계 = 장비·수동 줄 합 + 버프(이자벨·특선 묘약 명중)
+  const hitTotal = () => equipTotal() + buffHitBonus();
 
   // ── 저장 ──
   function save() {
@@ -4347,7 +4347,7 @@ const hitCalc = (() => {
       ${groups}
       <div class="hit-stat-total">
         <div><span>기본 능력치</span>${HIT_STATS.map((st) => `<b>${st} <em data-hit-total="basic-${st}">${fmt(r[st].basic)}</em></b>`).join("")}</div>
-        <div class="is-final"><span>최종 능력치</span>${HIT_STATS.map((st) => `<b>${st} <em data-hit-total="total-${st}">${fmt(r[st].total)}</em></b>`).join("")}<small>명중률 <em data-hit-total="hitpct">+${fmt(buffHitPct())}%</em></small></div>
+        <div class="is-final"><span>최종 능력치</span>${HIT_STATS.map((st) => `<b>${st} <em data-hit-total="total-${st}">${fmt(r[st].total)}</em></b>`).join("")}</div>
       </div>
       <p class="ok-note">기본 능력치 = [(기본 상태 + 비율 증가 + 고정값 증가) × 배율 A] · 최종 능력치 = 기본 능력치 + [기본 능력치 × 배율 B] + 최종 고정치</p>
     `;
@@ -4373,10 +4373,10 @@ const hitCalc = (() => {
         <thead><tr><th>부위</th><th>장비</th><th>명중</th></tr></thead>
         <tbody>
           ${rows.map((r) => r.manual ? `
-            <tr class="is-manual${r.pct ? " is-pct" : ""}">
+            <tr class="is-manual">
               <td class="hit-name">${escapeHtml(r.slot)}</td>
               <td class="hit-manual-label">수동 입력</td>
-              <td class="hit-cell"><span class="hit-manual-wrap"><input type="number" inputmode="numeric" min="0" step="1" placeholder="0" data-hit-manual="${escapeHtml(r.slot)}" value="${r.value || ""}" />${r.pct ? "<em>%</em>" : ""}</span></td>
+              <td class="hit-cell"><input type="number" inputmode="numeric" min="0" step="1" placeholder="0" data-hit-manual="${escapeHtml(r.slot)}" value="${r.value || ""}" /></td>
             </tr>` : `
             <tr>
               <td class="hit-name">${escapeHtml(r.slot)}</td>
@@ -4385,11 +4385,11 @@ const hitCalc = (() => {
             </tr>`).join("")}
         </tbody>
         <tfoot>
-          <tr class="hit-total"><th colspan="2">장비 명중 보정 합계</th><td data-hit-equip-total>${fmt(equipTotal())}</td></tr>
-          <tr class="hit-total is-pct"><th colspan="2">명중률 보정 합계</th><td data-hit-equip-pct>+${fmt(equipPctTotal())}%</td></tr>
+          <tr class="hit-total is-sub"><th colspan="2">버프 명중 보정 <small>이자벨·특선 묘약 (명중)</small></th><td data-hit-buff-bonus>${fmt(buffHitBonus())}</td></tr>
+          <tr class="hit-total"><th colspan="2">명중 보정 합계</th><td data-hit-equip-total>${fmt(hitTotal())}</td></tr>
         </tfoot>
       </table>
-      <p class="ok-note">명중 값은 장비 DB의 중간값입니다. 어빌리티·효과·기타는 명중 수치를, 손 부가옵션·시에나의 기운은 명중률(%)을 수동으로 넣습니다. 장비를 "수동 입력"으로 두면 그 부위는 계산에서 뺍니다.</p>
+      <p class="ok-note">명중 값은 장비 DB의 중간값입니다. 어빌리티·효과·기타·손 부가옵션·시에나의 기운은 명중 보정 수치를 수동으로 넣습니다. 장비를 "수동 입력"으로 두면 그 부위는 계산에서 뺍니다.</p>
     `;
   }
 
@@ -4410,8 +4410,7 @@ const hitCalc = (() => {
     els.result.innerHTML = `
       <div class="hit-result-grid">
         <div><span>최종 DEX</span><strong>${fmt(dex.total)}</strong></div>
-        <div><span>장비 명중 보정</span><strong>${fmt(equipTotal())}</strong></div>
-        <div><span>명중률 보정 <small>장비 ${fmt(equipPctTotal())} + 버프 ${fmt(buffHitPct())}</small></span><strong>+${fmt(equipPctTotal() + buffHitPct())}%</strong></div>
+        <div><span>명중 보정 합계</span><strong>${fmt(hitTotal())}</strong></div>
         <div class="is-wide"><span>사냥터</span><strong>${ground ? escapeHtml(ground.name) : "선택 안 됨"}</strong></div>
       </div>
       <div class="ok-verdict hit-verdict"><span>명중 판정식이 정해지면 여기에 가능 / 불가와 부족분이 표시됩니다.</span></div>
@@ -4487,7 +4486,7 @@ const hitCalc = (() => {
             hit.buffs[other.key] = other.input === "num" ? { on: false, value: num(hit.buffs[other.key]?.value) } : false;
           });
         }
-        save(); renderStats(); renderResult();
+        save(); renderStats(); renderEquip(); renderResult();
       }
       else if (t.dataset.hitCharacter != null) { hit.character = t.value; hit.type = ""; hit.equip = {}; save(); renderEquip(); renderResult(); }
       else if (t.dataset.hitType != null) { hit.type = t.value; hit.equip = {}; save(); renderEquip(); renderResult(); }
@@ -4517,14 +4516,13 @@ const hitCalc = (() => {
       if (total) total.textContent = fmt(r[st].total);
     });
     const total = els.equip?.querySelector("[data-hit-equip-total]");
-    if (total) total.textContent = fmt(equipTotal());
-    const pct = els.equip?.querySelector("[data-hit-equip-pct]");
-    if (pct) pct.textContent = `+${fmt(equipPctTotal())}%`;
+    if (total) total.textContent = fmt(hitTotal());
+    const bonus = els.equip?.querySelector("[data-hit-buff-bonus]");
+    if (bonus) bonus.textContent = fmt(buffHitBonus());
     const cells = els.result?.querySelectorAll(".hit-result-grid > div > strong");
-    if (cells?.length >= 3) {
+    if (cells?.length >= 2) {
       cells[0].textContent = fmt(r.DEX.total);
-      cells[1].textContent = fmt(equipTotal());
-      cells[2].textContent = `+${fmt(equipPctTotal() + buffHitPct())}%`;
+      cells[1].textContent = fmt(hitTotal());
     }
   }
 

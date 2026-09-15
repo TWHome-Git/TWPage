@@ -6847,10 +6847,14 @@ img.dmg-chk-icon {
   font-weight: 700;
 }
 
-.hit-total.is-pct th,
-.hit-total.is-pct td {
+.hit-total.is-sub th,
+.hit-total.is-sub td {
   color: var(--muted);
   font-size: 12px;
+}
+
+.hit-total.is-sub small {
+  font-weight: 400;
 }
 
 .hit-table tfoot th,
