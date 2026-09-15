@@ -23,7 +23,7 @@ const SNAPSHOT_URL = "./data/equipment-snapshot.json";
 const CDN_ROOT = "https://cdn.jsdelivr.net/gh/TWHome-Git/TWPage@";
 const CDN_AVATAR_ROOT = `${CDN_ROOT}v1.0.15/`;
 const CDN_EQUIP_ROOT = `${CDN_ROOT}v2.0.8/`;
-const CDN_ETC_ROOT = `${CDN_ROOT}v3.0.4/`;
+const CDN_ETC_ROOT = `${CDN_ROOT}v3.0.5/`;
 
 const IMAGE_BASE = `${CDN_EQUIP_ROOT}equipment-images/`;
 const CHARACTER_IMAGE_BASE = `${CDN_ETC_ROOT}character-images/`;
@@ -4187,27 +4187,27 @@ const HIT_SLOTS = [
 const HIT_BUFFS = [
   { key: "snowman", name: "눈사람 특제 포션", kind: "pct", input: "check", value: 30, icon: "눈사람.png", excl: "snow" },
   { key: "illumi", name: "일루미네이션 축제 음료", kind: "pct", input: "check", value: 30, icon: "일루미.png", excl: "snow" },
-  { key: "isabelBless", name: "이자벨 (고정 능력치)", kind: "fixed", input: "check", value: 20, icon: "", excl: "bless" },
+  { key: "isabelBless", name: "이자벨 (고정 능력치)", kind: "fixed", input: "check", value: 20, icon: "이자벨_고정.png", excl: "bless" },
   { key: "bless", name: "축복의 물약", kind: "fixed", input: "check", value: 20, icon: "축복.png", excl: "bless" },
-  { key: "isabelMult", name: "이자벨 (비율 능력치)", kind: "multA", input: "check", value: 1.1, icon: "", excl: "multA" },
+  { key: "isabelMult", name: "이자벨 (비율 능력치)", kind: "multA", input: "check", value: 1.1, icon: "이자벨_비율.png", excl: "multA" },
   { key: "exorcist", name: "퇴마사의 축복", kind: "multA", input: "check", value: 1.1, icon: "퇴마사.png", excl: "multA" },
-  { key: "isabelFixed", name: "특선 묘약 (고정 능력치)", kind: "fixed", input: "check", value: 100, icon: "" },
-  { key: "isabelPct", name: "특선 묘약 (비율 능력치)", kind: "pct", input: "check", value: 50, icon: "" },
-  { key: "isabelHit", name: "이자벨 (명중)", kind: "hitPct", input: "check", value: 10, icon: "" },
-  { key: "isabelHitSpecial", name: "특선 묘약 (명중)", kind: "hitPct", input: "check", value: 20, icon: "" },
+  { key: "isabelFixed", name: "특선 묘약 (고정 능력치)", kind: "fixed", input: "check", value: 100, icon: "이자벨_고정.png" },
+  { key: "isabelPct", name: "특선 묘약 (비율 능력치)", kind: "pct", input: "check", value: 50, icon: "이자벨_비율.png" },
+  { key: "isabelHit", name: "이자벨 (명중)", kind: "hitPct", input: "check", value: 10, icon: "이자벨_명중.png" },
+  { key: "isabelHitSpecial", name: "특선 묘약 (명중)", kind: "hitPct", input: "check", value: 20, icon: "이자벨_명중.png" },
   { key: "trust", name: "개-신뢰의 물약", kind: "fixed", input: "num", min: 28, max: 33, icon: "신뢰.png" },
   { key: "fever", name: "피버 상태", kind: "fixed", input: "check", value: 30, icon: "피버.png" },
-  { key: "crown", name: "크라운", kind: "final", input: "num", min: 0, max: 300, icon: "" },
-  { key: "relicGoods", name: "신조의 성물", kind: "final", input: "num", min: 0, max: 300, icon: "" },
+  { key: "crown", name: "크라운", kind: "final", input: "num", min: 0, max: 300, icon: "크라운.png" },
+  { key: "relicGoods", name: "신조의 성물", kind: "final", input: "num", min: 0, max: 300, icon: "신조의_성물.png" },
   { key: "helmet", name: "투구 부가 옵션", kind: "fixed", input: "num", min: 0, max: 60, icon: "Exp/투구_부가.png" },
   { key: "card", name: "몬스터 카드 옵션", kind: "fixed", input: "num", min: 0, max: 70, icon: "Exp/카드.png" },
-  { key: "petS", name: "펫 S 스킬", kind: "fixed", input: "num", min: 0, max: 50, icon: "" },
-  { key: "rune", name: "룬 스킬", kind: "fixed", input: "num", min: 0, max: 20, icon: "" },
-  { key: "club", name: "클럽 효과", kind: "fixed", input: "num", min: 0, max: 7, icon: "클럽.png" },
-  { key: "clubS", name: "클럽 S효과", kind: "fixed", input: "check", value: 20, icon: "클럽.png" },
-  { key: "enhance", name: "능력 강화 (%)", kind: "multB", input: "num", min: 0, max: 20, icon: "" },
-  { key: "encourage", name: "엔커리지", kind: "multB", input: "check", value: 10, icon: "" },
-  { key: "siena", name: "시에나의 기운 (DEX)", kind: "final", input: "num", min: 0, max: 999, icon: "기운.png" },
+  { key: "petS", name: "펫 S 스킬", kind: "fixed", input: "num", min: 0, max: 50, icon: "펫_덱스.png" },
+  { key: "rune", name: "룬 스킬", kind: "fixed", input: "num", min: 0, max: 20, icon: "룬_예리한눈.png" },
+  { key: "club", name: "클럽 효과", kind: "fixed", input: "num", min: 0, max: 7, icon: "클럽_덱스.png" },
+  { key: "clubS", name: "클럽 S효과", kind: "fixed", input: "check", value: 20, icon: "클럽S_덱스.png" },
+  { key: "enhance", name: "능력 강화 (%)", kind: "multB", input: "num", min: 0, max: 20, icon: "능력_강화.png" },
+  { key: "encourage", name: "엔커리지", kind: "multB", input: "check", value: 10, icon: "엔커리지.png" },
+  { key: "siena", name: "시에나의 기운 (DEX)", kind: "final", input: "num", min: 0, max: 999, icon: "시에나.png" },
 ];
 
 const hitCalc = (() => {
