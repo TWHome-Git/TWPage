@@ -4439,7 +4439,7 @@ const hitCalc = (() => {
     });
     const option = (g) => `<option value="${escapeHtml(groundKey(g))}"${groundKey(g) === hit.ground ? " selected" : ""}>${escapeHtml(g.name)} (${groundRange(g)})</option>`;
     els.ground.innerHTML = `
-      <p class="ok-note hit-ground-note">이 명중 조건은 유저들이 조사한 명중 조건이므로 실제와 다를 수 있습니다.</p>
+      <p class="hit-ground-note"><strong>주의 :</strong> 이 명중 조건은 유저들이 조사한 명중 조건이므로 실제와 다를 수 있습니다.</p>
       <label class="field ok-field hit-ground-field">
         <span>사냥터 (필요 명중)</span>
         <select data-hit-ground-select>
