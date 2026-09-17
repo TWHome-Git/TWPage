@@ -8755,7 +8755,7 @@ function coreSim() {
   coreRun(true);
 }
 function coreRenderTable(rows, useElso) {
-  const feeHead = useElso ? `<span class="sim-elso">엘소</span>강화 비용` : `${simIcon("시드.png")}강화 비용`;
+  const feeHead = useElso ? `<span class="sim-elso">ELSO</span>강화 비용` : `${simIcon("시드.png")}강화 비용`;
   const head = [
     "단계",
     "확률",
@@ -8791,7 +8791,7 @@ function coreRenderSummary(s) {
     `<span>${simIcon("코어가루.png", 24)}${t.dust.toLocaleString("ko-KR")}개${gap(t.dust, m.dust)}</span>` +
     `<span>${simIcon("코어결정.png", 24)}${t.crystal.toLocaleString("ko-KR")}개${gap(t.crystal, m.crystal)}</span>` +
     `<span>${simIcon("시드.png", 24)}${coreFmtEok(t.seedCost)}억${gap(t.seedCost / 1e8, m.seedCost / 1e8, "억")}</span>` +
-    (s.useElso ? `<span><span class="sim-elso">엘소</span>${t.elso.toLocaleString("ko-KR")}${gap(t.elso, m.elso)}</span>` : "") +
+    (s.useElso ? `<span><span class="sim-elso">ELSO</span>${t.elso.toLocaleString("ko-KR")}${gap(t.elso, m.elso)}</span>` : "") +
     `</div>`;
 
   simEls.coreSummary.innerHTML =
