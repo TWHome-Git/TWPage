@@ -1531,6 +1531,19 @@ select {
 }
 
 /* 시뮬레이터 재료 아이콘 */
+/* 엘소는 아이콘이 없어 글자 배지로 */
+.sim-elso {
+  display: inline-block;
+  margin-right: 4px;
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: rgba(15, 111, 99, 0.12);
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 800;
+  vertical-align: middle;
+}
+
 .sim-icon {
   vertical-align: middle;
   object-fit: contain;

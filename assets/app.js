@@ -8058,7 +8058,7 @@ function initSimulators() {
     "encElso", "encDiscount", "encBaseCost", "encCostLabel", "encStartInk", "encTargetInk",
     "encManualCount", "encPresets", "encRunBatch", "encRunTarget", "encReset", "encStatus", "encLog",
     "coreMainStat", "coreHasDust", "coreStartStage", "coreTargetStage",
-    "coreBoxPrice", "coreBoxPriceField", "coreCalc", "coreSim", "coreSummary", "coreTable",
+    "coreBoxPrice", "coreBoxPriceField", "coreCalc", "coreSim", "coreSummary", "coreTable", "coreElso", "coreDiscount",
     "relicCurrent", "relicTarget", "relicDifficulty", "relicCalc", "relicSim", "relicSummary", "relicTable",
     "enhStart", "enhTarget", "enhCalc", "enhSim", "enhSummary", "enhTable",
     "relicRateButton", "coreRateButton",
@@ -8580,6 +8580,16 @@ function wireEncryptSim() {
 // ── 코어 강화 시뮬 (CoreEnhanceSimulatorView) ─────────────────
 let coreStages = [];
 
+// 엘소로 강화할 때 단계별 비용 (2026-09-17 사용자 제공). 상자(가루) 비용은 엘소와 무관하게 시드다
+const CORE_ELSO_COST = [
+  0,
+  600, 660, 720, 780,          // 0진 1~4강
+  840, 900, 960, 1020, 1060,   // 1진 0~4강
+  1140, 1200, 1260, 1320, 1380, // 2진
+  1800, 1860, 1920, 1980, 2040, // 3진
+  2100, 2160, 2220, 2280, 2340, // 4진
+];
+
 function coreBuildStages(isAbyss) {
   const rows = [
     [0, 0, 1, 0, 0, 0, 0],
@@ -8615,6 +8625,7 @@ function coreBuildStages(isAbyss) {
     dust: x[3],
     crystal: x[4],
     seed: x[5],
+    elso: CORE_ELSO_COST[i] || 0,
     ratePct: x[6],
     rate: x[6] / 100,
     display: `${x[0]}진 ${x[1]}강`,
@@ -8658,6 +8669,8 @@ function coreRun(sampled) {
   const isMainStat = simEls.coreMainStat.checked;
   const isSubStat = !isMainStat;
   const hasDust = simEls.coreHasDust.checked;
+  const useElso = !!simEls.coreElso?.checked;           // 강화 비용을 시드 대신 엘소로
+  const discount = simEls.coreDiscount?.checked ? 0.8 : 1; // 강화 비용 20% 할인 (시드·엘소 공통, 상자는 제외)
 
   let dustUnitPrice = 0;
   if (!hasDust) {
@@ -8670,50 +8683,68 @@ function coreRun(sampled) {
     dustUnitPrice = box * 10000 + 20000;
   }
 
-  const rows = [];
-  let totalDust = 0, totalCrystal = 0, totalSeed = 0, totalCost = 0;
-  const model = { dust: 0, crystal: 0, seed: 0, cost: 0 };
-
   for (let i = startIdx + 1; i <= targetIdx; i++) {
-    const step = coreStages[i];
-    if (step.rate <= 0) {
-      alert(`${step.display} 단계 확률이 0%라 계산할 수 없습니다.`);
+    if (coreStages[i].rate <= 0) {
+      alert(`${coreStages[i].display} 단계 확률이 0%라 계산할 수 없습니다.`);
       return;
     }
-    const expected = sampled ? simDrawAttempts(step.rate) : 1 / step.rate;
-    const modelAttempt = 1 / step.rate;
-
-    let dustPer = step.dust, crystalPer = step.crystal, seedPer = step.seed;
-    if (isSubStat) {
-      dustPer = Math.floor(dustPer / 2);
-      crystalPer = Math.floor(crystalPer / 2);
-      seedPer = Math.floor(seedPer / 2);
-    }
-
-    const dustExp = Math.round(dustPer * expected);
-    const crystalExp = Math.round(crystalPer * expected);
-    const seedExp = Math.round(seedPer * expected);
-    const dustCost = !hasDust ? dustExp * dustUnitPrice : 0;
-    const stepCost = dustCost + seedExp;
-
-    const modelDust = Math.round(dustPer * modelAttempt);
-    const modelSeed = Math.round(seedPer * modelAttempt);
-    model.dust += modelDust;
-    model.crystal += Math.round(crystalPer * modelAttempt);
-    model.seed += modelSeed;
-    model.cost += (!hasDust ? modelDust * dustUnitPrice : 0) + modelSeed;
-
-    totalDust += dustExp;
-    totalCrystal += crystalExp;
-    totalSeed += seedExp;
-    totalCost += stepCost;
-
-    rows.push({ step, expected, dustExp, crystalExp, seedExp, stepCost });
   }
 
-  coreRenderTable(rows);
-  coreRenderSummary({ isMainStat, startIdx, targetIdx, totalDust, totalCrystal, totalSeed, totalCost,
-    sampled, model });
+  // 코어 한 개를 시작 → 목표까지 올리는 데 드는 양. draw=true면 확률대로 뽑고, 아니면 기대값
+  const runOne = (draw) => {
+    const rows = [];
+    const total = { dust: 0, crystal: 0, seedCost: 0, elso: 0 };
+    for (let i = startIdx + 1; i <= targetIdx; i++) {
+      const step = coreStages[i];
+      const attempts = draw ? simDrawAttempts(step.rate) : 1 / step.rate;
+
+      let dustPer = step.dust, crystalPer = step.crystal;
+      let feePer = useElso ? step.elso : step.seed;
+      if (isSubStat) {
+        dustPer = Math.floor(dustPer / 2);
+        crystalPer = Math.floor(crystalPer / 2);
+        feePer = Math.floor(feePer / 2);
+      }
+      feePer = Math.round(feePer * discount);
+
+      const dustExp = Math.round(dustPer * attempts);
+      const crystalExp = Math.round(crystalPer * attempts);
+      const feeExp = Math.round(feePer * attempts);
+      const dustCost = !hasDust ? dustExp * dustUnitPrice : 0;
+      // 시드 비용 = 상자(가루) 비용 + (시드로 강화할 때) 강화 비용. 엘소 강화면 강화 비용은 엘소로 따로 센다
+      const seedCost = dustCost + (useElso ? 0 : feeExp);
+      const elso = useElso ? feeExp : 0;
+
+      total.dust += dustExp;
+      total.crystal += crystalExp;
+      total.seedCost += seedCost;
+      total.elso += elso;
+      rows.push({ step, attempts, dustExp, crystalExp, feeExp, seedCost, elso });
+    }
+    return { rows, total };
+  };
+
+  const model = runOne(false);
+  const scale = (t, n) => ({ dust: t.dust * n, crystal: t.crystal * n, seedCost: t.seedCost * n, elso: t.elso * n });
+  let one, six;
+  if (sampled) {
+    // 코어 6개는 각각 따로 뽑아서 더한다 (1개 결과 × 6이 아니라)
+    const runs = Array.from({ length: CORE_SLOT_COUNT }, () => runOne(true));
+    one = runs[0];
+    six = runs.reduce((acc, r) => ({
+      dust: acc.dust + r.total.dust, crystal: acc.crystal + r.total.crystal,
+      seedCost: acc.seedCost + r.total.seedCost, elso: acc.elso + r.total.elso,
+    }), { dust: 0, crystal: 0, seedCost: 0, elso: 0 });
+  } else {
+    one = model;
+    six = scale(model.total, CORE_SLOT_COUNT);
+  }
+
+  coreRenderTable(one.rows, useElso);
+  coreRenderSummary({
+    isMainStat, startIdx, targetIdx, sampled, useElso, discount,
+    one: one.total, six, modelOne: model.total, modelSix: scale(model.total, CORE_SLOT_COUNT),
+  });
 }
 
 function coreCalc() {
@@ -8723,21 +8754,23 @@ function coreCalc() {
 function coreSim() {
   coreRun(true);
 }
-function coreRenderTable(rows) {
+function coreRenderTable(rows, useElso) {
+  const feeHead = useElso ? `<span class="sim-elso">엘소</span>강화 비용` : `${simIcon("시드.png")}강화 비용`;
   const head = [
     "단계",
     "확률",
     "시도",
     `${simIcon("코어가루.png")}가루`,
     `${simIcon("코어결정.png")}결정`,
-    `${simIcon("시드.png")}강화 비용`,
-    `${simIcon("시드.png")}총 기대비용`,
+    feeHead,
+    `${simIcon("시드.png")}${useElso ? "상자 비용" : "총 기대비용"}`,
   ];
   // 폰에서는 표를 카드로 펴므로 셀마다 이름을 달아둔다 (머리글이 안 보인다)
-  const labels = ["단계", "확률", "시도", "가루", "결정", "강화 비용", "총 기대비용"];
+  const labels = ["단계", "확률", "시도", "가루", "결정", "강화 비용", useElso ? "상자 비용" : "총 기대비용"];
   const body = rows
     .map((r) => {
-      const cells = [r.step.display, `${r.step.ratePct}%`, coreFmtCount(r.expected), r.dustExp.toLocaleString("ko-KR"), r.crystalExp.toLocaleString("ko-KR"), `${coreFmtEok(r.seedExp)}억`, `${coreFmtEok(r.stepCost)}억`];
+      const fee = useElso ? `${r.feeExp.toLocaleString("ko-KR")} 엘소` : `${coreFmtEok(r.feeExp)}억`;
+      const cells = [r.step.display, `${r.step.ratePct}%`, coreFmtCount(r.attempts), r.dustExp.toLocaleString("ko-KR"), r.crystalExp.toLocaleString("ko-KR"), fee, `${coreFmtEok(r.seedCost)}억`];
       return "<tr>" + cells.map((c, i) => `<td data-label="${escapeHtml(labels[i])}"${i === cells.length - 1 ? ' class="sim-cost"' : ""}>${escapeHtml(c)}</td>`).join("") + "</tr>";
     })
     .join("");
@@ -8751,19 +8784,21 @@ function coreRenderSummary(s) {
   const statLabel = s.isMainStat ? "주스탯" : "부스탯";
   const range = `${coreStages[s.startIdx].display} → ${coreStages[s.targetIdx].display}`;
   const kind = s.sampled ? "시뮬레이션" : "기대값";
-  const gap = (value, expected, n) => (s.sampled ? simDelta(value * n, expected * n) : "");
-  const mats = (n) =>
+  const note = [s.useElso ? "엘소 강화" : "", s.discount < 1 ? "강화 비용 20% 할인" : ""].filter(Boolean).join(" · ");
+  const gap = (value, expected, unit = "") => (s.sampled ? simDelta(value, expected, unit) : "");
+  const mats = (t, m) =>
     `<div class="sim-summary-mats">` +
-    `<span>${simIcon("코어가루.png", 24)}${(s.totalDust * n).toLocaleString("ko-KR")}개${gap(s.totalDust, s.model.dust, n)}</span>` +
-    `<span>${simIcon("코어결정.png", 24)}${(s.totalCrystal * n).toLocaleString("ko-KR")}개${gap(s.totalCrystal, s.model.crystal, n)}</span>` +
-    `<span>${simIcon("시드.png", 24)}${coreFmtEok(s.totalCost * n)}억${s.sampled ? simDelta(s.totalCost * n / 1e8, s.model.cost * n / 1e8, "억") : ""}</span>` +
+    `<span>${simIcon("코어가루.png", 24)}${t.dust.toLocaleString("ko-KR")}개${gap(t.dust, m.dust)}</span>` +
+    `<span>${simIcon("코어결정.png", 24)}${t.crystal.toLocaleString("ko-KR")}개${gap(t.crystal, m.crystal)}</span>` +
+    `<span>${simIcon("시드.png", 24)}${coreFmtEok(t.seedCost)}억${gap(t.seedCost / 1e8, m.seedCost / 1e8, "억")}</span>` +
+    (s.useElso ? `<span><span class="sim-elso">엘소</span>${t.elso.toLocaleString("ko-KR")}${gap(t.elso, m.elso)}</span>` : "") +
     `</div>`;
 
   simEls.coreSummary.innerHTML =
-    `<div class="sim-summary-title">${escapeHtml(statLabel)} | ${escapeHtml(range)} ${escapeHtml(kind)}</div>` +
+    `<div class="sim-summary-title">${escapeHtml(statLabel)} | ${escapeHtml(range)} ${escapeHtml(kind)}${note ? ` <small>(${escapeHtml(note)})</small>` : ""}</div>` +
     `<div class="sim-summary-cols">` +
-    `<div class="sim-summary-col"><span class="sim-summary-label">코어 1개</span>${mats(1)}</div>` +
-    `<div class="sim-summary-col"><span class="sim-summary-label">코어 ${CORE_SLOT_COUNT}개 전체</span>${mats(CORE_SLOT_COUNT)}</div>` +
+    `<div class="sim-summary-col"><span class="sim-summary-label">코어 1개</span>${mats(s.one, s.modelOne)}</div>` +
+    `<div class="sim-summary-col"><span class="sim-summary-label">코어 ${CORE_SLOT_COUNT}개 전체${s.sampled ? " (각각 뽑아 합산)" : ""}</span>${mats(s.six, s.modelSix)}</div>` +
     `</div>`;
 }
 function wireCoreSim() {
@@ -8990,6 +9025,7 @@ function coreRateTableHtml() {
       <td class="rr-mat">${s.dust.toLocaleString("ko-KR")}</td>
       <td class="rr-mat">${s.crystal ? s.crystal.toLocaleString("ko-KR") : "-"}</td>
       <td class="rr-mat">${(s.seed / 10000).toLocaleString("ko-KR")}만</td>
+      <td class="rr-mat">${s.elso.toLocaleString("ko-KR")}</td>
     </tr>`;
   }).join("");
 
@@ -8998,7 +9034,7 @@ function coreRateTableHtml() {
       <th class="rr-corner">단계</th>
       <th class="${curType ? "is-on" : ""}">머큐리얼/어비스</th>
       <th class="${curType ? "" : "is-on"}">이클립스/루비코나</th>
-      <th>가루</th><th>결정</th><th>시드</th>
+      <th>가루</th><th>결정</th><th>시드</th><th>엘소</th>
     </tr></thead>
     <tbody>${body}</tbody>
   </table>`;
