@@ -8267,8 +8267,8 @@ function renderInheritResult() {
         ${rows.map((r) => `
           <tr>
             <th>${escapeHtml(r.stat)}</th>
-            <td>${formatNumber(r.value)}</td>
-            <td><b>${blocked ? "-" : formatNumber(inheritedValue(r.value, grade))}</b></td>
+            <td data-label="추출 수치">${formatNumber(r.value)}</td>
+            <td data-label="상속 수치"><b>${blocked ? "-" : formatNumber(inheritedValue(r.value, grade))}</b></td>
           </tr>`).join("")}
       </tbody>
     `
