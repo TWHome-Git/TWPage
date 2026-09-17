@@ -1309,6 +1309,8 @@ const etaNew = {
   loading: false,
   seq: 0,
   cache: new Map(), // 날짜 → 서버별 행. 날짜를 오가며 볼 때 재다운로드를 막는다
+  highlight: "",    // 기록 검색에서 날짜를 눌러 넘어온 아이디. 표에서 강조한다
+  scrollTo: false,  // 그 아이디 행으로 한 번만 스크롤
 };
 
 const ETA_NEW_CACHE_LIMIT = 6;
@@ -1466,7 +1468,7 @@ function etaMoveRowsHtml(userId) {
       </div>
       <ul class="eta-move-dates">
         ${events.map((event) => `
-          <li><span class="eta-move-kind ${event.kind === "진입" ? "in" : "out"}">${event.kind}</span>${escapeHtml(event.date)}</li>
+          <li><button type="button" class="eta-move-jump" data-eta-move-date="${escapeHtml(event.date)}" data-eta-move-user="${escapeHtml(userId)}" title="${escapeHtml(event.date)} 진입·이탈 표로 이동"><span class="eta-move-kind ${event.kind === "진입" ? "in" : "out"}">${event.kind}</span>${escapeHtml(event.date)}</button></li>
         `).join("")}
       </ul>
     </section>
@@ -1511,7 +1513,7 @@ function renderEtaMoveSearch() {
 function etaNewGroupHtml(title, hint, rows) {
   const body = rows.length
     ? rows.map((row) => `
-      <tr>
+      <tr${etaNew.highlight && row.userId === etaNew.highlight ? ' class="is-highlight"' : ""}>
         <td class="eta-newcomer-id">${escapeHtml(row.userId)}</td>
         <td>${escapeHtml(row.characterName)}</td>
         <td>${formatNumber(row.level)}</td>
@@ -1572,6 +1574,13 @@ function renderEtaNewcomers() {
       groups.left,
     ),
   ].join("");
+
+  // 기록 검색에서 날짜를 눌러 왔으면 그 아이디 행으로 한 번 스크롤한다
+  if (etaNew.scrollTo && !etaNew.loading) {
+    etaNew.scrollTo = false;
+    const row = els.etaNewGroups.querySelector("tr.is-highlight");
+    row?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
 }
 
 function renderEtaNewServerTabs() {
@@ -6438,6 +6447,20 @@ function wireEvents() {
 
   els.etaNewDateSelect?.addEventListener("change", () => {
     etaNew.date = els.etaNewDateSelect.value;
+    etaNew.highlight = "";
+    loadEtaNewcomerData();
+  });
+
+  // 기록 검색 결과의 날짜를 누르면 기준 날짜를 그 날로 바꾸고 해당 아이디를 강조한다
+  els.etaMoveResult?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-eta-move-date]");
+    if (!button) return;
+    etaNew.date = button.dataset.etaMoveDate;
+    etaNew.highlight = button.dataset.etaMoveUser || "";
+    etaNew.scrollTo = true;
+    if (els.etaNewDateSelect) els.etaNewDateSelect.value = etaNew.date;
+    els.etaMoveResult.querySelectorAll(".eta-move-jump.is-active").forEach((el) => el.classList.remove("is-active"));
+    button.classList.add("is-active");
     loadEtaNewcomerData();
   });
 

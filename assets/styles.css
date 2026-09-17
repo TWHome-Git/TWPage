@@ -4172,10 +4172,39 @@ img.dmg-chk-icon {
 }
 
 .eta-move-dates li {
+  padding: 1px 0;
+}
+
+/* 날짜 항목은 눌러서 그 날의 진입·이탈 표로 넘어간다 */
+.eta-move-jump {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 3px 0;
+  width: 100%;
+  padding: 3px 4px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.eta-move-jump:hover {
+  border-color: var(--line);
+  background: var(--panel-strong);
+}
+
+.eta-move-jump.is-active {
+  border-color: var(--accent);
+  background: rgba(15, 111, 99, 0.08);
+}
+
+/* 기록 검색에서 넘어온 아이디 행 */
+.eta-newcomer-list tr.is-highlight td {
+  background: rgba(255, 214, 102, 0.45);
+  font-weight: 700;
 }
 
 .eta-move-kind {
