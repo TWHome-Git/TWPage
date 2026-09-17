@@ -1299,6 +1299,18 @@ select {
   align-items: center;
 }
 
+/* 왼쪽 라디오 묶음, 오른쪽 체크 하나 (코어 강화) */
+.sim-row-split {
+  justify-content: space-between;
+}
+
+.sim-row-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: center;
+}
+
 .sim-radio,
 .sim-check {
   display: inline-flex;
