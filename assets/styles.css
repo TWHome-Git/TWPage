@@ -1299,16 +1299,51 @@ select {
   align-items: center;
 }
 
-/* 왼쪽 라디오 묶음, 오른쪽 체크 하나 (코어 강화) */
-.sim-row-split {
-  justify-content: space-between;
+/* 둘 중 하나를 고르는 큰 버튼 (코어 강화 주스탯/부스탯, 시드/엘소). 라디오는 감추고 라벨을 버튼처럼 */
+.sim-toggle-group {
+  display: inline-flex;
+  gap: 6px;
 }
 
-.sim-row-group {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 16px;
+.sim-toggle {
+  position: relative;
+  display: inline-flex;
   align-items: center;
+  justify-content: center;
+  min-width: 104px;
+  min-height: 36px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  user-select: none;
+}
+
+.sim-toggle input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.sim-toggle:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.sim-toggle:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+.sim-toggle:has(input:focus-visible) {
+  box-shadow: 0 0 0 3px rgba(15, 111, 99, 0.2);
 }
 
 .sim-radio,

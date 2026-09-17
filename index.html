@@ -6,7 +6,7 @@
     <title>TW DB</title>
     <!-- 이미지 CDN. 첫 이미지 요청 전에 DNS+TLS를 미리 끝내둔다 -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
-    <link rel="stylesheet" href="./assets/styles.css?v=20260917-coreui" />
+    <link rel="stylesheet" href="./assets/styles.css?v=20260917-coreui3" />
     <!-- 모바일 전용. media 속성 덕에 넓은 화면에서는 렌더링을 막지 않는다 -->
     <link rel="stylesheet" href="./assets/mobile.css?v=20260915-result3" media="(max-width: 720px)" />
   </head>
@@ -857,22 +857,24 @@
           <section class="addon-content sim-panel" data-simulator-panel="core" hidden>
             <div class="sim-controls">
               <div class="sim-row">
-                <label class="sim-radio"><input type="radio" name="coreType" value="abyss" checked /><span>머큐리얼/어비스</span></label>
-                <label class="sim-radio"><input type="radio" name="coreType" value="normal" /><span>이클립스/루비코나</span></label>
+                <div class="sim-toggle-group">
+                  <label class="sim-toggle"><input type="radio" name="coreType" value="abyss" checked /><span>머큐리얼/어비스</span></label>
+                  <label class="sim-toggle"><input type="radio" name="coreType" value="normal" /><span>이클립스/루비코나</span></label>
+                </div>
                 <button id="coreRateButton" class="eta-help-button" type="button" title="강화 확률표" aria-label="강화 확률표">?</button>
               </div>
-              <!-- 주스탯/부스탯, 시드/엘소는 하나만 고르는 라디오. 오른쪽 체크는 별개 옵션 -->
-              <div class="sim-row sim-row-split">
-                <div class="sim-row-group">
-                  <label class="sim-radio"><input id="coreMainStat" type="radio" name="coreStat" value="main" checked /><span>주스탯</span></label>
-                  <label class="sim-radio"><input type="radio" name="coreStat" value="sub" /><span>부스탯</span></label>
+              <!-- 주스탯/부스탯, 시드/엘소는 하나만 고르는 큰 버튼(라디오를 감춘 라벨). 옆 체크는 별개 옵션 -->
+              <div class="sim-row">
+                <div class="sim-toggle-group">
+                  <label class="sim-toggle"><input id="coreMainStat" type="radio" name="coreStat" value="main" checked /><span>주스탯</span></label>
+                  <label class="sim-toggle"><input type="radio" name="coreStat" value="sub" /><span>부스탯</span></label>
                 </div>
                 <label class="sim-check"><input id="coreHasDust" type="checkbox" /><span>가루 보유</span></label>
               </div>
-              <div class="sim-row sim-row-split">
-                <div class="sim-row-group">
-                  <label class="sim-radio"><input type="radio" name="coreFee" value="seed" checked /><span>시드 강화</span></label>
-                  <label class="sim-radio"><input id="coreElso" type="radio" name="coreFee" value="elso" /><span>엘소 강화</span></label>
+              <div class="sim-row">
+                <div class="sim-toggle-group">
+                  <label class="sim-toggle"><input type="radio" name="coreFee" value="seed" checked /><span>시드 강화</span></label>
+                  <label class="sim-toggle"><input id="coreElso" type="radio" name="coreFee" value="elso" /><span>엘소 강화</span></label>
                 </div>
                 <label class="sim-check"><input id="coreDiscount" type="checkbox" /><span>강화 비용 20% 할인</span></label>
               </div>
