@@ -7176,10 +7176,6 @@ img.dmg-chk-icon {
 }
 
 .hammer-log {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 4px 12px;
   margin-top: 8px;
   padding: 8px 10px;
   border: 1px solid var(--accent);
@@ -7188,12 +7184,39 @@ img.dmg-chk-icon {
   font-size: 12px;
 }
 
+.hammer-log-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+}
+
 .hammer-log span {
   color: var(--muted);
 }
 
 .hammer-log b {
   color: var(--ink);
+}
+
+/* 단계가 많아지면 안에서만 스크롤한다 */
+.hammer-log-wrap {
+  max-height: 220px;
+  margin-top: 8px;
+  overflow: auto;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.hammer-log-table {
+  width: 100%;
+  font-size: 11px;
+}
+
+.hammer-log-table thead th {
+  position: sticky;
+  top: 0;
+  background: #fff;
 }
 
 .hammer-status {

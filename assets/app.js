@@ -9136,6 +9136,7 @@ function hammerAuto() {
   }
   const best = plans[0];
   const before = { rolls: hammer.rolls, seed: hammer.seed, hammers: hammer.hammers };
+  const stages = [];   // 잠금 개수가 바뀔 때마다 한 칸. 단계마다 얼마를 썼는지 남긴다
   let guard = 0;
 
   while (hammerSum() < hammer.target && guard < HAMMER_AUTO_CAP) {
@@ -9150,14 +9151,23 @@ function hammerAuto() {
     if (keep.length >= hammer.slots) break;
 
     const locks = keep.length;
+    let stage = stages[stages.length - 1];
+    if (!stage || stage.locks !== locks) {
+      stage = { locks, rolls: 0, seed: 0, hammers: 0, startSum: hammerSum(), endSum: hammerSum() };
+      stages.push(stage);
+    }
     hammer.seed += hammerSeedCost(locks);
     hammer.hammers += hammerCount(locks);
     hammer.rolls += 1;
+    stage.seed += hammerSeedCost(locks);
+    stage.hammers += hammerCount(locks);
+    stage.rolls += 1;
     guard += 1;
     for (let i = 0; i < hammer.slots; i += 1) {
       if (hammer.locks[i] && hammer.lines[i]) continue;
       hammer.lines[i] = hammerRollLine();
     }
+    stage.endSum = hammerSum();
   }
 
   const used = {
@@ -9166,14 +9176,31 @@ function hammerAuto() {
     hammers: hammer.hammers - before.hammers,
   };
   const done = hammerSum() >= hammer.target;
+  const rows = stages.map((st, i) => `
+    <tr>
+      <td data-label="단계">${i + 1}</td>
+      <td data-label="잠금">${st.locks}개</td>
+      <td data-label="굴림">${formatNumber(st.rolls)}회</td>
+      <td data-label="시드">${hammerFmtSeed(st.seed)}</td>
+      <td data-label="망치">${formatNumber(st.hammers)}개</td>
+      <td data-label="누적 수치">${formatNumber(st.startSum)} → <b>${formatNumber(st.endSum)}</b></td>
+    </tr>`).join("");
   simEls.hammerLog.hidden = false;
   simEls.hammerLog.innerHTML = `
-    <b>자동 굴리기 ${done ? "완료" : "중단"}</b>
-    <span>수치 ${best.threshold} 이상만 잠금</span>
-    <span>굴림 <b>${formatNumber(used.rolls)}회</b>${simDelta(used.rolls, best.rolls, "회")}</span>
-    <span>비용 <b>${hammerFmtSeed(used.cost)}</b>${simDelta(used.cost / 1e8, best.cost / 1e8, "억")}</span>
-    <span>망치 ${formatNumber(used.hammers)}개</span>
-    ${done ? "" : `<span class="sim-neg">${formatNumber(HAMMER_AUTO_CAP)}회를 넘겨 멈췄습니다</span>`}`;
+    <div class="hammer-log-head">
+      <b>자동 굴리기 ${done ? "완료" : "중단"}</b>
+      <span>수치 ${best.threshold} 이상만 잠금</span>
+      <span>굴림 <b>${formatNumber(used.rolls)}회</b>${simDelta(used.rolls, best.rolls, "회")}</span>
+      <span>비용 <b>${hammerFmtSeed(used.cost)}</b>${simDelta(used.cost / 1e8, best.cost / 1e8, "억")}</span>
+      <span>망치 <b>${formatNumber(used.hammers)}개</b></span>
+      ${done ? "" : `<span class="sim-neg">${formatNumber(HAMMER_AUTO_CAP)}회를 넘겨 멈췄습니다</span>`}
+    </div>
+    <div class="hammer-log-wrap">
+      <table class="sim-table hammer-log-table">
+        <thead><tr><th>단계</th><th>잠금</th><th>굴림</th><th>시드</th><th>망치</th><th>누적 수치</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
   renderHammer();
 }
 
