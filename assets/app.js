@@ -8989,31 +8989,43 @@ function hammerSolve(target, slots, price, statKey) {
   const C = Array.from({ length: maxLock + 1 }, () => new Float64Array(target + 1));
   const policy = Array.from({ length: maxLock + 1 }, () => new Int8Array(target + 1));
 
-  // 마지막 칸은 잠글 수 없다. 잠금을 다 채웠으면 남은 한 줄이 한 방에 R 이상을 띄워야 끝난다
   const dist = hammerValueDist(statKey);
-  const lastLines = Math.max(1, slots - maxLock);
-  const finishOnce = (R) => {
-    const one = dist.filter((d) => d.value >= R).reduce((sum, d) => sum + d.p, 0);
-    return 1 - Math.pow(1 - one, lastLines);   // 남은 줄 중 하나라도 R 이상
-  };
+  // 굴린 줄들의 합 분포. 잠그지 않아도 한 판에 목표를 넘기면 그대로 끝난다.
+  // 이 경우를 빼놓으면 굳이 낮은 값을 잠가 비싼 단계로 올라가는 쪽을 고르게 된다.
+  const totalDist = [];     // totalDist[m][sum] = 확률
+  totalDist[0] = [1];
+  const pNone = 1 - dist.reduce((sum, d) => sum + d.p, 0);
+  for (let m = 1; m <= slots; m += 1) {
+    const prev = totalDist[m - 1];
+    const next = [];
+    prev.forEach((p, sum) => {
+      if (!p) return;
+      next[sum] = (next[sum] || 0) + p * pNone;
+      dist.forEach((d) => { next[sum + d.value] = (next[sum + d.value] || 0) + p * d.p; });
+    });
+    totalDist[m] = next;
+  }
+  const finishAll = (R, m) => totalDist[m].reduce((sum, p, value) => (value >= R ? sum + p : sum), 0);
 
   for (let R = 1; R <= target; R += 1) {
     for (let k = maxLock; k >= 0; k -= 1) {
       const m = slots - k;
       if (m <= 0) { C[k][R] = Infinity; policy[k][R] = 0; continue; }
       if (k === maxLock) {
-        // 더 잠글 수 없으니 한 판에 끝나야 한다. 10을 넘게 남았으면 이 상태로는 못 끝낸다
-        const p = finishOnce(R);
+        // 더 잠글 수 없으니 남은 줄이 한 판에 R 이상을 띄워야 끝난다
+        const p = finishAll(R, m);
         C[k][R] = p > 0 ? cost[k] / p : Infinity;
         policy[k][R] = 1;
         continue;
       }
+      const pFinishAll = finishAll(R, m);
       let best = Infinity;
       let bestT = 1;
       for (let t = 1; t <= 10; t += 1) {
         const dist = table[t][m];
         let rest = 0;
         let stay = 0;
+        let finish = 0;   // 잠근 값만으로 목표를 넘겨 끝난 경우
         let ok = true;
         for (let c = 0; c < dist.length; c += 1) {
           const row = dist[c];
@@ -9028,6 +9040,7 @@ function hammerSolve(target, slots, price, statKey) {
             const gain = take === c ? sum : Math.round((sum * take) / c);
             const nk = k + take;
             const nR = Math.max(0, R - gain);
+            if (nR === 0) { finish += p; continue; }   // 여기서 끝
             const v = C[nk][nR];
             if (!Number.isFinite(v)) { ok = false; break; }
             rest += p * v;
@@ -9035,7 +9048,11 @@ function hammerSolve(target, slots, price, statKey) {
           if (!ok) break;
         }
         if (!ok || stay >= 1) continue;
-        const value = (cost[k] + rest) / (1 - stay);
+        // 잠그지 않은 줄까지 합쳐 끝나는 경우를 더한다 (이미 센 몫은 뺀다)
+        const extraFinish = Math.max(0, pFinishAll - finish);
+        const idle = Math.max(0, stay - extraFinish);
+        if (idle >= 1) continue;
+        const value = (cost[k] + rest) / (1 - idle);
         if (value < best) { best = value; bestT = t; }
       }
       C[k][R] = best;
@@ -9075,7 +9092,8 @@ function hammerRoute(solved, startValues, target, slots, price, statKey, runs = 
       bag.cost += step;
       stages.set(k, bag);
 
-      let rolledSum = 0;
+      const beforeSum = sum;   // 이번 판을 굴리기 전 잠가 둔 합
+      let rolledSum = 0;       // 이번 판에 나온 모든 줄의 합 (잠근 것 포함)
       for (let i = 0; i < m; i += 1) {
         if (Math.random() >= hit) continue;
         let r = Math.random() * hit;
@@ -9088,11 +9106,10 @@ function hammerRoute(solved, startValues, target, slots, price, statKey, runs = 
           r -= d.p;
         }
       }
-      // 마지막 판은 잠그지 않은 줄도 그대로 쓰므로 합계에 넣어 본다
-      if (sum >= target || kept.reduce((a, b) => a + b, 0) + rolledSum >= target) {
-        sum = Math.max(sum, kept.reduce((a, b) => a + b, 0) + rolledSum);
-        break;
-      }
+      // 판 위의 합 = 이번 판 전에 잠가 둔 값 + 이번에 나온 줄 전부.
+      // 이번에 잠근 값은 이미 rolledSum에 들어 있으니 kept에 다시 더하면 두 번 세게 된다
+      const board = beforeSum + rolledSum;
+      if (board >= target) { sum = board; break; }
       const cur = stages.get(k);
       cur.end = sum;
     }
@@ -9308,8 +9325,10 @@ function hammerAuto() {
 
   while (hammerSum() < hammer.target && guard < HAMMER_AUTO_CAP) {
     // 지금 잠금 개수와 남은 수치에 맞는 기준을 꺼내, 새로 나온 줄 중 기준 이상인 것을 더 잠근다.
-    // 이미 잠근 줄은 그대로 둔다. 놓으면 쌓아 둔 수치가 사라진다
-    const remain = Math.max(1, Math.min(hammer.target, hammer.target - hammerSum()));
+    // 이미 잠근 줄은 그대로 둔다. 놓으면 쌓아 둔 수치가 사라진다.
+    // 남은 수치는 "잠가 둔 줄"만으로 센다. 굴러다니는 줄은 다음 판에 사라지므로 계획에 넣으면 안 된다
+    const heldSum = [...held].reduce((sum, i) => sum + (hammer.lines[i]?.value || 0), 0);
+    const remain = Math.max(1, Math.min(hammer.target, hammer.target - heldSum));
     const threshold = best.solved.policy[Math.min(held.size, maxLock)][remain] || 1;
     hammer.lines
       .map((line, i) => ({ i, line }))
