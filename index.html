@@ -6,7 +6,7 @@
     <title>TW DB</title>
     <!-- 이미지 CDN. 첫 이미지 요청 전에 DNS+TLS를 미리 끝내둔다 -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
-    <link rel="stylesheet" href="./assets/styles.css?v=20260918-hammer19" />
+    <link rel="stylesheet" href="./assets/styles.css?v=20260918-hammer22" />
     <!-- 모바일 전용. media 속성 덕에 넓은 화면에서는 렌더링을 막지 않는다 -->
     <link rel="stylesheet" href="./assets/mobile.css?v=20260918-hammer" media="(max-width: 720px)" />
   </head>
@@ -100,6 +100,7 @@
               <a class="home-chip" href="#/simulator/core">코어 강화</a>
               <a class="home-chip" href="#/simulator/relic">신조 렐릭</a>
               <a class="home-chip" href="#/simulator/enhance">장비 강화</a>
+              <a class="home-chip" href="#/simulator/hammer">에이라의 망치</a>
               </div>
             </div>
           </article>
@@ -822,7 +823,7 @@
               <button class="addon-tab" type="button" data-simulator-tab="core">코어 강화</button>
               <button class="addon-tab" type="button" data-simulator-tab="relic">신조 렐릭</button>
               <button class="addon-tab" type="button" data-simulator-tab="enhance">장비 강화</button>
-              <button class="addon-tab" type="button" data-simulator-tab="hammer" data-local-only hidden>에이라의 망치</button>
+              <button class="addon-tab" type="button" data-simulator-tab="hammer">에이라의 망치</button>
             </nav>
           </div>
         </div>
@@ -923,8 +924,11 @@
               </div>
               <div class="sim-buttons">
                 <button id="hammerReset" class="sim-btn" type="button">초기화</button>
-                <button id="hammerAuto" class="sim-btn" type="button">자동 굴리기</button>
-                <button id="hammerRoll" class="sim-btn primary" type="button">굴리기</button>
+                <button id="hammerAuto" class="sim-btn" type="button" title="추천 루트대로 목표 수치까지 자동으로 재설정합니다">자동 재설정</button>
+                <div class="hammer-roll-group" title="적은 횟수만큼 재설정합니다. 2회 이상이면 추천 루트에서 잠글 만한 줄이 뜨거나 목표를 채울 때 그 자리에서 멈춥니다">
+                  <label class="hammer-roll-count"><input id="hammerRollCount" type="number" min="1" max="1000" step="1" value="1" inputmode="numeric" aria-label="재설정 횟수" /><span>회</span></label>
+                  <button id="hammerRoll" class="sim-btn primary" type="button">재설정</button>
+                </div>
               </div>
             </div>
             <div class="hammer-body">
@@ -1130,7 +1134,7 @@
       </div>
     </template>
 
-    <script src="./assets/app.js?v=20260918-hammer21" type="module"></script>
+    <script src="./assets/app.js?v=20260918-hammer30" type="module"></script>
     <!-- GoatCounter 방문자 분석 (localhost 방문은 count.js가 기본으로 집계 제외)
          자동 집계를 끄고 app.js의 라우터가 탭 단위 경로(/eta/ranking 등)로 직접 보낸다 -->
     <script>window.goatcounter = { no_onload: true };</script>

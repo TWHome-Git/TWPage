@@ -7108,6 +7108,45 @@ img.dmg-chk-icon {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+/* 재설정 횟수 칸 + 재설정 버튼을 한 덩어리로 묶는다 */
+.hammer-roll-group {
+  flex: 2 1 220px;
+  display: flex;
+  gap: 8px;
+}
+
+.hammer-roll-count {
+  flex: 0 0 96px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.hammer-roll-count:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(15, 111, 99, 0.14);
+}
+
+.hammer-roll-count input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 700;
+  text-align: right;
+}
+
 .hammer-body {
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
@@ -7156,6 +7195,29 @@ img.dmg-chk-icon {
 /* 목표 스탯으로 나온 줄은 강조한다 */
 .hammer-table tbody tr.is-target td {
   background: rgba(15, 111, 99, 0.08);
+}
+
+/* 잠근 줄은 굴려도 남는 줄이다. 목표 스탯 강조(초록)와 헷갈리지 않게 금색으로 따로 칠한다 */
+.hammer-table tbody tr.is-locked td {
+  background: rgba(200, 138, 44, 0.18);
+}
+
+.hammer-table tbody tr.is-locked td:first-child {
+  box-shadow: inset 3px 0 0 var(--gold);
+}
+
+.hammer-table tbody tr.is-locked .hammer-step,
+.hammer-table tbody tr.is-locked .hammer-line {
+  color: var(--ink, inherit);
+  font-weight: 700;
+}
+
+/* 10회 재설정이 멈춘 이유. 비용 줄 아래 한 줄을 통째로 쓴다 */
+.hammer-stop-note {
+  flex: 1 1 100%;
+  margin: 0;
+  color: var(--accent-strong);
+  font-size: 12px;
 }
 
 .hammer-empty {

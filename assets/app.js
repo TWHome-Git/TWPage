@@ -8086,7 +8086,7 @@ function initSimulators() {
     "coreBoxPrice", "coreBoxPriceField", "coreCalc", "coreSim", "coreSummary", "coreTable", "coreElso", "coreDiscount",
     "relicCurrent", "relicTarget", "relicDifficulty", "relicCalc", "relicSim", "relicSummary", "relicTable",
     "enhStart", "enhTarget", "enhCalc", "enhSim", "enhSummary", "enhTable",
-    "hammerStat", "hammerSlots", "hammerTarget", "hammerPrice", "hammerRoll", "hammerReset", "hammerAuto",
+    "hammerStat", "hammerSlots", "hammerTarget", "hammerPrice", "hammerRoll", "hammerRollCount", "hammerReset", "hammerAuto",
     "hammerTable", "hammerCost", "hammerStatus", "hammerPlan", "hammerLog",
     "relicRateButton", "coreRateButton",
     "rateModal", "rateModalTitle", "rateModalNote", "rateModalBody",
@@ -8901,6 +8901,8 @@ function hammerRollLine() {
 const hammer = {
   slots: 7,         // 기본 7단계
   target: 45,
+  stopNote: "",     // 10회 재설정이 왜 멈췄는지 (다음 동작 때 지운다)
+  autoBase: null,   // 직접 입력한 상태에서 자동 굴리기를 시작했을 때의 기대값 (다 채운 뒤 견주기용)
   stat: "stab",
   price: HAMMER_PRICE_DEFAULT,
   lines: [],        // { stat, grade, value } | null
@@ -8908,7 +8910,6 @@ const hammer = {
   rolls: 0,
   seed: 0,
   hammers: 0,
-  autoBase: null,   // 자동 굴리기를 누를 때 쓴 예상치 (결과 칸과 로그의 증감 기준을 맞춘다)
   loaded: false,
 };
 
@@ -9171,16 +9172,23 @@ function hammerBestKeep(solved, values, target) {
   return best;
 }
 
-// 아무것도 없는 상태에서 목표까지 드는 값 (다 채운 뒤 견주기용)
+const hammerCondKey = () => `${hammer.target}|${hammer.slots}|${hammer.price}|${hammer.stat}`;
+
+// 아무것도 없는 상태에서 목표까지 드는 값 (다 채운 뒤 견주기용).
+// 굴려서 얻는 값이라 구할 때마다 조금씩 다르다. 같은 조건이면 한 번만 구해 화면의 숫자가 흔들리지 않게 한다
+let hammerScratchCache = null;
 function hammerScratchPlan() {
-  const solved = hammerSolved();
-  return hammerRoute(solved, [], hammer.target, hammer.slots, hammer.price, hammer.stat);
+  const key = hammerCondKey();
+  if (!hammerScratchCache || hammerScratchCache.key !== key) {
+    hammerScratchCache = { key, plan: hammerRoute(hammerSolved(), [], hammer.target, hammer.slots, hammer.price, hammer.stat) };
+  }
+  return hammerScratchCache.plan;
 }
 
 // 지금 화면 상태에서의 추천. 계산이 무거워 같은 조건이면 다시 풀지 않는다
 let hammerSolveCache = null;
 function hammerSolved() {
-  const key = `${hammer.target}|${hammer.slots}|${hammer.price}|${hammer.stat}`;
+  const key = hammerCondKey();
   if (!hammerSolveCache || hammerSolveCache.key !== key) {
     hammerSolveCache = { key, solved: hammerSolve(hammer.target, hammer.slots, hammer.price, hammer.stat) };
   }
@@ -9222,7 +9230,7 @@ function renderHammerTable() {
     const mine = hammerCounts(i);
     const name = line ? hammerStatName(line.stat) : "-";
     rows.push(`
-      <tr class="${mine ? "is-target" : ""}">
+      <tr class="${[mine ? "is-target" : "", hammer.locks[i] && line ? "is-locked" : ""].filter(Boolean).join(" ")}">
         <td class="hammer-lock">
           <label><input type="checkbox" data-hammer-lock="${i}"${hammer.locks[i] ? " checked" : ""}${line ? "" : " disabled"} /><span class="hammer-lock-mark" aria-hidden="true">${hammer.locks[i] ? "🔒" : "🔓"}</span></label>
         </td>
@@ -9237,8 +9245,9 @@ function renderHammerTable() {
     <tbody>${rows.join("")}</tbody>`;
   if (simEls.hammerCost) {
     simEls.hammerCost.innerHTML = `
-      <span>이번 굴림 <b>${hammerFmtSeed(hammerSeedCost(locks))} 시드 · 망치 ${hammerCount(locks)}개</b></span>
-      <span>누적 <b>${hammerFmtSeed(hammer.seed + hammer.hammers * hammer.price)}</b> <small>(굴림 ${formatNumber(hammer.rolls)}회 · 망치 ${formatNumber(hammer.hammers)}개)</small></span>`;
+      <span>이번 재설정 <b>${hammerFmtSeed(hammerSeedCost(locks))} 시드 · 망치 ${hammerCount(locks)}개</b></span>
+      <span>누적 <b>${hammerFmtSeed(hammer.seed + hammer.hammers * hammer.price)}</b> <small>(재설정 ${formatNumber(hammer.rolls)}회 · 망치 ${formatNumber(hammer.hammers)}개)</small></span>
+      ${hammer.stopNote ? `<p class="hammer-stop-note">${hammer.stopNote}</p>` : ""}`;
   }
 }
 
@@ -9261,23 +9270,31 @@ function hammerKeepNote(plan) {
   const gain = plan.keepAllCost != null ? plan.keepAllCost - plan.pick.cost : 0;
   const cheaper = gain > 0 ? ` 그대로 들고 가는 것보다 <b>${hammerFmtSeed(gain)}</b> 저렴합니다.` : "";
   if (drop <= 0) return ` 지금 가진 ${formatNumber(plan.have.length)}줄은 그대로 두는 것이 가장 저렴합니다.`;
-  if (!plan.pick.keep) return ` 지금 ${formatNumber(plan.have.length)}줄은 모두 버리고 처음부터 다시 굴리는 쪽이 낫습니다.${cheaper}`;
+  if (!plan.pick.keep) return ` 지금 ${formatNumber(plan.have.length)}줄은 모두 버리고 처음부터 다시 재설정하는 쪽이 낫습니다.${cheaper}`;
   return ` <b>${plan.pick.kept.join(" · ")}</b>만 남기고 낮은 ${formatNumber(drop)}줄은 버리세요.${cheaper}`;
 }
+
 
 function renderHammerPlan() {
   if (!simEls.hammerPlan) return;
   const sum = hammerSum();
   if (sum >= hammer.target) {
-    // 다 채운 뒤에는 "처음부터 여기까지 보통 얼마가 드는지"를 알려 준다. 이번 판과 견주기 좋다.
-    // 자동 굴리기로 끝냈다면 그때 쓴 예상치를 그대로 써서 로그와 증감이 어긋나지 않게 한다
-    const scratch = hammer.autoBase || hammerScratchPlan();
+    // 다 채운 뒤에는 기대값과, 이번 판(왼쪽 "누적")이 거기서 얼마나 벗어났는지를 한 줄씩 적는다.
+    // 이번 판의 금액 자체는 누적에만 적는다. 같은 금액을 여러 곳에 적으면 어느 것이 맞는지 헷갈린다.
+    // 수치를 직접 입력해 두고 자동 굴리기로 끝냈다면 그 상태에서의 기대값과 견준다
+    if (hammer.autoBase && hammer.autoBase.key !== hammerCondKey()) hammer.autoBase = null;
+    const base = hammer.autoBase || hammerScratchPlan();
     const used = hammer.seed + hammer.hammers * hammer.price;
+    const gaps = base && hammer.rolls ? [
+      ["비용", simDelta(used / 1e8, base.cost / 1e8, "억")],
+      ["망치", simDelta(hammer.hammers, base.hammers, "개")],
+      ["재설정", simDelta(hammer.rolls, base.rolls, "회")],
+    ].filter(([, delta]) => delta) : [];
     simEls.hammerPlan.innerHTML = `
       <p class="hammer-plan-done"><b>목표를 채웠습니다.</b> 더 올리려면 목표치를 높여 보세요.</p>
-      ${scratch ? `
-        <div class="hammer-plan-head">처음부터 ${formatNumber(hammer.target)}까지 기대값 <b>${hammerFmtSeed(scratch.cost)}</b> · 망치 <b>${formatNumber(Math.round(scratch.hammers))}개</b> · 굴림 <b>${formatNumber(Math.round(scratch.rolls))}회</b> <small>(중앙값)</small></div>
-        ${hammer.rolls ? `<p class="hammer-plan-note">이번 판은 ${hammerFmtSeed(used)}${simDelta(used / 1e8, scratch.cost / 1e8, "억")} · 망치 ${formatNumber(hammer.hammers)}개${simDelta(hammer.hammers, scratch.hammers, "개")} · 굴림 ${formatNumber(hammer.rolls)}회${simDelta(hammer.rolls, scratch.rolls, "회")}</p>` : ""}
+      ${base ? `
+        <div class="hammer-plan-head">${hammer.autoBase ? "입력한 상태에서" : "처음부터"} ${formatNumber(hammer.target)}까지 기대값 <b>${hammerFmtSeed(base.cost)}</b> · 망치 <b>${formatNumber(Math.round(base.hammers))}개</b> · 재설정 <b>${formatNumber(Math.round(base.rolls))}회</b> <small>(중앙값)</small></div>
+        ${hammer.rolls ? `<p class="hammer-plan-note">기대값과의 차이 ${gaps.length ? gaps.map(([label, delta]) => `${label} ${delta}`).join(" · ") : "없음"}</p>` : ""}
       ` : ""}`;
     return;
   }
@@ -9286,23 +9303,46 @@ function renderHammerPlan() {
     simEls.hammerPlan.innerHTML = `<p class="hammer-plan-empty">이 조건으로는 계산이 끝나지 않습니다. 목표치를 낮추거나 단계 수를 늘려 보세요.</p>`;
     return;
   }
-  const rows = plan.stages.map((st, i) => `
+  // 잠금이 꽉 찬 마지막 단계에서는 더 잠글 줄이 없다. 남은 한 줄에서 모자란 수치 이상이 나오면 그대로 끝난다.
+  // 이때 "N 이상 잠금"이라고 적으면 뜻이 통하지 않으므로 "N 이상 나오면 끝"으로 적는다
+  const maxLock = Math.max(0, hammer.slots - 1);
+  const nowLast = Math.min(plan.pick.keep, maxLock) >= maxLock;
+  const lastNeed = (st, i) => {
+    const held = i === 0 && nowLast ? plan.pick.sum : Math.round(st.end ?? plan.pick.sum);
+    return Math.max(1, hammer.target - held);
+  };
+  const rows = plan.stages.map((st, i) => {
+    const last = st.locks >= maxLock;
+    return `
       <tr${i === 0 ? ' class="is-now"' : ""}>
         <td data-label="잠금">${st.locks}개</td>
-        <td data-label="이때 잠글 값">${st.threshold} 이상</td>
-        <td data-label="굴림">${formatNumber(Math.round(st.rolls))}회</td>
+        <td data-label="이때 잠글 값">${last ? `${lastNeed(st, i)} 이상 나오면 끝` : `${st.threshold} 이상`}</td>
+        <td data-label="재설정">${formatNumber(Math.round(st.rolls))}회</td>
         <td data-label="비용" class="sim-cost">${hammerFmtSeed(st.cost)}</td>
-        <td data-label="단계 끝 누적">${st.end != null ? formatNumber(Math.round(st.end)) : formatNumber(hammer.target)}</td>
-      </tr>`).join("");
+        <td data-label="단계 끝 누적">${last ? `${formatNumber(hammer.target)} 이상` : (st.end != null ? formatNumber(Math.round(st.end)) : formatNumber(hammer.target))}</td>
+      </tr>`;
+  }).join("");
+
+  const statLabel = escapeHtml(hammerIncluded(hammer.stat).map(hammerStatName).join(" · "));
+  const drop = plan.have.length - plan.pick.keep;
+  let nowText;
+  if (nowLast) {
+    const keepText = drop > 0 ? `<b>${plan.pick.kept.join(" · ")}</b> ${formatNumber(maxLock)}줄만 잠그고` : `가진 ${formatNumber(maxLock)}줄을 모두 잠그고`;
+    nowText = `${keepText}, 남은 1줄에서 ${statLabel} <b>${Math.max(1, hammer.target - plan.pick.sum)} 이상</b>이 나올 때까지 재설정하세요.`;
+  } else if (plan.nowThreshold <= 1) {
+    nowText = `지금은 ${statLabel}이 나온 줄은 <b>수치와 상관없이 모두</b> 잠그고 나머지를 재설정하세요.${hammerKeepNote(plan)}`;
+  } else {
+    nowText = `지금은 ${statLabel} <b>${plan.nowThreshold} 이상</b>인 줄만 잠그고 나머지를 재설정하세요.${hammerKeepNote(plan)}`;
+  }
 
   simEls.hammerPlan.innerHTML = `
-    <div class="hammer-plan-head">지금 상태에서 목표까지 <b>${hammerFmtSeed(plan.cost)}</b> · 망치 <b>${formatNumber(Math.round(plan.hammers))}개</b> · 굴림 <b>${formatNumber(Math.round(plan.rolls))}회</b> <small>(중앙값)</small></div>
-    <p class="hammer-plan-now">지금은 <b>${plan.nowThreshold} 이상</b>인 줄만 잠그고 나머지를 굴리세요.${hammerKeepNote(plan)}</p>
+    <div class="hammer-plan-head">지금 상태에서 목표까지 <b>${hammerFmtSeed(plan.cost)}</b> · 망치 <b>${formatNumber(Math.round(plan.hammers))}개</b> · 재설정 <b>${formatNumber(Math.round(plan.rolls))}회</b> <small>(중앙값)</small></div>
+    <p class="hammer-plan-now">${nowText}</p>
     <table class="sim-table hammer-plan-table">
-      <thead><tr><th>잠금</th><th>이때 잠글 값</th><th>굴림</th><th>비용</th><th>단계 끝 누적</th></tr></thead>
+      <thead><tr><th>잠금</th><th>이때 잠글 값</th><th>재설정</th><th>비용</th><th>단계 끝 누적</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
-    <p class="hammer-plan-note">잠금이 늘수록 굴림값이 비싸지므로 초반에는 높은 값만 받고, 목표가 가까워지면 낮은 값도 받는 것이 가장 저렴합니다.</p>`;
+    <p class="hammer-plan-note">잠금이 늘수록 재설정 비용이 비싸지므로 초반에는 높은 값만 받고, 목표가 가까워지면 낮은 값도 받는 것이 가장 저렴합니다.</p>`;
 }
 
 function renderHammer() {
@@ -9311,18 +9351,65 @@ function renderHammer() {
   renderHammerPlan();
 }
 
-function hammerRoll() {
+function hammerClearLog() {
+  if (!simEls.hammerLog) return;
+  simEls.hammerLog.hidden = true;
+  simEls.hammerLog.innerHTML = "";
+}
+
+// 잠그지 않은 줄을 한 번 재설정한다 (비용 누적 포함). 화면은 부르는 쪽에서 그린다
+function hammerRollOnce() {
   const locks = hammerLockCount();
-  if (locks >= hammer.slots) {
-    alert("모두 잠그면 굴릴 줄이 없습니다. 하나는 풀어 주세요.");
-    return;
-  }
   hammer.seed += hammerSeedCost(locks);
   hammer.hammers += hammerCount(locks);
   hammer.rolls += 1;
   for (let i = 0; i < hammer.slots; i += 1) {
     if (hammer.locks[i] && hammer.lines[i]) continue;
     hammer.lines[i] = hammerRollLine();
+  }
+}
+
+// 추천 루트 기준으로 지금 멈춰야 하는지. 목표를 채웠거나, 잠글 만한 줄(추천 기준 이상)이 새로 떴으면 그 이유를 돌려준다.
+// 기준은 자동 재설정과 같이 "잠가 둔 줄"만으로 정한다. 잠그지 않은 줄은 다음 판에 사라지기 때문이다
+function hammerStopReason() {
+  if (hammerSum() >= hammer.target) return "목표를 채웠습니다.";
+  const maxLock = Math.max(0, hammer.slots - 1);
+  const held = hammer.lines.map((line, i) => (line && hammerCounts(i) && hammer.locks[i] ? line.value : 0)).filter(Boolean);
+  if (hammerLockCount() >= maxLock) return "";   // 더 잠글 수 없다. 목표를 채울 때까지 재설정할 뿐이다
+  const remain = Math.max(1, Math.min(hammer.target, hammer.target - held.reduce((a, b) => a + b, 0)));
+  const threshold = hammerSolved().policy[Math.min(held.length, maxLock)][remain] || 1;
+  const hits = hammer.lines
+    .map((line, i) => (line && hammerCounts(i) && !hammer.locks[i] && line.value >= threshold ? line.value : 0))
+    .filter(Boolean)
+    .sort((x, y) => y - x);
+  if (!hits.length) return "";
+  const what = threshold <= 1 ? "잠글 줄" : `<b>${threshold} 이상</b>`;
+  return `${what}(+${hits.join(", +")})이 떠서 멈췄습니다. 잠글 줄을 골라 주세요.`;
+}
+
+// times번 재설정한다. 여러 번일 때는 추천 루트 기준에 닿으면 그 자리에서 멈춘다
+function hammerRoll(times = 1) {
+  if (hammerLockCount() >= hammer.slots) {
+    alert("모두 잠그면 재설정할 줄이 없습니다. 하나는 풀어 주세요.");
+    return;
+  }
+  // 직접 재설정하면 자동 재설정 로그는 지난 내역이 되어 누적과 맞지 않으므로 지운다
+  hammerClearLog();
+  hammer.stopNote = "";
+  let done = 0;
+  let reason = "";
+  while (done < times) {
+    hammerRollOnce();
+    done += 1;
+    if (times > 1) {
+      reason = hammerStopReason();
+      if (reason) break;
+    }
+  }
+  if (times > 1) {
+    hammer.stopNote = reason
+      ? `${formatNumber(times)}회 중 ${formatNumber(done)}회째에 ${reason}`
+      : `${formatNumber(times)}회 재설정하는 동안 잠글 만한 줄이 나오지 않았습니다.`;
   }
   renderHammer();
 }
@@ -9341,9 +9428,12 @@ function hammerAuto() {
     alert("이 조건으로는 계산이 끝나지 않습니다. 목표치를 낮추거나 단계 수를 늘려 주세요.");
     return;
   }
+  hammer.stopNote = "";
   const before = { rolls: hammer.rolls, seed: hammer.seed, hammers: hammer.hammers };
-  // 아래 결과 칸도 같은 예상치와 견주도록 남겨 둔다. 예상치는 굴려서 얻는 값이라 다시 계산하면 조금씩 달라진다
-  hammer.autoBase = { cost: best.cost, rolls: best.rolls, hammers: best.hammers, at: before };
+  // 수치를 직접 입력해 둔 채로 시작했다면 다 채운 뒤에도 "그 상태에서의 기대값"과 견주도록 남겨 둔다
+  hammer.autoBase = !before.rolls && best.have.length
+    ? { cost: best.cost, rolls: best.rolls, hammers: best.hammers, key: hammerCondKey() }
+    : null;
   const stages = [];   // 잠금 개수가 바뀔 때마다 한 칸. 단계마다 얼마를 썼는지 남긴다
   // 누적 수치는 "잠가 둔 합"으로 적는다. 잠그지 않은 줄은 다음 판에 사라지므로 남는 값이 아니다
   const heldSumOf = (set) => [...set].reduce((sum, i) => sum + (hammer.lines[i]?.value || 0), 0);
@@ -9391,17 +9481,23 @@ function hammerAuto() {
     st.endSum = i + 1 < stages.length ? stages[i + 1].startSum : hammerSum();
   });
 
-  const used = {
-    rolls: hammer.rolls - before.rolls,
-    cost: (hammer.seed - before.seed) + (hammer.hammers - before.hammers) * hammer.price,
-    hammers: hammer.hammers - before.hammers,
-  };
+  // 합계 금액은 왼쪽 "누적" 한 곳에만 적는다. 로그는 단계별 내역만 보여 주고,
+  // 직접 굴린 것이 있으면 맨 위 행으로 넣어 표의 합이 누적과 맞게 한다
+  const manualRow = before.rolls ? `
+    <tr class="hammer-log-manual">
+      <td data-label="단계">직접</td>
+      <td data-label="잠금">-</td>
+      <td data-label="재설정">${formatNumber(before.rolls)}회</td>
+      <td data-label="시드">${hammerFmtSeed(before.seed)}</td>
+      <td data-label="망치">${formatNumber(before.hammers)}개</td>
+      <td data-label="누적 수치">→ <b>${formatNumber(stages.length ? stages[0].startSum : hammerSum())}</b></td>
+    </tr>` : "";
   const done = hammerSum() >= hammer.target;
   const rows = stages.map((st, i) => `
     <tr>
       <td data-label="단계">${i + 1}</td>
       <td data-label="잠금">${st.locks}개</td>
-      <td data-label="굴림">${formatNumber(st.rolls)}회</td>
+      <td data-label="재설정">${formatNumber(st.rolls)}회</td>
       <td data-label="시드">${hammerFmtSeed(st.seed)}</td>
       <td data-label="망치">${formatNumber(st.hammers)}개</td>
       <td data-label="누적 수치">${formatNumber(st.startSum)} → <b>${formatNumber(st.endSum)}</b></td>
@@ -9409,33 +9505,28 @@ function hammerAuto() {
   simEls.hammerLog.hidden = false;
   simEls.hammerLog.innerHTML = `
     <div class="hammer-log-head">
-      <b>자동 굴리기 ${done ? "완료" : "중단"}</b>
-      <span>단계별 기준 적용</span>
-      <span>굴림 <b>${formatNumber(used.rolls)}회</b>${simDelta(used.rolls, best.rolls, "회")}</span>
-      <span>비용 <b>${hammerFmtSeed(used.cost)}</b>${simDelta(used.cost / 1e8, best.cost / 1e8, "억")}</span>
-      <span>망치 <b>${formatNumber(used.hammers)}개</b></span>
+      <b>자동 재설정 ${done ? "완료" : "중단"}</b>
+      <span>${before.rolls ? "직접 재설정 포함" : "단계별 기준 적용"}</span>
       ${done ? "" : `<span class="sim-neg">${formatNumber(HAMMER_AUTO_CAP)}회를 넘겨 멈췄습니다</span>`}
     </div>
     <div class="hammer-log-wrap">
       <table class="sim-table hammer-log-table">
-        <thead><tr><th>단계</th><th>잠금</th><th>굴림</th><th>시드</th><th>망치</th><th>누적 수치</th></tr></thead>
-        <tbody>${rows}</tbody>
+        <thead><tr><th>단계</th><th>잠금</th><th>재설정</th><th>시드</th><th>망치</th><th>누적 수치</th></tr></thead>
+        <tbody>${manualRow}${rows}</tbody>
       </table>
     </div>`;
   renderHammer();
 }
 
 function hammerReset() {
+  hammer.autoBase = null;
+  hammer.stopNote = "";
   hammer.lines = [];
   hammer.locks = [];
   hammer.rolls = 0;
   hammer.seed = 0;
   hammer.hammers = 0;
-  hammer.autoBase = null;
-  if (simEls.hammerLog) {
-    simEls.hammerLog.hidden = true;
-    simEls.hammerLog.innerHTML = "";
-  }
+  hammerClearLog();
   renderHammer();
 }
 
@@ -9464,7 +9555,12 @@ function wireHammerSim() {
     hammer.price = Math.max(0, (Number(simEls.hammerPrice.value) || 0) * 10000);
     renderHammer();
   });
-  simEls.hammerRoll.addEventListener("click", hammerRoll);
+  // 횟수 칸에 적은 만큼 재설정한다. 비워 두거나 1이면 한 번만
+  simEls.hammerRoll.addEventListener("click", () => {
+    const times = Math.min(1000, Math.max(1, Math.floor(Number(simEls.hammerRollCount?.value) || 1)));
+    if (simEls.hammerRollCount) simEls.hammerRollCount.value = String(times);
+    hammerRoll(times);
+  });
   simEls.hammerAuto.addEventListener("click", hammerAuto);
   simEls.hammerReset.addEventListener("click", hammerReset);
 
