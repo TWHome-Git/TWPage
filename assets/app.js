@@ -8937,61 +8937,188 @@ const hammerCounts = (i) => !!hammer.lines[i] && hammerIncluded(hammer.stat).inc
 const hammerLockCount = () => hammer.locks.filter(Boolean).length;
 
 // ── 추천 계산 ──
-// 정책은 "수치 T 이상인 목표 스탯 줄만 잠그고 나머지를 굴린다" 한 줄로 정해진다.
-// 비용은 잠금 개수에만 달려 있고 잠근 값은 합계로만 쓰이므로, 같은 개수를 잠근다면
-// 높은 값부터 잠그는 것이 항상 이득이다. 그래서 T만 1~10으로 훑으면 최적에 닿는다.
-function hammerSimulate(startValues, target, slots, price, threshold, runs) {
-  const dist = hammerValueDist(hammer.stat);
-  const hit = hammerHitRate(hammer.stat);
+// 잠금이 늘수록 굴림값이 비싸진다. 그래서 "수치 T 이상이면 잠근다" 기준 하나를 끝까지 쓰면 손해다.
+// 초반에는 높은 값만 받아 싸게 굴리고, 목표가 가까워지면 낮은 값도 받아 끝내는 쪽이 싸다.
+// 그래서 (잠근 개수 k, 남은 수치 R)마다 기준을 따로 푼다. R이 작은 쪽부터 채우면 한 번에 정확히 풀린다.
+//
+// 한 판에서 잠그지 않은 줄은 전부 다시 굴러가므로, 기준 이상으로 나온 줄만 받아 잠근다고 보면
+// 다음 상태는 (받은 개수, 받은 수치 합)으로 정해진다. 그 분포를 먼저 만들어 둔다.
+function hammerAcceptDist(statKey, slots) {
+  const dist = hammerValueDist(statKey);
+  const maxValue = 10;
+  const table = [];   // table[T][m] = { p0, list: [{ c, s, p }] }
+  for (let t = 1; t <= maxValue; t += 1) {
+    const accept = dist.filter((d) => d.value >= t);
+    const pSkip = 1 - accept.reduce((sum, d) => sum + d.p, 0);
+    const perM = [];
+    // 줄 수 m에 대해 (받은 개수, 합) 분포를 차곡차곡 쌓는다
+    let cur = [[1]];    // cur[c][s] = 확률
+    perM[0] = cur;
+    for (let m = 1; m <= slots; m += 1) {
+      const next = [];
+      cur.forEach((row, c) => {
+        if (!row) return;
+        row.forEach((p, sum) => {
+          if (!p) return;
+          next[c] = next[c] || [];
+          next[c][sum] = (next[c][sum] || 0) + p * pSkip;
+          accept.forEach((d) => {
+            const nc = c + 1;
+            const ns = sum + d.value;
+            next[nc] = next[nc] || [];
+            next[nc][ns] = (next[nc][ns] || 0) + p * d.p;
+          });
+        });
+      });
+      cur = next;
+      perM[m] = cur;
+    }
+    table[t] = perM;
+  }
+  return table;
+}
+
+// (잠근 개수, 남은 수치)마다 최적 기준과 남은 기대비용을 푼다
+function hammerSolve(target, slots, price, statKey) {
+  const maxLock = Math.max(0, slots - 1);
+  const table = hammerAcceptDist(statKey, slots);
+  const cost = [];
+  for (let k = 0; k <= maxLock; k += 1) cost[k] = hammerSeedCost(k) + hammerCount(k) * price;
+
+  // C[k][R] = 남은 수치 R을 잠금 k개 상태에서 채우는 데 드는 기대비용
+  const C = Array.from({ length: maxLock + 1 }, () => new Float64Array(target + 1));
+  const policy = Array.from({ length: maxLock + 1 }, () => new Int8Array(target + 1));
+
+  // 마지막 칸은 잠글 수 없다. 잠금을 다 채웠으면 남은 한 줄이 한 방에 R 이상을 띄워야 끝난다
+  const dist = hammerValueDist(statKey);
+  const lastLines = Math.max(1, slots - maxLock);
+  const finishOnce = (R) => {
+    const one = dist.filter((d) => d.value >= R).reduce((sum, d) => sum + d.p, 0);
+    return 1 - Math.pow(1 - one, lastLines);   // 남은 줄 중 하나라도 R 이상
+  };
+
+  for (let R = 1; R <= target; R += 1) {
+    for (let k = maxLock; k >= 0; k -= 1) {
+      const m = slots - k;
+      if (m <= 0) { C[k][R] = Infinity; policy[k][R] = 0; continue; }
+      if (k === maxLock) {
+        // 더 잠글 수 없으니 한 판에 끝나야 한다. 10을 넘게 남았으면 이 상태로는 못 끝낸다
+        const p = finishOnce(R);
+        C[k][R] = p > 0 ? cost[k] / p : Infinity;
+        policy[k][R] = 1;
+        continue;
+      }
+      let best = Infinity;
+      let bestT = 1;
+      for (let t = 1; t <= 10; t += 1) {
+        const dist = table[t][m];
+        let rest = 0;
+        let stay = 0;
+        let ok = true;
+        for (let c = 0; c < dist.length; c += 1) {
+          const row = dist[c];
+          if (!row) continue;
+          for (let sum = 0; sum < row.length; sum += 1) {
+            const p = row[sum];
+            if (!p) continue;
+            if (c === 0) { stay += p; continue; }   // 아무것도 못 받은 판
+            // 잠글 칸이 모자라면 높은 값부터 잠근다. 몇 개만 남기는 셈이라 합계도 그만큼만 센다
+            const room = maxLock - k;
+            const take = Math.min(c, room);
+            const gain = take === c ? sum : Math.round((sum * take) / c);
+            const nk = k + take;
+            const nR = Math.max(0, R - gain);
+            const v = C[nk][nR];
+            if (!Number.isFinite(v)) { ok = false; break; }
+            rest += p * v;
+          }
+          if (!ok) break;
+        }
+        if (!ok || stay >= 1) continue;
+        const value = (cost[k] + rest) / (1 - stay);
+        if (value < best) { best = value; bestT = t; }
+      }
+      C[k][R] = best;
+      policy[k][R] = bestT;
+    }
+  }
+  return { C, policy, maxLock };
+}
+
+// 푼 기준대로 실제로 굴려 보며 단계별 예상치를 모은다
+function hammerRoute(solved, startValues, target, slots, price, statKey, runs = 300) {
+  const dist = hammerValueDist(statKey);
+  const hit = dist.reduce((sum, d) => sum + d.p, 0);
+  const { policy, maxLock } = solved;
+  const stageBag = new Map();   // 잠금 수 → { rolls: [], cost: [], end: [] }
   const totals = [];
   const rollCounts = [];
-  const perLock = new Map();   // 잠금 수 → { rolls: [], cost: [], reach: [] }
-  const capRolls = 3000;
+  const cap = 4000;
 
   for (let run = 0; run < runs; run += 1) {
-    let kept = startValues.filter((v) => v >= threshold).sort((a, b) => b - a).slice(0, slots - 1);
-    let cost = 0;
-    let rolls = 0;
-    const stage = new Map();
+    let kept = [...startValues].sort((a, b) => b - a).slice(0, maxLock);
     let sum = kept.reduce((a, b) => a + b, 0);
-    while (sum < target && rolls < capRolls) {
-      const locks = kept.length;
-      if (locks >= slots) break;
-      const step = hammerSeedCost(locks) + hammerCount(locks) * price;
-      cost += step;
+    let spent = 0;
+    let rolls = 0;
+    const stages = new Map();
+    while (sum < target && rolls < cap) {
+      const k = Math.min(kept.length, maxLock);
+      const m = slots - k;
+      if (m <= 0) break;
+      const R = Math.max(1, Math.min(target, target - sum));
+      const t = policy[k][R] || 1;
+      const step = hammerSeedCost(k) + hammerCount(k) * price;
+      spent += step;
       rolls += 1;
-      const cur = stage.get(locks) || { rolls: 0, cost: 0 };
-      cur.rolls += 1;
-      cur.cost += step;
-      stage.set(locks, cur);
+      const bag = stages.get(k) || { rolls: 0, cost: 0 };
+      bag.rolls += 1;
+      bag.cost += step;
+      stages.set(k, bag);
 
-      const pool = [...kept];
-      for (let i = 0; i < slots - locks; i += 1) {
-        if (Math.random() >= hit) continue;          // 다른 스탯이 뜬 줄
+      let rolledSum = 0;
+      for (let i = 0; i < m; i += 1) {
+        if (Math.random() >= hit) continue;
         let r = Math.random() * hit;
         for (const d of dist) {
-          if (r < d.p) { pool.push(d.value); break; }
+          if (r < d.p) {
+            rolledSum += d.value;
+            if (d.value >= t && kept.length < maxLock) { kept.push(d.value); sum += d.value; }
+            break;
+          }
           r -= d.p;
         }
       }
-      pool.sort((a, b) => b - a);
-      const total = pool.reduce((a, b) => a + b, 0);
-      kept = pool.filter((v) => v >= threshold).slice(0, slots - 1);
-      sum = kept.reduce((a, b) => a + b, 0);
-      if (total >= target) { sum = total; break; }
+      // 마지막 판은 잠그지 않은 줄도 그대로 쓰므로 합계에 넣어 본다
+      if (sum >= target || kept.reduce((a, b) => a + b, 0) + rolledSum >= target) {
+        sum = Math.max(sum, kept.reduce((a, b) => a + b, 0) + rolledSum);
+        break;
+      }
+      const cur = stages.get(k);
+      cur.end = sum;
     }
-    if (rolls >= capRolls) continue;
-    totals.push(cost);
+    if (rolls >= cap) continue;
+    totals.push(spent);
     rollCounts.push(rolls);
-    stage.forEach((v, k) => {
-      const bag = perLock.get(k) || { rolls: [], cost: [] };
+    stages.forEach((v, k) => {
+      const bag = stageBag.get(k) || { rolls: [], cost: [], end: [] };
       bag.rolls.push(v.rolls);
       bag.cost.push(v.cost);
-      perLock.set(k, bag);
+      if (v.end != null) bag.end.push(v.end);
+      stageBag.set(k, bag);
     });
   }
   if (!totals.length) return null;
-  return { threshold, cost: hammerMedian(totals), rolls: hammerMedian(rollCounts), perLock, runs: totals.length };
+  return {
+    cost: hammerMedian(totals),
+    rolls: hammerMedian(rollCounts),
+    stages: [...stageBag.entries()].sort((a, b) => a[0] - b[0]).map(([k, bag]) => ({
+      locks: k,
+      threshold: policy[Math.min(k, maxLock)][Math.max(1, Math.min(target, target))] || 1,
+      rolls: hammerMedian(bag.rolls),
+      cost: hammerMedian(bag.cost),
+      end: bag.end.length ? hammerMedian(bag.end) : null,
+    })),
+  };
 }
 
 function hammerMedian(list) {
@@ -9001,15 +9128,52 @@ function hammerMedian(list) {
   return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
-function hammerPlans() {
-  const start = hammer.lines.map((line, i) => (hammerCounts(i) ? line.value : 0)).filter(Boolean);
-  const results = [];
-  for (let t = 1; t <= 10; t += 1) {
-    const res = hammerSimulate(start, hammer.target, hammer.slots, hammer.price, t, HAMMER_RUNS);
-    if (res && res.runs >= HAMMER_RUNS * 0.9) results.push(res);
+// 지금 가진 값 중 몇 개를 들고 갈지 고른다.
+// 잠그면 그 줄은 남지만 이후 굴림값이 비싸진다. 그래서 낮은 값은 버리고 다시 굴리는 쪽이 쌀 수 있다.
+// 값이 높은 순으로 j개만 들고 가는 경우를 모두 재보고 가장 싼 j를 고른다.
+function hammerBestKeep(solved, values, target) {
+  const sorted = [...values].sort((a, b) => b - a);
+  const { C, maxLock } = solved;
+  let best = null;
+  for (let j = 0; j <= Math.min(sorted.length, maxLock); j += 1) {
+    const kept = sorted.slice(0, j);
+    const sum = kept.reduce((a, b) => a + b, 0);
+    if (sum >= target) return { keep: j, kept, cost: 0, sum };
+    const cost = C[j][Math.max(1, target - sum)];
+    if (!Number.isFinite(cost)) continue;
+    if (!best || cost < best.cost) best = { keep: j, kept, cost, sum };
   }
-  results.sort((a, b) => a.cost - b.cost);
-  return results;
+  return best;
+}
+
+// 지금 화면 상태에서의 추천. 계산이 무거워 같은 조건이면 다시 풀지 않는다
+let hammerSolveCache = null;
+function hammerBestPlan() {
+  const key = `${hammer.target}|${hammer.slots}|${hammer.price}|${hammer.stat}`;
+  if (!hammerSolveCache || hammerSolveCache.key !== key) {
+    hammerSolveCache = { key, solved: hammerSolve(hammer.target, hammer.slots, hammer.price, hammer.stat) };
+  }
+  const solved = hammerSolveCache.solved;
+  const have = hammer.lines.map((line, i) => (hammerCounts(i) ? line.value : 0)).filter(Boolean);
+  const pick = hammerBestKeep(solved, have, hammer.target);
+  if (!pick) return null;
+  const route = hammerRoute(solved, pick.kept, hammer.target, hammer.slots, hammer.price, hammer.stat);
+  if (!route) return null;
+  // 다 들고 갔을 때와 견줘 얼마나 차이가 나는지 (버리는 편이 쌀 때 알려 준다)
+  const keepAllSum = have.reduce((a, b) => a + b, 0);
+  const keepAllCost = have.length
+    ? solved.C[Math.min(have.length, solved.maxLock)][Math.max(1, hammer.target - keepAllSum)]
+    : null;
+  const R = Math.max(1, hammer.target - pick.sum);
+  const k = Math.min(pick.keep, solved.maxLock);
+  return {
+    ...route,
+    solved,
+    have,
+    pick,
+    keepAllCost: Number.isFinite(keepAllCost) ? keepAllCost : null,
+    nowThreshold: solved.policy[k][Math.min(R, hammer.target)] || 1,
+  };
 }
 
 // ── 화면 ──
@@ -9055,6 +9219,17 @@ function renderHammerStatus() {
     </div>`;
 }
 
+// 지금 가진 값을 그대로 쓸지, 일부를 버리고 다시 굴릴지 한 줄로 알려 준다
+function hammerKeepNote(plan) {
+  if (!plan.have.length) return "";
+  const drop = plan.have.length - plan.pick.keep;
+  const gain = plan.keepAllCost != null ? plan.keepAllCost - plan.pick.cost : 0;
+  const cheaper = gain > 0 ? ` 그대로 들고 가는 것보다 <b>${hammerFmtSeed(gain)}</b> 쌉니다.` : "";
+  if (drop <= 0) return ` 지금 가진 ${formatNumber(plan.have.length)}줄은 그대로 두는 것이 가장 쌉니다.`;
+  if (!plan.pick.keep) return ` 지금 ${formatNumber(plan.have.length)}줄은 모두 버리고 처음부터 다시 굴리는 쪽이 낫습니다.${cheaper}`;
+  return ` <b>${plan.pick.kept.join(" · ")}</b>만 남기고 낮은 ${formatNumber(drop)}줄은 버리세요.${cheaper}`;
+}
+
 function renderHammerPlan() {
   if (!simEls.hammerPlan) return;
   const sum = hammerSum();
@@ -9062,40 +9237,31 @@ function renderHammerPlan() {
     simEls.hammerPlan.innerHTML = `<p class="hammer-plan-empty">목표를 채웠습니다. 더 올리려면 목표치를 높여 보세요.</p>`;
     return;
   }
-  const plans = hammerPlans();
-  if (!plans.length) {
+  const plan = hammerBestPlan();
+  if (!plan) {
     simEls.hammerPlan.innerHTML = `<p class="hammer-plan-empty">이 조건으로는 계산이 끝나지 않습니다. 목표치를 낮추거나 단계 수를 늘려 보세요.</p>`;
     return;
   }
-  const best = plans[0];
-  const stageRows = [];
-  const keys = [...best.perLock.keys()].sort((a, b) => a - b);
-  keys.forEach((k, i) => {
-    const bag = best.perLock.get(k);
-    stageRows.push(`
-      <tr>
-        <td data-label="단계">${i + 1}</td>
-        <td data-label="잠금">${k}개</td>
-        <td data-label="굴림">${formatNumber(Math.round(hammerMedian(bag.rolls)))}회</td>
-        <td data-label="비용" class="sim-cost">${hammerFmtSeed(hammerMedian(bag.cost))}</td>
-      </tr>`);
-  });
-  const others = plans.slice(0, 3).map((p, i) => `
-    <li${i === 0 ? ' class="is-best"' : ""}>
-      <b>${i + 1}순위</b>
-      <span>수치 <b>${p.threshold}</b> 이상만 잠금</span>
-      <span class="sim-cost">${hammerFmtSeed(p.cost)}</span>
-      <small>굴림 ${formatNumber(Math.round(p.rolls))}회</small>
-    </li>`).join("");
+  const rows = plan.stages.map((st, i) => {
+    const t = plan.solved.policy[Math.min(st.locks, plan.solved.maxLock)][Math.max(1, hammer.target - (st.end ?? sum))] || st.threshold;
+    return `
+      <tr${i === 0 ? ' class="is-now"' : ""}>
+        <td data-label="잠금">${st.locks}개</td>
+        <td data-label="이때 잠글 값">${t} 이상</td>
+        <td data-label="굴림">${formatNumber(Math.round(st.rolls))}회</td>
+        <td data-label="비용" class="sim-cost">${hammerFmtSeed(st.cost)}</td>
+        <td data-label="단계 끝 누적">${st.end != null ? formatNumber(Math.round(st.end)) : formatNumber(hammer.target)}</td>
+      </tr>`;
+  }).join("");
 
   simEls.hammerPlan.innerHTML = `
-    <div class="hammer-plan-head">지금 상태에서 목표까지 <b>${hammerFmtSeed(best.cost)}</b> · 굴림 <b>${formatNumber(Math.round(best.rolls))}회</b> <small>(중앙값, ${formatNumber(HAMMER_RUNS)}판 시뮬레이션)</small></div>
+    <div class="hammer-plan-head">지금 상태에서 목표까지 <b>${hammerFmtSeed(plan.cost)}</b> · 굴림 <b>${formatNumber(Math.round(plan.rolls))}회</b> <small>(중앙값)</small></div>
+    <p class="hammer-plan-now">지금은 <b>${plan.nowThreshold} 이상</b>인 줄만 잠그고 나머지를 굴리세요.${hammerKeepNote(plan)}</p>
     <table class="sim-table hammer-plan-table">
-      <thead><tr><th>단계</th><th>잠금</th><th>굴림</th><th>비용</th></tr></thead>
-      <tbody>${stageRows.join("")}</tbody>
+      <thead><tr><th>잠금</th><th>이때 잠글 값</th><th>굴림</th><th>비용</th><th>단계 끝 누적</th></tr></thead>
+      <tbody>${rows}</tbody>
     </table>
-    <p class="hammer-plan-note">수치 <b>${best.threshold}</b> 이상인 ${escapeHtml(hammerIncluded(hammer.stat).map(hammerStatName).join(" · "))} 줄만 잠그고 나머지를 굴리는 것이 가장 쌉니다.</p>
-    <ol class="hammer-plan-list">${others}</ol>`;
+    <p class="hammer-plan-note">잠금이 늘수록 굴림값이 비싸지므로 초반에는 높은 값만 받고, 목표가 가까워지면 낮은 값도 받는 것이 가장 쌉니다.</p>`;
 }
 
 function renderHammer() {
@@ -9129,28 +9295,32 @@ function hammerAuto() {
     alert("이미 목표를 채웠습니다.");
     return;
   }
-  const plans = hammerPlans();
-  if (!plans.length) {
+  const best = hammerBestPlan();
+  if (!best) {
     alert("이 조건으로는 계산이 끝나지 않습니다. 목표치를 낮추거나 단계 수를 늘려 주세요.");
     return;
   }
-  const best = plans[0];
   const before = { rolls: hammer.rolls, seed: hammer.seed, hammers: hammer.hammers };
   const stages = [];   // 잠금 개수가 바뀔 때마다 한 칸. 단계마다 얼마를 썼는지 남긴다
+  const maxLock = Math.max(0, hammer.slots - 1);
+  // 이미 잠가 둔 줄은 이어서 들고 간다
+  const held = new Set(hammer.lines.map((line, i) => (line && hammerCounts(i) && hammer.locks[i] ? i : -1)).filter((i) => i >= 0));
   let guard = 0;
 
   while (hammerSum() < hammer.target && guard < HAMMER_AUTO_CAP) {
-    // 목표 스탯이면서 기준 이상인 줄을 값 높은 순으로 잠근다. 한 칸은 굴려야 하므로 slots-1까지만
-    const keep = hammer.lines
+    // 지금 잠금 개수와 남은 수치에 맞는 기준을 꺼내, 새로 나온 줄 중 기준 이상인 것을 더 잠근다.
+    // 이미 잠근 줄은 그대로 둔다. 놓으면 쌓아 둔 수치가 사라진다
+    const remain = Math.max(1, Math.min(hammer.target, hammer.target - hammerSum()));
+    const threshold = best.solved.policy[Math.min(held.size, maxLock)][remain] || 1;
+    hammer.lines
       .map((line, i) => ({ i, line }))
-      .filter(({ i, line }) => line && hammerCounts(i) && line.value >= best.threshold)
+      .filter(({ i, line }) => line && !held.has(i) && hammerCounts(i) && line.value >= threshold)
       .sort((a, b) => b.line.value - a.line.value)
-      .slice(0, hammer.slots - 1)
-      .map(({ i }) => i);
-    hammer.locks = hammer.lines.map((_, i) => keep.includes(i));
-    if (keep.length >= hammer.slots) break;
+      .forEach(({ i }) => { if (held.size < maxLock) held.add(i); });
+    hammer.locks = hammer.lines.map((_, i) => held.has(i));
+    if (held.size >= hammer.slots) break;
 
-    const locks = keep.length;
+    const locks = held.size;
     let stage = stages[stages.length - 1];
     if (!stage || stage.locks !== locks) {
       stage = { locks, rolls: 0, seed: 0, hammers: 0, startSum: hammerSum(), endSum: hammerSum() };
@@ -9189,7 +9359,7 @@ function hammerAuto() {
   simEls.hammerLog.innerHTML = `
     <div class="hammer-log-head">
       <b>자동 굴리기 ${done ? "완료" : "중단"}</b>
-      <span>수치 ${best.threshold} 이상만 잠금</span>
+      <span>단계별 기준 적용</span>
       <span>굴림 <b>${formatNumber(used.rolls)}회</b>${simDelta(used.rolls, best.rolls, "회")}</span>
       <span>비용 <b>${hammerFmtSeed(used.cost)}</b>${simDelta(used.cost / 1e8, best.cost / 1e8, "억")}</span>
       <span>망치 <b>${formatNumber(used.hammers)}개</b></span>

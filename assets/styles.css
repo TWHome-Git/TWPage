@@ -7286,31 +7286,17 @@ img.dmg-chk-icon {
   font-size: 12px;
 }
 
-.hammer-plan-list {
-  margin: 8px 0 0;
-  padding: 0;
-  list-style: none;
-  display: grid;
-  gap: 4px;
-}
-
-.hammer-plan-list li {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 4px 8px;
-  padding: 5px 8px;
-  border: 1px solid var(--line);
+.hammer-plan-now {
+  margin: 0 0 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--accent);
   border-radius: 6px;
+  background: rgba(15, 111, 99, 0.08);
   font-size: 12px;
 }
 
-.hammer-plan-list li.is-best {
-  border-color: var(--accent);
+/* 지금 있는 단계 */
+.hammer-plan-table tbody tr.is-now td {
   background: rgba(15, 111, 99, 0.06);
-}
-
-.hammer-plan-list small {
-  margin-left: auto;
-  color: var(--muted);
+  font-weight: 700;
 }
