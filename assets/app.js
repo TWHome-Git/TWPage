@@ -9070,6 +9070,7 @@ function hammerRoute(solved, startValues, target, slots, price, statKey, runs = 
   const stageBag = new Map();   // 잠금 수 → { rolls: [], cost: [], end: [] }
   const totals = [];
   const rollCounts = [];
+  const hammerCounts = [];
   const cap = 4000;
 
   for (let run = 0; run < runs; run += 1) {
@@ -9077,6 +9078,7 @@ function hammerRoute(solved, startValues, target, slots, price, statKey, runs = 
     let sum = kept.reduce((a, b) => a + b, 0);
     let spent = 0;
     let rolls = 0;
+    let hammers = 0;
     const stages = new Map();
     while (sum < target && rolls < cap) {
       const k = Math.min(kept.length, maxLock);
@@ -9087,6 +9089,7 @@ function hammerRoute(solved, startValues, target, slots, price, statKey, runs = 
       const step = hammerSeedCost(k) + hammerCount(k) * price;
       spent += step;
       rolls += 1;
+      hammers += hammerCount(k);
       const bag = stages.get(k) || { rolls: 0, cost: 0, threshold: t };
       bag.rolls += 1;
       bag.cost += step;
@@ -9116,6 +9119,7 @@ function hammerRoute(solved, startValues, target, slots, price, statKey, runs = 
     if (rolls >= cap) continue;
     totals.push(spent);
     rollCounts.push(rolls);
+    hammerCounts.push(hammers);
     stages.forEach((v, k) => {
       const bag = stageBag.get(k) || { rolls: [], cost: [], end: [], thresholds: [] };
       bag.rolls.push(v.rolls);
@@ -9129,6 +9133,7 @@ function hammerRoute(solved, startValues, target, slots, price, statKey, runs = 
   return {
     cost: hammerMedian(totals),
     rolls: hammerMedian(rollCounts),
+    hammers: hammerMedian(hammerCounts),
     stages: [...stageBag.entries()].sort((a, b) => a[0] - b[0]).map(([k, bag]) => ({
       locks: k,
       // 그 단계에서 실제로 쓴 기준 (단계가 시작될 때의 남은 수치로 정해진다)
@@ -9165,14 +9170,24 @@ function hammerBestKeep(solved, values, target) {
   return best;
 }
 
+// 아무것도 없는 상태에서 목표까지 드는 값 (다 채운 뒤 견주기용)
+function hammerScratchPlan() {
+  const solved = hammerSolved();
+  return hammerRoute(solved, [], hammer.target, hammer.slots, hammer.price, hammer.stat);
+}
+
 // 지금 화면 상태에서의 추천. 계산이 무거워 같은 조건이면 다시 풀지 않는다
 let hammerSolveCache = null;
-function hammerBestPlan() {
+function hammerSolved() {
   const key = `${hammer.target}|${hammer.slots}|${hammer.price}|${hammer.stat}`;
   if (!hammerSolveCache || hammerSolveCache.key !== key) {
     hammerSolveCache = { key, solved: hammerSolve(hammer.target, hammer.slots, hammer.price, hammer.stat) };
   }
-  const solved = hammerSolveCache.solved;
+  return hammerSolveCache.solved;
+}
+
+function hammerBestPlan() {
+  const solved = hammerSolved();
   const have = hammer.lines.map((line, i) => (hammerCounts(i) ? line.value : 0)).filter(Boolean);
   const pick = hammerBestKeep(solved, have, hammer.target);
   if (!pick) return null;
@@ -9253,7 +9268,15 @@ function renderHammerPlan() {
   if (!simEls.hammerPlan) return;
   const sum = hammerSum();
   if (sum >= hammer.target) {
-    simEls.hammerPlan.innerHTML = `<p class="hammer-plan-empty">목표를 채웠습니다. 더 올리려면 목표치를 높여 보세요.</p>`;
+    // 다 채운 뒤에는 "처음부터 여기까지 보통 얼마가 드는지"를 알려 준다. 이번 판과 견주기 좋다
+    const scratch = hammerScratchPlan();
+    const used = hammer.seed + hammer.hammers * hammer.price;
+    simEls.hammerPlan.innerHTML = `
+      <p class="hammer-plan-done"><b>목표를 채웠습니다.</b> 더 올리려면 목표치를 높여 보세요.</p>
+      ${scratch ? `
+        <div class="hammer-plan-head">처음부터 ${formatNumber(hammer.target)}까지 기대값 <b>${hammerFmtSeed(scratch.cost)}</b> · 망치 <b>${formatNumber(Math.round(scratch.hammers))}개</b> · 굴림 <b>${formatNumber(Math.round(scratch.rolls))}회</b> <small>(중앙값)</small></div>
+        ${hammer.rolls ? `<p class="hammer-plan-note">이번 판은 ${hammerFmtSeed(used)}${simDelta(used / 1e8, scratch.cost / 1e8, "억")} · 망치 ${formatNumber(hammer.hammers)}개${simDelta(hammer.hammers, scratch.hammers, "개")} · 굴림 ${formatNumber(hammer.rolls)}회</p>` : ""}
+      ` : ""}`;
     return;
   }
   const plan = hammerBestPlan();
@@ -9271,7 +9294,7 @@ function renderHammerPlan() {
       </tr>`).join("");
 
   simEls.hammerPlan.innerHTML = `
-    <div class="hammer-plan-head">지금 상태에서 목표까지 <b>${hammerFmtSeed(plan.cost)}</b> · 굴림 <b>${formatNumber(Math.round(plan.rolls))}회</b> <small>(중앙값)</small></div>
+    <div class="hammer-plan-head">지금 상태에서 목표까지 <b>${hammerFmtSeed(plan.cost)}</b> · 망치 <b>${formatNumber(Math.round(plan.hammers))}개</b> · 굴림 <b>${formatNumber(Math.round(plan.rolls))}회</b> <small>(중앙값)</small></div>
     <p class="hammer-plan-now">지금은 <b>${plan.nowThreshold} 이상</b>인 줄만 잠그고 나머지를 굴리세요.${hammerKeepNote(plan)}</p>
     <table class="sim-table hammer-plan-table">
       <thead><tr><th>잠금</th><th>이때 잠글 값</th><th>굴림</th><th>비용</th><th>단계 끝 누적</th></tr></thead>
