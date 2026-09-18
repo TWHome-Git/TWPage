@@ -7197,6 +7197,17 @@ img.dmg-chk-icon {
   background: rgba(15, 111, 99, 0.08);
 }
 
+/* 그중 추천 기준 이상이라 잠글 만한 줄은 진한 초록으로 한 번 더 강조한다 (잠그면 아래 금색이 우선한다) */
+.hammer-table tbody tr.is-keep td {
+  background: rgba(15, 111, 99, 0.26);
+}
+
+.hammer-table tbody tr.is-keep .hammer-step,
+.hammer-table tbody tr.is-keep .hammer-line {
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+
 /* 잠근 줄은 굴려도 남는 줄이다. 목표 스탯 강조(초록)와 헷갈리지 않게 금색으로 따로 칠한다 */
 .hammer-table tbody tr.is-locked td {
   background: rgba(200, 138, 44, 0.18);
@@ -7228,6 +7239,10 @@ img.dmg-chk-icon {
 
 .hammer-table tbody tr.is-lockable:hover td {
   background: rgba(200, 138, 44, 0.09);
+}
+
+.hammer-table tbody tr.is-lockable.is-keep:not(.is-locked):hover td {
+  background: rgba(15, 111, 99, 0.34);
 }
 
 .hammer-table tbody tr.is-lockable.is-locked:hover td {

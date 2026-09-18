@@ -9222,15 +9222,30 @@ function hammerBestPlan() {
 // ── 화면 ──
 const hammerFmtSeed = (v) => (v >= 1e8 ? `${(v / 1e8).toFixed(1)}억` : `${Math.round(v / 1e4).toLocaleString("ko-KR")}만`);
 
+// 추천 루트가 "잠그고 남기라"고 하는 줄 번호들. 목표 스탯 줄 중 값이 높은 순으로 추천 개수만큼이며,
+// 안내 문구의 "N 이상인 줄만 잠그고 / X만 남기고"와 같은 판단이다. 목표를 채운 뒤에는 고를 것이 없다
+function hammerKeepRows() {
+  const keep = new Set();
+  if (hammerSum() >= hammer.target) return keep;
+  const counted = [];
+  for (let i = 0; i < hammer.slots; i += 1) if (hammerCounts(i)) counted.push(i);
+  if (!counted.length) return keep;
+  counted.sort((a, b) => hammer.lines[b].value - hammer.lines[a].value);
+  const pick = hammerBestKeep(hammerSolved(), counted.map((i) => hammer.lines[i].value), hammer.target);
+  counted.slice(0, pick?.keep || 0).forEach((i) => keep.add(i));
+  return keep;
+}
+
 function renderHammerTable() {
   if (!simEls.hammerTable) return;
+  const keepRows = hammerKeepRows();
   const rows = [];
   for (let i = 0; i < hammer.slots; i += 1) {
     const line = hammer.lines[i];
     const mine = hammerCounts(i);
     const name = line ? hammerStatName(line.stat) : "-";
     rows.push(`
-      <tr class="${[mine ? "is-target" : "", hammer.locks[i] && line ? "is-locked" : "", line ? "is-lockable" : ""].filter(Boolean).join(" ")}"${line ? ' title="눌러서 잠금을 바꿉니다"' : ""}>
+      <tr class="${[mine ? "is-target" : "", keepRows.has(i) ? "is-keep" : "", hammer.locks[i] && line ? "is-locked" : "", line ? "is-lockable" : ""].filter(Boolean).join(" ")}"${line ? ' title="눌러서 잠금을 바꿉니다"' : ""}>
         <td class="hammer-lock">
           <label><input type="checkbox" data-hammer-lock="${i}"${hammer.locks[i] ? " checked" : ""}${line ? "" : " disabled"} /><span class="hammer-lock-mark" aria-hidden="true">${hammer.locks[i] ? "🔒" : "🔓"}</span></label>
         </td>
@@ -9263,14 +9278,15 @@ function renderHammerStatus() {
 }
 
 // 지금 가진 값을 그대로 쓸지, 일부를 버리고 다시 굴릴지 한 줄로 알려 준다
+// 지금 가진 줄을 어떻게 할지에 대한 덧붙임. 문장마다 줄을 바꿔 적는다
 function hammerKeepNote(plan) {
   if (!plan.have.length) return "";
   const drop = plan.have.length - plan.pick.keep;
   const gain = plan.keepAllCost != null ? plan.keepAllCost - plan.pick.cost : 0;
-  const cheaper = gain > 0 ? ` 그대로 들고 가는 것보다 <b>${hammerFmtSeed(gain)}</b> 저렴합니다.` : "";
-  if (drop <= 0) return ` 지금 가진 ${formatNumber(plan.have.length)}줄은 그대로 두는 것이 가장 저렴합니다.`;
-  if (!plan.pick.keep) return ` 지금 ${formatNumber(plan.have.length)}줄은 모두 버리고 처음부터 다시 재설정하는 쪽이 낫습니다.${cheaper}`;
-  return ` <b>${plan.pick.kept.join(" · ")}</b>만 남기고 낮은 ${formatNumber(drop)}줄은 버리세요.${cheaper}`;
+  const cheaper = gain > 0 ? `<br>그대로 들고 가는 것보다 <b>${hammerFmtSeed(gain)}</b> 저렴합니다.` : "";
+  if (drop <= 0) return `<br>지금 가진 ${formatNumber(plan.have.length)}줄은 그대로 두는 것이 가장 저렴합니다.`;
+  if (!plan.pick.keep) return `<br>지금 ${formatNumber(plan.have.length)}줄은 모두 버리고 처음부터 다시 재설정하는 쪽이 낫습니다.${cheaper}`;
+  return `<br><b>${plan.pick.kept.join(" · ")}</b>만 남기고 낮은 ${formatNumber(drop)}줄은 버리세요.${cheaper}`;
 }
 
 
@@ -9611,7 +9627,12 @@ function wireHammerSim() {
         lock.disabled = !value;
         if (!value) lock.checked = false;
       }
+      row.classList.toggle("is-lockable", !!value);
+      if (!value) row.classList.remove("is-locked");
     }
+    // 값이 바뀌면 어느 줄을 남길지도 달라진다. 표를 다시 그리지 않고 강조 표시만 맞춘다
+    const keepRows = hammerKeepRows();
+    simEls.hammerTable.querySelectorAll("tbody tr").forEach((tr, n) => tr.classList.toggle("is-keep", keepRows.has(n)));
     renderHammerStatus();
     renderHammerPlan();
   });
