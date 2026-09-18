@@ -9070,7 +9070,7 @@ function hammerRoute(solved, startValues, target, slots, price, statKey, runs = 
       const step = hammerSeedCost(k) + hammerCount(k) * price;
       spent += step;
       rolls += 1;
-      const bag = stages.get(k) || { rolls: 0, cost: 0 };
+      const bag = stages.get(k) || { rolls: 0, cost: 0, threshold: t };
       bag.rolls += 1;
       bag.cost += step;
       stages.set(k, bag);
@@ -9100,9 +9100,10 @@ function hammerRoute(solved, startValues, target, slots, price, statKey, runs = 
     totals.push(spent);
     rollCounts.push(rolls);
     stages.forEach((v, k) => {
-      const bag = stageBag.get(k) || { rolls: [], cost: [], end: [] };
+      const bag = stageBag.get(k) || { rolls: [], cost: [], end: [], thresholds: [] };
       bag.rolls.push(v.rolls);
       bag.cost.push(v.cost);
+      bag.thresholds.push(v.threshold);
       if (v.end != null) bag.end.push(v.end);
       stageBag.set(k, bag);
     });
@@ -9113,7 +9114,8 @@ function hammerRoute(solved, startValues, target, slots, price, statKey, runs = 
     rolls: hammerMedian(rollCounts),
     stages: [...stageBag.entries()].sort((a, b) => a[0] - b[0]).map(([k, bag]) => ({
       locks: k,
-      threshold: policy[Math.min(k, maxLock)][Math.max(1, Math.min(target, target))] || 1,
+      // 그 단계에서 실제로 쓴 기준 (단계가 시작될 때의 남은 수치로 정해진다)
+      threshold: Math.round(hammerMedian(bag.thresholds)),
       rolls: hammerMedian(bag.rolls),
       cost: hammerMedian(bag.cost),
       end: bag.end.length ? hammerMedian(bag.end) : null,
@@ -9242,17 +9244,14 @@ function renderHammerPlan() {
     simEls.hammerPlan.innerHTML = `<p class="hammer-plan-empty">이 조건으로는 계산이 끝나지 않습니다. 목표치를 낮추거나 단계 수를 늘려 보세요.</p>`;
     return;
   }
-  const rows = plan.stages.map((st, i) => {
-    const t = plan.solved.policy[Math.min(st.locks, plan.solved.maxLock)][Math.max(1, hammer.target - (st.end ?? sum))] || st.threshold;
-    return `
+  const rows = plan.stages.map((st, i) => `
       <tr${i === 0 ? ' class="is-now"' : ""}>
         <td data-label="잠금">${st.locks}개</td>
-        <td data-label="이때 잠글 값">${t} 이상</td>
+        <td data-label="이때 잠글 값">${st.threshold} 이상</td>
         <td data-label="굴림">${formatNumber(Math.round(st.rolls))}회</td>
         <td data-label="비용" class="sim-cost">${hammerFmtSeed(st.cost)}</td>
         <td data-label="단계 끝 누적">${st.end != null ? formatNumber(Math.round(st.end)) : formatNumber(hammer.target)}</td>
-      </tr>`;
-  }).join("");
+      </tr>`).join("");
 
   simEls.hammerPlan.innerHTML = `
     <div class="hammer-plan-head">지금 상태에서 목표까지 <b>${hammerFmtSeed(plan.cost)}</b> · 굴림 <b>${formatNumber(Math.round(plan.rolls))}회</b> <small>(중앙값)</small></div>
