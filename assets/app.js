@@ -8872,7 +8872,7 @@ const HAMMER_INCLUDES = {
 };
 const hammerIncluded = (statKey) => HAMMER_INCLUDES[statKey] || [statKey];
 
-const HAMMER_SLOT_MAX = 9;          // 단계는 최대 9칸
+const HAMMER_SLOT_MAX = 10;         // 단계는 1~10단계
 const HAMMER_SEED_PER_LOCK = 1_000_000;  // 잠금 k개 → 시드 (k+1) × 100만
 const HAMMER_PRICE_DEFAULT = 80_000_000; // 망치 1개 기본 시세 (시드)
 const HAMMER_RUNS = 400;            // 추천 계산에 쓰는 시뮬레이션 판 수
@@ -8899,7 +8899,7 @@ function hammerRollLine() {
 }
 
 const hammer = {
-  slots: HAMMER_SLOT_MAX,
+  slots: 7,         // 기본 7단계
   target: 45,
   stat: "stab",
   price: HAMMER_PRICE_DEFAULT,
@@ -9391,14 +9391,14 @@ function wireHammerSim() {
   if (!simEls.hammerTable) return;
   simEls.hammerStat.innerHTML = HAMMER_STATS.map((s) => optionHtml(s.key, s.name)).join("");
   simEls.hammerStat.value = hammer.stat;
-  simEls.hammerSlots.innerHTML = Array.from({ length: HAMMER_SLOT_MAX }, (_, i) => optionHtml(String(i + 1), `${i + 1}칸`)).join("");
+  simEls.hammerSlots.innerHTML = Array.from({ length: HAMMER_SLOT_MAX }, (_, i) => optionHtml(String(i + 1), `${i + 1}단계`)).join("");
   simEls.hammerSlots.value = String(hammer.slots);
   simEls.hammerTarget.value = String(hammer.target);
   simEls.hammerPrice.value = String(hammer.price / 10000);
 
   simEls.hammerStat.addEventListener("change", () => { hammer.stat = simEls.hammerStat.value; renderHammer(); });
   simEls.hammerSlots.addEventListener("change", () => {
-    hammer.slots = Number(simEls.hammerSlots.value) || HAMMER_SLOT_MAX;
+    hammer.slots = Number(simEls.hammerSlots.value) || 7;
     hammer.lines = hammer.lines.slice(0, hammer.slots);
     hammer.locks = hammer.locks.slice(0, hammer.slots);
     renderHammer();
