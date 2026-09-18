@@ -9224,8 +9224,8 @@ function hammerKeepNote(plan) {
   if (!plan.have.length) return "";
   const drop = plan.have.length - plan.pick.keep;
   const gain = plan.keepAllCost != null ? plan.keepAllCost - plan.pick.cost : 0;
-  const cheaper = gain > 0 ? ` 그대로 들고 가는 것보다 <b>${hammerFmtSeed(gain)}</b> 쌉니다.` : "";
-  if (drop <= 0) return ` 지금 가진 ${formatNumber(plan.have.length)}줄은 그대로 두는 것이 가장 쌉니다.`;
+  const cheaper = gain > 0 ? ` 그대로 들고 가는 것보다 <b>${hammerFmtSeed(gain)}</b> 저렴합니다.` : "";
+  if (drop <= 0) return ` 지금 가진 ${formatNumber(plan.have.length)}줄은 그대로 두는 것이 가장 저렴합니다.`;
   if (!plan.pick.keep) return ` 지금 ${formatNumber(plan.have.length)}줄은 모두 버리고 처음부터 다시 굴리는 쪽이 낫습니다.${cheaper}`;
   return ` <b>${plan.pick.kept.join(" · ")}</b>만 남기고 낮은 ${formatNumber(drop)}줄은 버리세요.${cheaper}`;
 }
@@ -9261,7 +9261,7 @@ function renderHammerPlan() {
       <thead><tr><th>잠금</th><th>이때 잠글 값</th><th>굴림</th><th>비용</th><th>단계 끝 누적</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
-    <p class="hammer-plan-note">잠금이 늘수록 굴림값이 비싸지므로 초반에는 높은 값만 받고, 목표가 가까워지면 낮은 값도 받는 것이 가장 쌉니다.</p>`;
+    <p class="hammer-plan-note">잠금이 늘수록 굴림값이 비싸지므로 초반에는 높은 값만 받고, 목표가 가까워지면 낮은 값도 받는 것이 가장 저렴합니다.</p>`;
 }
 
 function renderHammer() {
