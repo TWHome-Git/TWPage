@@ -8908,6 +8908,7 @@ const hammer = {
   rolls: 0,
   seed: 0,
   hammers: 0,
+  autoBase: null,   // 자동 굴리기를 누를 때 쓴 예상치 (결과 칸과 로그의 증감 기준을 맞춘다)
   loaded: false,
 };
 
@@ -9268,14 +9269,15 @@ function renderHammerPlan() {
   if (!simEls.hammerPlan) return;
   const sum = hammerSum();
   if (sum >= hammer.target) {
-    // 다 채운 뒤에는 "처음부터 여기까지 보통 얼마가 드는지"를 알려 준다. 이번 판과 견주기 좋다
-    const scratch = hammerScratchPlan();
+    // 다 채운 뒤에는 "처음부터 여기까지 보통 얼마가 드는지"를 알려 준다. 이번 판과 견주기 좋다.
+    // 자동 굴리기로 끝냈다면 그때 쓴 예상치를 그대로 써서 로그와 증감이 어긋나지 않게 한다
+    const scratch = hammer.autoBase || hammerScratchPlan();
     const used = hammer.seed + hammer.hammers * hammer.price;
     simEls.hammerPlan.innerHTML = `
       <p class="hammer-plan-done"><b>목표를 채웠습니다.</b> 더 올리려면 목표치를 높여 보세요.</p>
       ${scratch ? `
         <div class="hammer-plan-head">처음부터 ${formatNumber(hammer.target)}까지 기대값 <b>${hammerFmtSeed(scratch.cost)}</b> · 망치 <b>${formatNumber(Math.round(scratch.hammers))}개</b> · 굴림 <b>${formatNumber(Math.round(scratch.rolls))}회</b> <small>(중앙값)</small></div>
-        ${hammer.rolls ? `<p class="hammer-plan-note">이번 판은 ${hammerFmtSeed(used)}${simDelta(used / 1e8, scratch.cost / 1e8, "억")} · 망치 ${formatNumber(hammer.hammers)}개${simDelta(hammer.hammers, scratch.hammers, "개")} · 굴림 ${formatNumber(hammer.rolls)}회</p>` : ""}
+        ${hammer.rolls ? `<p class="hammer-plan-note">이번 판은 ${hammerFmtSeed(used)}${simDelta(used / 1e8, scratch.cost / 1e8, "억")} · 망치 ${formatNumber(hammer.hammers)}개${simDelta(hammer.hammers, scratch.hammers, "개")} · 굴림 ${formatNumber(hammer.rolls)}회${simDelta(hammer.rolls, scratch.rolls, "회")}</p>` : ""}
       ` : ""}`;
     return;
   }
@@ -9340,6 +9342,8 @@ function hammerAuto() {
     return;
   }
   const before = { rolls: hammer.rolls, seed: hammer.seed, hammers: hammer.hammers };
+  // 아래 결과 칸도 같은 예상치와 견주도록 남겨 둔다. 예상치는 굴려서 얻는 값이라 다시 계산하면 조금씩 달라진다
+  hammer.autoBase = { cost: best.cost, rolls: best.rolls, hammers: best.hammers, at: before };
   const stages = [];   // 잠금 개수가 바뀔 때마다 한 칸. 단계마다 얼마를 썼는지 남긴다
   // 누적 수치는 "잠가 둔 합"으로 적는다. 잠그지 않은 줄은 다음 판에 사라지므로 남는 값이 아니다
   const heldSumOf = (set) => [...set].reduce((sum, i) => sum + (hammer.lines[i]?.value || 0), 0);
@@ -9427,6 +9431,7 @@ function hammerReset() {
   hammer.rolls = 0;
   hammer.seed = 0;
   hammer.hammers = 0;
+  hammer.autoBase = null;
   if (simEls.hammerLog) {
     simEls.hammerLog.hidden = true;
     simEls.hammerLog.innerHTML = "";
