@@ -7360,24 +7360,40 @@ img.dmg-chk-icon {
   font-size: 12px;
 }
 
-/* 이번 판에 지금까지 쓴 값. 예상·기대값 줄 바로 아래에 붙인다 */
-.hammer-plan-total {
-  display: inline-block;
+/* 결과 칸 맨 위의 "라벨 : 값" 행. 라벨 열 너비를 맞춰 기대값과 현재 누적이 위아래로 나란히 읽히게 한다 */
+.hammer-plan-stats {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 4px 8px;
   margin: 0 0 8px;
-  padding: 5px 10px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: rgba(15, 111, 99, 0.08);
   font-size: 13px;
 }
 
-.hammer-plan-total small {
-  color: var(--muted);
-  font-size: 11px;
+.hammer-plan-stats > div {
+  display: contents;
 }
 
-.hammer-plan-total + .hammer-plan-note {
-  margin-top: 0;
+.hammer-plan-stats dt {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.hammer-plan-stats dt::after {
+  content: " :";
+}
+
+.hammer-plan-stats dt {
+  white-space: nowrap;
+}
+
+.hammer-plan-stats dd small {
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.hammer-plan-stats dd {
+  margin: 0;
 }
 
 .hammer-plan-done {

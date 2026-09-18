@@ -9274,11 +9274,12 @@ function hammerKeepNote(plan) {
 }
 
 
-// 이번 판에 지금까지 쓴 값. 예상 비용·기대값과 나란히 읽히도록 오른쪽 결과 칸에 둔다.
-// 한 번도 재설정하지 않았으면 적을 것이 없다
-function hammerTotalHtml() {
-  if (!hammer.rolls) return "";
-  return `<p class="hammer-plan-total">누적 <b>${hammerFmtSeed(hammer.seed + hammer.hammers * hammer.price)}</b> <small>(재설정 ${formatNumber(hammer.rolls)}회 · 망치 ${formatNumber(hammer.hammers)}개)</small></p>`;
+// 결과 칸 맨 위의 "라벨 : 값" 행들. 기대값과 현재 누적을 같은 형식(금액 · 망치 · 재설정)으로 위아래에 맞춰 적어
+// 바로 견줄 수 있게 한다. 한 번도 재설정하지 않았으면 누적 행은 뺀다
+const hammerStatValue = (cost, hammers, rolls) => `<b>${hammerFmtSeed(cost)}</b> · 망치 <b>${formatNumber(Math.round(hammers))}개</b> · 재설정 <b>${formatNumber(Math.round(rolls))}회</b>`;
+function hammerStatRows(rows) {
+  const total = hammer.rolls ? [["현재 누적", hammerStatValue(hammer.seed + hammer.hammers * hammer.price, hammer.hammers, hammer.rolls)]] : [];
+  return `<dl class="hammer-plan-stats">${[rows[0], ...total, ...rows.slice(1)].map(([label, value]) => `<div><dt>${label}</dt><dd>${value}</dd></div>`).join("")}</dl>`;
 }
 
 function renderHammerPlan() {
@@ -9299,15 +9300,16 @@ function renderHammerPlan() {
     simEls.hammerPlan.innerHTML = `
       <p class="hammer-plan-done"><b>목표를 채웠습니다.</b> 더 올리려면 목표치를 높여 보세요.</p>
       ${base ? `
-        <div class="hammer-plan-head">${hammer.autoBase ? "입력한 상태에서" : "처음부터"} ${formatNumber(hammer.target)}까지 기대값 <b>${hammerFmtSeed(base.cost)}</b> · 망치 <b>${formatNumber(Math.round(base.hammers))}개</b> · 재설정 <b>${formatNumber(Math.round(base.rolls))}회</b> <small>(중앙값)</small></div>
-        ${hammerTotalHtml()}
-        ${hammer.rolls ? `<p class="hammer-plan-note">기대값과의 차이 ${gaps.length ? gaps.map(([label, delta]) => `${label} ${delta}`).join(" · ") : "없음"}</p>` : ""}
+        ${hammerStatRows([
+          ["기대값", `${hammerStatValue(base.cost, base.hammers, base.rolls)} <small>(${hammer.autoBase ? "입력한 상태에서" : "처음부터"} ${formatNumber(hammer.target)}까지, 중앙값)</small>`],
+          ...(hammer.rolls ? [["차이", gaps.length ? gaps.map(([label, delta]) => `${label} ${delta}`).join(" · ") : "없음"]] : []),
+        ])}
       ` : ""}`;
     return;
   }
   const plan = hammerBestPlan();
   if (!plan) {
-    simEls.hammerPlan.innerHTML = `<p class="hammer-plan-empty">이 조건으로는 계산이 끝나지 않습니다. 목표치를 낮추거나 단계 수를 늘려 보세요.</p>${hammerTotalHtml()}`;
+    simEls.hammerPlan.innerHTML = `<p class="hammer-plan-empty">이 조건으로는 계산이 끝나지 않습니다. 목표치를 낮추거나 단계 수를 늘려 보세요.</p>`;
     return;
   }
   // 잠금이 꽉 찬 마지막 단계에서는 더 잠글 줄이 없다. 남은 한 줄에서 모자란 수치 이상이 나오면 그대로 끝난다.
@@ -9343,8 +9345,7 @@ function renderHammerPlan() {
   }
 
   simEls.hammerPlan.innerHTML = `
-    <div class="hammer-plan-head">지금 상태에서 목표까지 <b>${hammerFmtSeed(plan.cost)}</b> · 망치 <b>${formatNumber(Math.round(plan.hammers))}개</b> · 재설정 <b>${formatNumber(Math.round(plan.rolls))}회</b> <small>(중앙값)</small></div>
-    ${hammerTotalHtml()}
+    ${hammerStatRows([["남은 기대값", `${hammerStatValue(plan.cost, plan.hammers, plan.rolls)} <small>(목표까지, 중앙값)</small>`]])}
     <p class="hammer-plan-now">${nowText}</p>
     <table class="sim-table hammer-plan-table">
       <thead><tr><th>잠금</th><th>이때 잠글 값</th><th>재설정</th><th>비용</th><th>단계 끝 누적</th></tr></thead>
@@ -9556,8 +9557,7 @@ function wireHammerSim() {
   });
   simEls.hammerTarget.addEventListener("input", () => {
     hammer.target = Math.max(1, Number(simEls.hammerTarget.value) || 1);
-    renderHammerStatus();
-    renderHammerPlan();
+    renderHammer();
   });
   simEls.hammerPrice.addEventListener("input", () => {
     hammer.price = Math.max(0, (Number(simEls.hammerPrice.value) || 0) * 10000);
