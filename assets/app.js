@@ -8086,8 +8086,8 @@ function initSimulators() {
     "coreBoxPrice", "coreBoxPriceField", "coreCalc", "coreSim", "coreSummary", "coreTable", "coreElso", "coreDiscount",
     "relicCurrent", "relicTarget", "relicDifficulty", "relicCalc", "relicSim", "relicSummary", "relicTable",
     "enhStart", "enhTarget", "enhCalc", "enhSim", "enhSummary", "enhTable",
-    "hammerStat", "hammerSlots", "hammerTarget", "hammerPrice", "hammerRoll", "hammerReset",
-    "hammerTable", "hammerCost", "hammerStatus", "hammerPlan",
+    "hammerStat", "hammerSlots", "hammerTarget", "hammerPrice", "hammerRoll", "hammerReset", "hammerAuto",
+    "hammerTable", "hammerCost", "hammerStatus", "hammerPlan", "hammerLog",
     "relicRateButton", "coreRateButton",
     "rateModal", "rateModalTitle", "rateModalNote", "rateModalBody",
     "inhFormula", "inhEnchants", "inhIncrement", "inhTotal", "inhFusionMax",
@@ -8864,6 +8864,14 @@ const HAMMER_GRADES = [
   { key: "mid", name: "중", rate: 0.05, values: [4, 5] },
   { key: "high", name: "상", rate: 0.005, values: [6, 7, 8, 9, 10] },
 ];
+// 목표 스탯에 함께 잡히는 줄 (2026-09-18 사용자 제공)
+//   물리 복합 = 찌르기 · 베기 · 물리 복합, 마법 베기 = 베기 · 마법 공격력 · 마법 베기
+const HAMMER_INCLUDES = {
+  hybrid: ["stab", "hack", "hybrid"],
+  mhack: ["hack", "magic", "mhack"],
+};
+const hammerIncluded = (statKey) => HAMMER_INCLUDES[statKey] || [statKey];
+
 const HAMMER_SLOT_MAX = 9;          // 단계는 최대 9칸
 const HAMMER_SEED_PER_LOCK = 1_000_000;  // 잠금 k개 → 시드 (k+1) × 100만
 const HAMMER_PRICE_DEFAULT = 80_000_000; // 망치 1개 기본 시세 (시드)
@@ -8904,25 +8912,28 @@ const hammer = {
 };
 
 const hammerStatName = (key) => HAMMER_STATS.find((s) => s.key === key)?.name || "";
-// 원하는 스탯 한 줄이 나올 확률 (하 + 중 + 상)
+// 목표에 잡히는 줄이 나올 확률 (하 + 중 + 상, 함께 잡히는 스탯까지 합산)
 function hammerHitRate(statKey) {
-  const stat = HAMMER_STATS.find((s) => s.key === statKey) || HAMMER_STATS[0];
-  return stat.low + 0.05 + 0.005;
+  return hammerValueDist(statKey).reduce((sum, d) => sum + d.p, 0);
 }
-// 원하는 스탯이 나왔을 때의 수치 분포 [{ value, p }]
+// 목표에 잡히는 줄이 나왔을 때의 수치 분포 [{ value, p }]
 function hammerValueDist(statKey) {
-  const stat = HAMMER_STATS.find((s) => s.key === statKey) || HAMMER_STATS[0];
-  const out = [];
-  HAMMER_GRADES.forEach((g) => {
-    const rate = g.key === "low" ? stat.low : g.rate;
-    g.values.forEach((v) => out.push({ value: v, p: rate / g.values.length }));
+  const keys = hammerIncluded(statKey);
+  const bag = new Map();
+  keys.forEach((key) => {
+    const stat = HAMMER_STATS.find((s) => s.key === key);
+    if (!stat) return;
+    HAMMER_GRADES.forEach((g) => {
+      const rate = g.key === "low" ? stat.low : g.rate;
+      g.values.forEach((v) => bag.set(v, (bag.get(v) || 0) + rate / g.values.length));
+    });
   });
-  return out;
+  return [...bag.entries()].sort((a, b) => a[0] - b[0]).map(([value, p]) => ({ value, p }));
 }
 
 const hammerSum = () => hammer.lines.reduce((sum, line, i) => sum + (hammerCounts(i) ? line.value : 0), 0);
-// 목표 스탯과 같은 줄만 합계에 들어간다
-const hammerCounts = (i) => !!hammer.lines[i] && hammer.lines[i].stat === hammer.stat;
+// 목표에 잡히는 줄만 합계에 들어간다 (물리 복합·마법 베기는 함께 잡히는 스탯 포함)
+const hammerCounts = (i) => !!hammer.lines[i] && hammerIncluded(hammer.stat).includes(hammer.lines[i].stat);
 const hammerLockCount = () => hammer.locks.filter(Boolean).length;
 
 // ── 추천 계산 ──
@@ -9039,7 +9050,7 @@ function renderHammerStatus() {
   simEls.hammerStatus.innerHTML = `
     <div class="hammer-gauge"><span style="width:${Math.min(100, (sum / hammer.target) * 100).toFixed(1)}%"></span></div>
     <div class="hammer-status-line">
-      <b class="${done ? "sim-pos" : ""}">${escapeHtml(hammerStatName(hammer.stat))} ${formatNumber(sum)} / ${formatNumber(hammer.target)}</b>
+      <b class="${done ? "sim-pos" : ""}">${escapeHtml(hammerIncluded(hammer.stat).map(hammerStatName).join(" + "))} ${formatNumber(sum)} / ${formatNumber(hammer.target)}</b>
       ${done ? "<span>목표 달성</span>" : `<span>${formatNumber(hammer.target - sum)} 남음</span>`}
     </div>`;
 }
@@ -9083,7 +9094,7 @@ function renderHammerPlan() {
       <thead><tr><th>단계</th><th>잠금</th><th>굴림</th><th>비용</th></tr></thead>
       <tbody>${stageRows.join("")}</tbody>
     </table>
-    <p class="hammer-plan-note">수치 <b>${best.threshold}</b> 이상인 ${escapeHtml(hammerStatName(hammer.stat))} 줄만 잠그고 나머지를 굴리는 것이 가장 쌉니다.</p>
+    <p class="hammer-plan-note">수치 <b>${best.threshold}</b> 이상인 ${escapeHtml(hammerIncluded(hammer.stat).map(hammerStatName).join(" · "))} 줄만 잠그고 나머지를 굴리는 것이 가장 쌉니다.</p>
     <ol class="hammer-plan-list">${others}</ol>`;
 }
 
@@ -9109,12 +9120,73 @@ function hammerRoll() {
   renderHammer();
 }
 
+// 추천 루트(수치 T 이상만 잠금)대로 목표까지 실제로 굴려 본다.
+// 기준 T는 시작할 때 한 번 정한다. 정책 자체가 "T 이상이면 잠근다" 한 줄이라 도중에 바뀌지 않는다.
+const HAMMER_AUTO_CAP = 3000;
+
+function hammerAuto() {
+  if (hammerSum() >= hammer.target) {
+    alert("이미 목표를 채웠습니다.");
+    return;
+  }
+  const plans = hammerPlans();
+  if (!plans.length) {
+    alert("이 조건으로는 계산이 끝나지 않습니다. 목표치를 낮추거나 단계 수를 늘려 주세요.");
+    return;
+  }
+  const best = plans[0];
+  const before = { rolls: hammer.rolls, seed: hammer.seed, hammers: hammer.hammers };
+  let guard = 0;
+
+  while (hammerSum() < hammer.target && guard < HAMMER_AUTO_CAP) {
+    // 목표 스탯이면서 기준 이상인 줄을 값 높은 순으로 잠근다. 한 칸은 굴려야 하므로 slots-1까지만
+    const keep = hammer.lines
+      .map((line, i) => ({ i, line }))
+      .filter(({ i, line }) => line && hammerCounts(i) && line.value >= best.threshold)
+      .sort((a, b) => b.line.value - a.line.value)
+      .slice(0, hammer.slots - 1)
+      .map(({ i }) => i);
+    hammer.locks = hammer.lines.map((_, i) => keep.includes(i));
+    if (keep.length >= hammer.slots) break;
+
+    const locks = keep.length;
+    hammer.seed += hammerSeedCost(locks);
+    hammer.hammers += hammerCount(locks);
+    hammer.rolls += 1;
+    guard += 1;
+    for (let i = 0; i < hammer.slots; i += 1) {
+      if (hammer.locks[i] && hammer.lines[i]) continue;
+      hammer.lines[i] = hammerRollLine();
+    }
+  }
+
+  const used = {
+    rolls: hammer.rolls - before.rolls,
+    cost: (hammer.seed - before.seed) + (hammer.hammers - before.hammers) * hammer.price,
+    hammers: hammer.hammers - before.hammers,
+  };
+  const done = hammerSum() >= hammer.target;
+  simEls.hammerLog.hidden = false;
+  simEls.hammerLog.innerHTML = `
+    <b>자동 굴리기 ${done ? "완료" : "중단"}</b>
+    <span>수치 ${best.threshold} 이상만 잠금</span>
+    <span>굴림 <b>${formatNumber(used.rolls)}회</b>${simDelta(used.rolls, best.rolls, "회")}</span>
+    <span>비용 <b>${hammerFmtSeed(used.cost)}</b>${simDelta(used.cost / 1e8, best.cost / 1e8, "억")}</span>
+    <span>망치 ${formatNumber(used.hammers)}개</span>
+    ${done ? "" : `<span class="sim-neg">${formatNumber(HAMMER_AUTO_CAP)}회를 넘겨 멈췄습니다</span>`}`;
+  renderHammer();
+}
+
 function hammerReset() {
   hammer.lines = [];
   hammer.locks = [];
   hammer.rolls = 0;
   hammer.seed = 0;
   hammer.hammers = 0;
+  if (simEls.hammerLog) {
+    simEls.hammerLog.hidden = true;
+    simEls.hammerLog.innerHTML = "";
+  }
   renderHammer();
 }
 
@@ -9144,6 +9216,7 @@ function wireHammerSim() {
     renderHammer();
   });
   simEls.hammerRoll.addEventListener("click", hammerRoll);
+  simEls.hammerAuto.addEventListener("click", hammerAuto);
   simEls.hammerReset.addEventListener("click", hammerReset);
 
   simEls.hammerTable.addEventListener("change", (event) => {

@@ -7175,6 +7175,27 @@ img.dmg-chk-icon {
   font-size: 12px;
 }
 
+.hammer-log {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: rgba(15, 111, 99, 0.06);
+  font-size: 12px;
+}
+
+.hammer-log span {
+  color: var(--muted);
+}
+
+.hammer-log b {
+  color: var(--ink);
+}
+
 .hammer-status {
   padding: 10px 12px;
   border: 1px solid var(--line);
