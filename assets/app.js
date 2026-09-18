@@ -8086,6 +8086,8 @@ function initSimulators() {
     "coreBoxPrice", "coreBoxPriceField", "coreCalc", "coreSim", "coreSummary", "coreTable", "coreElso", "coreDiscount",
     "relicCurrent", "relicTarget", "relicDifficulty", "relicCalc", "relicSim", "relicSummary", "relicTable",
     "enhStart", "enhTarget", "enhCalc", "enhSim", "enhSummary", "enhTable",
+    "hammerStat", "hammerSlots", "hammerTarget", "hammerPrice", "hammerRoll", "hammerReset",
+    "hammerTable", "hammerCost", "hammerStatus", "hammerPlan",
     "relicRateButton", "coreRateButton",
     "rateModal", "rateModalTitle", "rateModalNote", "rateModalBody",
     "inhFormula", "inhEnchants", "inhIncrement", "inhTotal", "inhFusionMax",
@@ -8098,6 +8100,7 @@ function initSimulators() {
 
   wireEncryptSim();
   wireCoreSim();
+  wireHammerSim();
   wireRelicSim();
   wireEnhanceSim();
   // 상속·장비 제작은 계산기 탭 화면이지만 입력 요소를 simEls로 함께 잡아 두어 여기서 엮는다
@@ -8839,6 +8842,344 @@ function wireCoreSim() {
   simEls.coreHasDust.addEventListener("change", coreApplyModeUi);
   simEls.coreCalc.addEventListener("click", coreCalc);
   simEls.coreSim?.addEventListener("click", coreSim);
+}
+
+// ── 에이라의 망치 시뮬 (HammerSimulatorView) ───────────────────
+// 게임 창처럼 한 번씩 굴린다. 잠그지 않은 줄은 전부 다시 굴러가고, 잠근 줄은 그대로 남는다.
+// 굴릴 때 스탯 종류와 수치가 함께 정해지므로, 원하는 스탯이 나올 확률은 그 스탯의 등급 확률 합이다.
+//
+// 확률표 (무기·손목, 2026-09-18 사용자 제공)
+//   하 1~2 / 중 4~5 / 상 6~10, 수치는 구간 안에서 같은 확률
+const HAMMER_STATS = [
+  { key: "stab", name: "찌르기 공격력", low: 0.112 },
+  { key: "hack", name: "베기 공격력", low: 0.110 },
+  { key: "magic", name: "마법 공격력", low: 0.112 },
+  { key: "mdef", name: "마법 방어력", low: 0.112 },
+  { key: "mhack", name: "마법 베기 공격력", low: 0.112 },
+  { key: "hybrid", name: "물리 복합 공격력", low: 0.112 },
+];
+// 등급별 확률과 수치 구간. 하만 스탯마다 조금 다르고(베기 11.0%) 중·상은 같다
+const HAMMER_GRADES = [
+  { key: "low", name: "하", mid: 0, values: [1, 2] },
+  { key: "mid", name: "중", rate: 0.05, values: [4, 5] },
+  { key: "high", name: "상", rate: 0.005, values: [6, 7, 8, 9, 10] },
+];
+const HAMMER_SLOT_MAX = 9;          // 단계는 최대 9칸
+const HAMMER_SEED_PER_LOCK = 1_000_000;  // 잠금 k개 → 시드 (k+1) × 100만
+const HAMMER_PRICE_DEFAULT = 80_000_000; // 망치 1개 기본 시세 (시드)
+const HAMMER_RUNS = 400;            // 추천 계산에 쓰는 시뮬레이션 판 수
+
+// 잠금 k개일 때 드는 비용. 망치는 (k ÷ 2 내림) + 1개
+const hammerSeedCost = (locks) => (locks + 1) * HAMMER_SEED_PER_LOCK;
+const hammerCount = (locks) => Math.floor(locks / 2) + 1;
+
+// 한 줄을 굴린 결과. { stat, grade, value }
+function hammerRollLine() {
+  let r = Math.random();
+  for (const stat of HAMMER_STATS) {
+    for (const grade of HAMMER_GRADES) {
+      const rate = grade.key === "low" ? stat.low : grade.rate;
+      if (r < rate) {
+        const values = grade.values;
+        return { stat: stat.key, grade: grade.key, value: values[Math.floor(Math.random() * values.length)] };
+      }
+      r -= rate;
+    }
+  }
+  // 확률 합이 1이라 여기까지 오지 않지만, 부동소수 오차 대비로 마지막 줄을 돌려준다
+  return { stat: "hybrid", grade: "low", value: 1 };
+}
+
+const hammer = {
+  slots: HAMMER_SLOT_MAX,
+  target: 45,
+  stat: "stab",
+  price: HAMMER_PRICE_DEFAULT,
+  lines: [],        // { stat, grade, value } | null
+  locks: [],        // 줄마다 보호 여부
+  rolls: 0,
+  seed: 0,
+  hammers: 0,
+  loaded: false,
+};
+
+const hammerStatName = (key) => HAMMER_STATS.find((s) => s.key === key)?.name || "";
+// 원하는 스탯 한 줄이 나올 확률 (하 + 중 + 상)
+function hammerHitRate(statKey) {
+  const stat = HAMMER_STATS.find((s) => s.key === statKey) || HAMMER_STATS[0];
+  return stat.low + 0.05 + 0.005;
+}
+// 원하는 스탯이 나왔을 때의 수치 분포 [{ value, p }]
+function hammerValueDist(statKey) {
+  const stat = HAMMER_STATS.find((s) => s.key === statKey) || HAMMER_STATS[0];
+  const out = [];
+  HAMMER_GRADES.forEach((g) => {
+    const rate = g.key === "low" ? stat.low : g.rate;
+    g.values.forEach((v) => out.push({ value: v, p: rate / g.values.length }));
+  });
+  return out;
+}
+
+const hammerSum = () => hammer.lines.reduce((sum, line, i) => sum + (hammerCounts(i) ? line.value : 0), 0);
+// 목표 스탯과 같은 줄만 합계에 들어간다
+const hammerCounts = (i) => !!hammer.lines[i] && hammer.lines[i].stat === hammer.stat;
+const hammerLockCount = () => hammer.locks.filter(Boolean).length;
+
+// ── 추천 계산 ──
+// 정책은 "수치 T 이상인 목표 스탯 줄만 잠그고 나머지를 굴린다" 한 줄로 정해진다.
+// 비용은 잠금 개수에만 달려 있고 잠근 값은 합계로만 쓰이므로, 같은 개수를 잠근다면
+// 높은 값부터 잠그는 것이 항상 이득이다. 그래서 T만 1~10으로 훑으면 최적에 닿는다.
+function hammerSimulate(startValues, target, slots, price, threshold, runs) {
+  const dist = hammerValueDist(hammer.stat);
+  const hit = hammerHitRate(hammer.stat);
+  const totals = [];
+  const rollCounts = [];
+  const perLock = new Map();   // 잠금 수 → { rolls: [], cost: [], reach: [] }
+  const capRolls = 3000;
+
+  for (let run = 0; run < runs; run += 1) {
+    let kept = startValues.filter((v) => v >= threshold).sort((a, b) => b - a).slice(0, slots - 1);
+    let cost = 0;
+    let rolls = 0;
+    const stage = new Map();
+    let sum = kept.reduce((a, b) => a + b, 0);
+    while (sum < target && rolls < capRolls) {
+      const locks = kept.length;
+      if (locks >= slots) break;
+      const step = hammerSeedCost(locks) + hammerCount(locks) * price;
+      cost += step;
+      rolls += 1;
+      const cur = stage.get(locks) || { rolls: 0, cost: 0 };
+      cur.rolls += 1;
+      cur.cost += step;
+      stage.set(locks, cur);
+
+      const pool = [...kept];
+      for (let i = 0; i < slots - locks; i += 1) {
+        if (Math.random() >= hit) continue;          // 다른 스탯이 뜬 줄
+        let r = Math.random() * hit;
+        for (const d of dist) {
+          if (r < d.p) { pool.push(d.value); break; }
+          r -= d.p;
+        }
+      }
+      pool.sort((a, b) => b - a);
+      const total = pool.reduce((a, b) => a + b, 0);
+      kept = pool.filter((v) => v >= threshold).slice(0, slots - 1);
+      sum = kept.reduce((a, b) => a + b, 0);
+      if (total >= target) { sum = total; break; }
+    }
+    if (rolls >= capRolls) continue;
+    totals.push(cost);
+    rollCounts.push(rolls);
+    stage.forEach((v, k) => {
+      const bag = perLock.get(k) || { rolls: [], cost: [] };
+      bag.rolls.push(v.rolls);
+      bag.cost.push(v.cost);
+      perLock.set(k, bag);
+    });
+  }
+  if (!totals.length) return null;
+  return { threshold, cost: hammerMedian(totals), rolls: hammerMedian(rollCounts), perLock, runs: totals.length };
+}
+
+function hammerMedian(list) {
+  if (!list.length) return 0;
+  const sorted = [...list].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
+function hammerPlans() {
+  const start = hammer.lines.map((line, i) => (hammerCounts(i) ? line.value : 0)).filter(Boolean);
+  const results = [];
+  for (let t = 1; t <= 10; t += 1) {
+    const res = hammerSimulate(start, hammer.target, hammer.slots, hammer.price, t, HAMMER_RUNS);
+    if (res && res.runs >= HAMMER_RUNS * 0.9) results.push(res);
+  }
+  results.sort((a, b) => a.cost - b.cost);
+  return results;
+}
+
+// ── 화면 ──
+const hammerFmtSeed = (v) => (v >= 1e8 ? `${(v / 1e8).toFixed(1)}억` : `${Math.round(v / 1e4).toLocaleString("ko-KR")}만`);
+
+function renderHammerTable() {
+  if (!simEls.hammerTable) return;
+  const rows = [];
+  for (let i = 0; i < hammer.slots; i += 1) {
+    const line = hammer.lines[i];
+    const mine = hammerCounts(i);
+    const name = line ? hammerStatName(line.stat) : "-";
+    rows.push(`
+      <tr class="${mine ? "is-target" : ""}">
+        <td class="hammer-lock">
+          <label><input type="checkbox" data-hammer-lock="${i}"${hammer.locks[i] ? " checked" : ""}${line ? "" : " disabled"} /><span class="hammer-lock-mark" aria-hidden="true">${hammer.locks[i] ? "🔒" : "🔓"}</span></label>
+        </td>
+        <td class="hammer-step">${i + 1}단계</td>
+        <td class="hammer-line">${line ? `${escapeHtml(name)} <b>+${line.value}</b>` : "<span class=\"hammer-empty\">비어 있음</span>"}</td>
+        <td class="hammer-manual"><input type="number" min="0" max="10" step="1" inputmode="numeric" placeholder="0" data-hammer-value="${i}" value="${mine ? line.value : ""}" title="목표 스탯 수치를 직접 넣습니다" /></td>
+      </tr>`);
+  }
+  const locks = hammerLockCount();
+  simEls.hammerTable.innerHTML = `
+    <thead><tr><th>보호</th><th>단계</th><th>단계별 능력치</th><th>직접 입력</th></tr></thead>
+    <tbody>${rows.join("")}</tbody>`;
+  if (simEls.hammerCost) {
+    simEls.hammerCost.innerHTML = `
+      <span>이번 굴림 <b>${hammerFmtSeed(hammerSeedCost(locks))} 시드 · 망치 ${hammerCount(locks)}개</b></span>
+      <span>누적 <b>${hammerFmtSeed(hammer.seed + hammer.hammers * hammer.price)}</b> <small>(굴림 ${formatNumber(hammer.rolls)}회 · 망치 ${formatNumber(hammer.hammers)}개)</small></span>`;
+  }
+}
+
+function renderHammerStatus() {
+  if (!simEls.hammerStatus) return;
+  const sum = hammerSum();
+  const done = sum >= hammer.target;
+  simEls.hammerStatus.innerHTML = `
+    <div class="hammer-gauge"><span style="width:${Math.min(100, (sum / hammer.target) * 100).toFixed(1)}%"></span></div>
+    <div class="hammer-status-line">
+      <b class="${done ? "sim-pos" : ""}">${escapeHtml(hammerStatName(hammer.stat))} ${formatNumber(sum)} / ${formatNumber(hammer.target)}</b>
+      ${done ? "<span>목표 달성</span>" : `<span>${formatNumber(hammer.target - sum)} 남음</span>`}
+    </div>`;
+}
+
+function renderHammerPlan() {
+  if (!simEls.hammerPlan) return;
+  const sum = hammerSum();
+  if (sum >= hammer.target) {
+    simEls.hammerPlan.innerHTML = `<p class="hammer-plan-empty">목표를 채웠습니다. 더 올리려면 목표치를 높여 보세요.</p>`;
+    return;
+  }
+  const plans = hammerPlans();
+  if (!plans.length) {
+    simEls.hammerPlan.innerHTML = `<p class="hammer-plan-empty">이 조건으로는 계산이 끝나지 않습니다. 목표치를 낮추거나 단계 수를 늘려 보세요.</p>`;
+    return;
+  }
+  const best = plans[0];
+  const stageRows = [];
+  const keys = [...best.perLock.keys()].sort((a, b) => a - b);
+  keys.forEach((k, i) => {
+    const bag = best.perLock.get(k);
+    stageRows.push(`
+      <tr>
+        <td data-label="단계">${i + 1}</td>
+        <td data-label="잠금">${k}개</td>
+        <td data-label="굴림">${formatNumber(Math.round(hammerMedian(bag.rolls)))}회</td>
+        <td data-label="비용" class="sim-cost">${hammerFmtSeed(hammerMedian(bag.cost))}</td>
+      </tr>`);
+  });
+  const others = plans.slice(0, 3).map((p, i) => `
+    <li${i === 0 ? ' class="is-best"' : ""}>
+      <b>${i + 1}순위</b>
+      <span>수치 <b>${p.threshold}</b> 이상만 잠금</span>
+      <span class="sim-cost">${hammerFmtSeed(p.cost)}</span>
+      <small>굴림 ${formatNumber(Math.round(p.rolls))}회</small>
+    </li>`).join("");
+
+  simEls.hammerPlan.innerHTML = `
+    <div class="hammer-plan-head">지금 상태에서 목표까지 <b>${hammerFmtSeed(best.cost)}</b> · 굴림 <b>${formatNumber(Math.round(best.rolls))}회</b> <small>(중앙값, ${formatNumber(HAMMER_RUNS)}판 시뮬레이션)</small></div>
+    <table class="sim-table hammer-plan-table">
+      <thead><tr><th>단계</th><th>잠금</th><th>굴림</th><th>비용</th></tr></thead>
+      <tbody>${stageRows.join("")}</tbody>
+    </table>
+    <p class="hammer-plan-note">수치 <b>${best.threshold}</b> 이상인 ${escapeHtml(hammerStatName(hammer.stat))} 줄만 잠그고 나머지를 굴리는 것이 가장 쌉니다.</p>
+    <ol class="hammer-plan-list">${others}</ol>`;
+}
+
+function renderHammer() {
+  renderHammerTable();
+  renderHammerStatus();
+  renderHammerPlan();
+}
+
+function hammerRoll() {
+  const locks = hammerLockCount();
+  if (locks >= hammer.slots) {
+    alert("모두 잠그면 굴릴 줄이 없습니다. 하나는 풀어 주세요.");
+    return;
+  }
+  hammer.seed += hammerSeedCost(locks);
+  hammer.hammers += hammerCount(locks);
+  hammer.rolls += 1;
+  for (let i = 0; i < hammer.slots; i += 1) {
+    if (hammer.locks[i] && hammer.lines[i]) continue;
+    hammer.lines[i] = hammerRollLine();
+  }
+  renderHammer();
+}
+
+function hammerReset() {
+  hammer.lines = [];
+  hammer.locks = [];
+  hammer.rolls = 0;
+  hammer.seed = 0;
+  hammer.hammers = 0;
+  renderHammer();
+}
+
+function wireHammerSim() {
+  if (!simEls.hammerTable) return;
+  simEls.hammerStat.innerHTML = HAMMER_STATS.map((s) => optionHtml(s.key, s.name)).join("");
+  simEls.hammerStat.value = hammer.stat;
+  simEls.hammerSlots.innerHTML = Array.from({ length: HAMMER_SLOT_MAX }, (_, i) => optionHtml(String(i + 1), `${i + 1}칸`)).join("");
+  simEls.hammerSlots.value = String(hammer.slots);
+  simEls.hammerTarget.value = String(hammer.target);
+  simEls.hammerPrice.value = String(hammer.price / 10000);
+
+  simEls.hammerStat.addEventListener("change", () => { hammer.stat = simEls.hammerStat.value; renderHammer(); });
+  simEls.hammerSlots.addEventListener("change", () => {
+    hammer.slots = Number(simEls.hammerSlots.value) || HAMMER_SLOT_MAX;
+    hammer.lines = hammer.lines.slice(0, hammer.slots);
+    hammer.locks = hammer.locks.slice(0, hammer.slots);
+    renderHammer();
+  });
+  simEls.hammerTarget.addEventListener("input", () => {
+    hammer.target = Math.max(1, Number(simEls.hammerTarget.value) || 1);
+    renderHammerStatus();
+    renderHammerPlan();
+  });
+  simEls.hammerPrice.addEventListener("input", () => {
+    hammer.price = Math.max(0, (Number(simEls.hammerPrice.value) || 0) * 10000);
+    renderHammer();
+  });
+  simEls.hammerRoll.addEventListener("click", hammerRoll);
+  simEls.hammerReset.addEventListener("click", hammerReset);
+
+  simEls.hammerTable.addEventListener("change", (event) => {
+    const lock = event.target.dataset?.hammerLock;
+    if (lock == null) return;
+    hammer.locks[Number(lock)] = event.target.checked;
+    renderHammerTable();
+  });
+  // 굴리지 않고 지금 가진 수치를 직접 넣는 칸. 목표 스탯으로 채운다
+  simEls.hammerTable.addEventListener("input", (event) => {
+    const idx = event.target.dataset?.hammerValue;
+    if (idx == null) return;
+    const i = Number(idx);
+    const value = Math.min(10, Math.max(0, Number(event.target.value) || 0));
+    hammer.lines[i] = value ? { stat: hammer.stat, grade: value >= 6 ? "high" : value >= 4 ? "mid" : "low", value } : null;
+    if (!value) hammer.locks[i] = false;
+    // 입력 중이라 표를 통째로 다시 그리면 커서가 빠진다. 그 줄만 손본다
+    const row = event.target.closest("tr");
+    if (row) {
+      row.classList.toggle("is-target", !!value);
+      const cell = row.children[2];
+      if (cell) {
+        cell.innerHTML = value
+          ? `${escapeHtml(hammerStatName(hammer.stat))} <b>+${value}</b>`
+          : '<span class="hammer-empty">비어 있음</span>';
+      }
+      const lock = row.querySelector("[data-hammer-lock]");
+      if (lock) {
+        lock.disabled = !value;
+        if (!value) lock.checked = false;
+      }
+    }
+    renderHammerStatus();
+    renderHammerPlan();
+  });
+  renderHammer();
 }
 
 // ── 신조 렐릭 시뮬 (RelicExpectationSimulatorView) ─────────────

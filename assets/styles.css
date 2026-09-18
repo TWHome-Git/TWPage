@@ -7102,3 +7102,171 @@ img.dmg-chk-icon {
 .hit-ground-field select {
   width: 100%;
 }
+
+/* ── 시뮬레이터 > 에이라의 망치 ─────────────────────────────── */
+.hammer-fields {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.hammer-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.hammer-table th,
+.hammer-table td {
+  vertical-align: middle;
+}
+
+.hammer-table .hammer-lock {
+  width: 52px;
+  text-align: center;
+}
+
+.hammer-table .hammer-lock label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.hammer-lock-mark {
+  font-size: 13px;
+}
+
+.hammer-table .hammer-step {
+  width: 64px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.hammer-table .hammer-manual {
+  width: 88px;
+}
+
+.hammer-table .hammer-manual input {
+  width: 100%;
+  padding: 3px 6px;
+  font-size: 12px;
+  text-align: right;
+}
+
+/* 목표 스탯으로 나온 줄은 강조한다 */
+.hammer-table tbody tr.is-target td {
+  background: rgba(15, 111, 99, 0.08);
+}
+
+.hammer-empty {
+  color: var(--muted);
+}
+
+.hammer-cost {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px 14px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-strong);
+  font-size: 12px;
+}
+
+.hammer-status {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.hammer-gauge {
+  height: 8px;
+  margin-bottom: 8px;
+  border-radius: 999px;
+  background: rgba(23, 33, 31, 0.1);
+  overflow: hidden;
+}
+
+.hammer-gauge span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+}
+
+.hammer-status-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.hammer-status-line span {
+  color: var(--muted);
+}
+
+.hammer-plan {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.hammer-plan-head {
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+
+.hammer-plan-head small,
+.hammer-plan-note {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.hammer-plan-note {
+  margin: 6px 0 0;
+}
+
+.hammer-plan-table {
+  width: 100%;
+  font-size: 12px;
+}
+
+.hammer-plan-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.hammer-plan-list {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 4px;
+}
+
+.hammer-plan-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.hammer-plan-list li.is-best {
+  border-color: var(--accent);
+  background: rgba(15, 111, 99, 0.06);
+}
+
+.hammer-plan-list small {
+  margin-left: auto;
+  color: var(--muted);
+}

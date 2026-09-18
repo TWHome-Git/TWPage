@@ -1029,3 +1029,14 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* 에이라의 망치: 폰에서는 판과 추천을 한 열로 */
+@media (max-width: 720px) {
+  .hammer-body {
+    grid-template-columns: 1fr;
+  }
+
+  .hammer-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
