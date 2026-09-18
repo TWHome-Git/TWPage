@@ -9318,6 +9318,8 @@ function hammerAuto() {
   }
   const before = { rolls: hammer.rolls, seed: hammer.seed, hammers: hammer.hammers };
   const stages = [];   // 잠금 개수가 바뀔 때마다 한 칸. 단계마다 얼마를 썼는지 남긴다
+  // 누적 수치는 "잠가 둔 합"으로 적는다. 잠그지 않은 줄은 다음 판에 사라지므로 남는 값이 아니다
+  const heldSumOf = (set) => [...set].reduce((sum, i) => sum + (hammer.lines[i]?.value || 0), 0);
   const maxLock = Math.max(0, hammer.slots - 1);
   // 이미 잠가 둔 줄은 이어서 들고 간다
   const held = new Set(hammer.lines.map((line, i) => (line && hammerCounts(i) && hammer.locks[i] ? i : -1)).filter((i) => i >= 0));
@@ -9341,7 +9343,7 @@ function hammerAuto() {
     const locks = held.size;
     let stage = stages[stages.length - 1];
     if (!stage || stage.locks !== locks) {
-      stage = { locks, rolls: 0, seed: 0, hammers: 0, startSum: hammerSum(), endSum: hammerSum() };
+      stage = { locks, rolls: 0, seed: 0, hammers: 0, startSum: heldSumOf(held), endSum: heldSumOf(held) };
       stages.push(stage);
     }
     hammer.seed += hammerSeedCost(locks);
@@ -9355,8 +9357,12 @@ function hammerAuto() {
       if (hammer.locks[i] && hammer.lines[i]) continue;
       hammer.lines[i] = hammerRollLine();
     }
-    stage.endSum = hammerSum();
+    stage.endSum = heldSumOf(held);
   }
+  // 한 단계 안에서는 잠근 합이 그대로다. 다음 단계가 시작될 때의 값을 그 단계의 끝으로 적는다
+  stages.forEach((st, i) => {
+    st.endSum = i + 1 < stages.length ? stages[i + 1].startSum : hammerSum();
+  });
 
   const used = {
     rolls: hammer.rolls - before.rolls,
