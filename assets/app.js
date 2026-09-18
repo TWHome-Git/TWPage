@@ -9230,7 +9230,7 @@ function renderHammerTable() {
     const mine = hammerCounts(i);
     const name = line ? hammerStatName(line.stat) : "-";
     rows.push(`
-      <tr class="${[mine ? "is-target" : "", hammer.locks[i] && line ? "is-locked" : ""].filter(Boolean).join(" ")}">
+      <tr class="${[mine ? "is-target" : "", hammer.locks[i] && line ? "is-locked" : "", line ? "is-lockable" : ""].filter(Boolean).join(" ")}"${line ? ' title="눌러서 잠금을 바꿉니다"' : ""}>
         <td class="hammer-lock">
           <label><input type="checkbox" data-hammer-lock="${i}"${hammer.locks[i] ? " checked" : ""}${line ? "" : " disabled"} /><span class="hammer-lock-mark" aria-hidden="true">${hammer.locks[i] ? "🔒" : "🔓"}</span></label>
         </td>
@@ -9246,7 +9246,6 @@ function renderHammerTable() {
   if (simEls.hammerCost) {
     simEls.hammerCost.innerHTML = `
       <span>이번 재설정 <b>${hammerFmtSeed(hammerSeedCost(locks))} 시드 · 망치 ${hammerCount(locks)}개</b></span>
-      <span>누적 <b>${hammerFmtSeed(hammer.seed + hammer.hammers * hammer.price)}</b> <small>(재설정 ${formatNumber(hammer.rolls)}회 · 망치 ${formatNumber(hammer.hammers)}개)</small></span>
       ${hammer.stopNote ? `<p class="hammer-stop-note">${hammer.stopNote}</p>` : ""}`;
   }
 }
@@ -9275,6 +9274,13 @@ function hammerKeepNote(plan) {
 }
 
 
+// 이번 판에 지금까지 쓴 값. 예상 비용·기대값과 나란히 읽히도록 오른쪽 결과 칸에 둔다.
+// 한 번도 재설정하지 않았으면 적을 것이 없다
+function hammerTotalHtml() {
+  if (!hammer.rolls) return "";
+  return `<p class="hammer-plan-total">누적 <b>${hammerFmtSeed(hammer.seed + hammer.hammers * hammer.price)}</b> <small>(재설정 ${formatNumber(hammer.rolls)}회 · 망치 ${formatNumber(hammer.hammers)}개)</small></p>`;
+}
+
 function renderHammerPlan() {
   if (!simEls.hammerPlan) return;
   const sum = hammerSum();
@@ -9294,13 +9300,14 @@ function renderHammerPlan() {
       <p class="hammer-plan-done"><b>목표를 채웠습니다.</b> 더 올리려면 목표치를 높여 보세요.</p>
       ${base ? `
         <div class="hammer-plan-head">${hammer.autoBase ? "입력한 상태에서" : "처음부터"} ${formatNumber(hammer.target)}까지 기대값 <b>${hammerFmtSeed(base.cost)}</b> · 망치 <b>${formatNumber(Math.round(base.hammers))}개</b> · 재설정 <b>${formatNumber(Math.round(base.rolls))}회</b> <small>(중앙값)</small></div>
+        ${hammerTotalHtml()}
         ${hammer.rolls ? `<p class="hammer-plan-note">기대값과의 차이 ${gaps.length ? gaps.map(([label, delta]) => `${label} ${delta}`).join(" · ") : "없음"}</p>` : ""}
       ` : ""}`;
     return;
   }
   const plan = hammerBestPlan();
   if (!plan) {
-    simEls.hammerPlan.innerHTML = `<p class="hammer-plan-empty">이 조건으로는 계산이 끝나지 않습니다. 목표치를 낮추거나 단계 수를 늘려 보세요.</p>`;
+    simEls.hammerPlan.innerHTML = `<p class="hammer-plan-empty">이 조건으로는 계산이 끝나지 않습니다. 목표치를 낮추거나 단계 수를 늘려 보세요.</p>${hammerTotalHtml()}`;
     return;
   }
   // 잠금이 꽉 찬 마지막 단계에서는 더 잠글 줄이 없다. 남은 한 줄에서 모자란 수치 이상이 나오면 그대로 끝난다.
@@ -9337,6 +9344,7 @@ function renderHammerPlan() {
 
   simEls.hammerPlan.innerHTML = `
     <div class="hammer-plan-head">지금 상태에서 목표까지 <b>${hammerFmtSeed(plan.cost)}</b> · 망치 <b>${formatNumber(Math.round(plan.hammers))}개</b> · 재설정 <b>${formatNumber(Math.round(plan.rolls))}회</b> <small>(중앙값)</small></div>
+    ${hammerTotalHtml()}
     <p class="hammer-plan-now">${nowText}</p>
     <table class="sim-table hammer-plan-table">
       <thead><tr><th>잠금</th><th>이때 잠글 값</th><th>재설정</th><th>비용</th><th>단계 끝 누적</th></tr></thead>
@@ -9568,6 +9576,16 @@ function wireHammerSim() {
     const lock = event.target.dataset?.hammerLock;
     if (lock == null) return;
     hammer.locks[Number(lock)] = event.target.checked;
+    renderHammerTable();
+  });
+  // 체크박스가 작아 누르기 번거로우므로 줄 아무 곳이나 눌러도 잠금이 바뀐다.
+  // 체크박스·직접 입력 칸을 누른 것은 그쪽 동작에 맡긴다 (두 번 바뀌지 않게)
+  simEls.hammerTable.addEventListener("click", (event) => {
+    if (event.target.closest("input, label, button, a")) return;
+    const box = event.target.closest("tbody tr")?.querySelector("[data-hammer-lock]");
+    if (!box || box.disabled) return;
+    const i = Number(box.dataset.hammerLock);
+    hammer.locks[i] = !hammer.locks[i];
     renderHammerTable();
   });
   // 굴리지 않고 지금 가진 수치를 직접 넣는 칸. 목표 스탯으로 채운다

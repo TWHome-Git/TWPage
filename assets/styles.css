@@ -7220,6 +7220,24 @@ img.dmg-chk-icon {
   font-size: 12px;
 }
 
+/* 줄 전체가 잠금 버튼 노릇을 한다 */
+.hammer-table tbody tr.is-lockable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.hammer-table tbody tr.is-lockable:hover td {
+  background: rgba(200, 138, 44, 0.09);
+}
+
+.hammer-table tbody tr.is-lockable.is-locked:hover td {
+  background: rgba(200, 138, 44, 0.24);
+}
+
+.hammer-table tbody tr.is-lockable .hammer-manual {
+  cursor: default;
+}
+
 .hammer-empty {
   color: var(--muted);
 }
@@ -7340,6 +7358,26 @@ img.dmg-chk-icon {
 .hammer-plan-table {
   width: 100%;
   font-size: 12px;
+}
+
+/* 이번 판에 지금까지 쓴 값. 예상·기대값 줄 바로 아래에 붙인다 */
+.hammer-plan-total {
+  display: inline-block;
+  margin: 0 0 8px;
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(15, 111, 99, 0.08);
+  font-size: 13px;
+}
+
+.hammer-plan-total small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.hammer-plan-total + .hammer-plan-note {
+  margin-top: 0;
 }
 
 .hammer-plan-done {
