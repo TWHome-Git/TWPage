@@ -997,6 +997,28 @@ select {
   margin-bottom: 0;
 }
 
+/* 계산기 묶음 사이 구분선. 칸을 차지하지 않도록 폭을 따로 준다 */
+.addon-tab-divider {
+  width: 1px;
+  align-self: stretch;
+  margin: 2px 2px;
+  background: var(--line);
+}
+
+/* 구분선이 있는 줄은 격자 대신 flex로 둔다. 격자에서는 구분선이 칸 하나를 통째로 차지해 간격이 벌어진다 */
+.addon-subtabs:has(.addon-tab-divider) {
+  display: flex;
+  flex-wrap: nowrap;
+}
+
+.addon-subtabs:has(.addon-tab-divider) .addon-tab {
+  flex: 1 1 0;
+}
+
+.addon-subtabs:has(.addon-tab-divider) .addon-tab-divider {
+  flex: 0 0 1px;
+}
+
 .addon-tab {
   min-width: 0;
   min-height: 38px;
@@ -1690,6 +1712,47 @@ select {
 
 .sim-summary:empty {
   display: none;
+}
+
+/* 이번 판이 운이 좋았는지: 인크립트 시뮬과 같은 순위·분포 표기를 요약 밑에 붙인다 */
+.sim-luck {
+  display: grid;
+  gap: 2px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--line);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.sim-luck b {
+  color: var(--accent-strong);
+  font-weight: 800;
+}
+
+/* 막대와 눈금 글자를 같은 폭으로 묶는다. 폭은 막대(고정폭 글꼴)가 정한다 */
+.sim-luck-bar {
+  display: inline-grid;
+  gap: 2px;
+  width: max-content;
+  max-width: 100%;
+  margin-top: 2px;
+}
+
+.sim-luck .sim-graph-legend {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.sim-luck .sim-graph {
+  font-family: "Consolas", "D2Coding", monospace;
+  color: var(--accent);
+  letter-spacing: 0.5px;
+  white-space: nowrap;
 }
 
 /* ── 상속 시뮬레이터 ─────────────────────────────────────────── */
@@ -3779,17 +3842,25 @@ img.dmg-chk-icon {
   font-size: 13px;
 }
 
-/* 부재료 칸은 재료가 여러 개라 nowrap이면 표를 혼자 밀어낸다(484px).
-   이 칸만 줄바꿈을 허용해 가로 스크롤을 없앤다. */
+/* 부재료는 90레벨대처럼 재료가 네 개까지 붙어 길다. 폭이 되면 한 줄로 두고,
+   모자라면 가로 스크롤 대신 " + " 자리에서만 줄을 나눈다 (재료 이름은 안 잘린다). */
 .eta-info-table td.eta-info-sub {
   white-space: normal;
-  word-break: keep-all;
   min-width: 220px;
 }
 
+.eta-info-table .eta-sub-item {
+  white-space: nowrap;
+}
+
+.eta-info-table .eta-sub-plus {
+  color: var(--muted);
+}
+
+/* 좌우 여백을 줄여 10칸 표가 가로 스크롤 없이 들어가게 한다 (부재료 한 줄 표시 유지) */
 .eta-info-table th,
 .eta-info-table td {
-  padding: 7px 10px;
+  padding: 7px 6px;
   border-bottom: 1px solid #e3ebe6;
   text-align: center;
   white-space: nowrap;
@@ -3803,6 +3874,24 @@ img.dmg-chk-icon {
 
 .eta-info-table tbody th {
   font-weight: 700;
+}
+
+/* 두 묶음 머리글(다음 레벨까지 필요 / 현재 레벨 능력치) — 묶음 사이를 선으로 나눈다 */
+.eta-info-table thead th.eta-info-group {
+  border-left: 1px solid #e3ebe6;
+  border-bottom: 1px solid #e3ebe6;
+  font-weight: 700;
+}
+
+/* "1 → 2" 표기: 화살표는 옅게 둬서 숫자가 먼저 읽힌다 */
+.eta-info-table tbody th.eta-info-lv {
+  white-space: nowrap;
+}
+
+.eta-info-table .eta-info-arrow {
+  color: var(--muted);
+  font-weight: 400;
+  margin: 0 1px;
 }
 
 .eta-info-table tbody tr:nth-child(even) {
@@ -7435,4 +7524,445 @@ img.dmg-chk-icon {
 .hammer-plan-table tbody tr.is-now td {
   background: rgba(15, 111, 99, 0.06);
   font-weight: 700;
+}
+
+/* ══════════════════════════════════════════════
+   각 탭의 기본 페이지 — 그 탭에 어떤 화면이 있는지 사진과 함께 보여준다.
+   홈 카드와 같은 결로 두되, 카드가 여럿이라 사진을 위에 두고 아래에 이름을 적는다.
+   ══════════════════════════════════════════════ */
+.section-landing {
+  padding: 18px 20px 24px;
+}
+
+.section-group + .section-group {
+  margin-top: 22px;
+}
+
+.section-group-title {
+  margin: 0 0 10px;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+/* 네 탭 모두 같은 모양: 가로형 카드를 한 줄에 두 개씩 */
+.section-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.section-card {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  color: inherit;
+  text-decoration: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.section-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 6px 18px rgba(16, 82, 58, 0.12);
+  transform: translateY(-2px);
+}
+
+/* 왼쪽 사진 — 그 기능 화면의 윗부분을 보여준다 */
+.section-shot {
+  display: block;
+  flex: 0 0 46%;
+  align-self: stretch;
+  min-height: 132px;
+  overflow: hidden;
+  background: var(--panel-strong);
+  border-right: 1px solid var(--line);
+}
+
+.section-shot img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+}
+
+.section-shot-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* 오른쪽 설명 */
+.section-card-body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: 12px 14px;
+}
+
+.section-card-body strong {
+  display: block;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.section-card-body span {
+  display: block;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+/* 좁은 화면에서는 한 줄에 하나씩 */
+@media (max-width: 980px) {
+  .section-card-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* 도구 탭: 묶음(계산기 / 시뮬레이터)마다 한 줄씩 */
+.addon-tab-field-rows {
+  display: grid;
+  gap: 6px;
+}
+
+.addon-subtab-row {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.addon-subtab-label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* ══════════════════════════════════════════════
+   홈 아래쪽 — 왼쪽은 문의·건의 글 목록, 오른쪽은 오버레이 내려받기
+   ══════════════════════════════════════════════ */
+.home-lower {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(430px, 0.92fr);
+  gap: 16px;
+  padding: 18px 16px 24px;   /* 바깥 여백을 줄여 두 칸을 넓게 쓴다 */
+  align-items: stretch;      /* 두 칸 높이를 맞춘다 */
+  --home-panel-h: 480px;     /* 두 칸이 같이 쓰는 높이 */
+}
+
+.home-board {
+  display: flex;
+  flex-direction: column;
+  max-height: var(--home-panel-h);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+}
+
+.home-board-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.home-board-head h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.home-board-write {
+  height: 28px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.home-board-write:hover {
+  filter: brightness(1.06);
+}
+
+/* 글 목록이 길어도 홈이 끝없이 늘어나지 않게 한다 (남는 높이를 이 칸이 가져간다) */
+.home-board-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 10px 10px 12px;
+}
+
+/* 오른쪽 카드도 같은 높이로 늘어난다 */
+.home-card-overlay {
+  min-height: 0;
+  height: 100%;
+}
+
+@media (max-width: 1080px) {
+  .home-lower {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* 홈 오른쪽 오버레이 카드: 글·버튼이 카드 오른쪽 끝에 붙지 않게 여백을 더 준다 */
+.home-card-overlay .home-menu {
+  padding-right: 28px;
+  justify-items: center;
+  text-align: center;
+}
+
+.home-card-overlay .home-chips {
+  justify-items: center;
+}
+
+/* 홈 오른쪽 오버레이 카드 — 버튼 없이 화면 사진을 다 보여준다. 누르면 사용 안내로 간다 */
+.home-overlay-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-height: var(--home-panel-h);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  color: inherit;
+  text-decoration: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.home-overlay-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 6px 18px rgba(16, 82, 58, 0.12);
+}
+
+.home-overlay-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.home-overlay-head strong {
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.home-overlay-meta {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* 사진은 잘리지 않게 칸 안에 통째로 담는다 */
+.home-overlay-shot {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+  background: var(--panel-strong);
+}
+
+.home-overlay-shot img {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  border-radius: 8px;
+  object-fit: contain;
+}
+
+/* hidden 속성이 display 지정에 밀리지 않게 한다 (기본 페이지에서 하위 메뉴 줄 감추기) */
+.db-subtabs[hidden],
+.addon-tab-field[hidden],
+.addon-subtabs[hidden],
+.addon-subtab-row[hidden] {
+  display: none;
+}
+
+/* 제목줄도 기본 페이지에서는 감춘다 */
+.addon-titlebar[hidden] {
+  display: none;
+}
+
+/* ── 기본 페이지 머리말 ── */
+.section-landing-head {
+  padding: 4px 2px 16px;
+}
+
+.section-landing-head h1 {
+  margin: 2px 0 0;
+  font-size: 26px;
+  letter-spacing: -0.4px;
+}
+
+.section-landing-lead {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+/* ── 카드 ── */
+.section-card {
+  border-radius: 16px;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+}
+
+.section-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 24px rgba(16, 82, 58, 0.14);
+}
+
+.section-shot img {
+  transition: transform 0.25s ease;
+}
+
+.section-card:hover .section-shot img {
+  transform: scale(1.03);
+}
+
+/* 오른쪽 아래에 옅은 화살표 — 누를 수 있다는 표시 */
+.section-card-body {
+  position: relative;
+}
+
+.section-card-body::after {
+  content: "→";
+  position: absolute;
+  right: 14px;
+  bottom: 10px;
+  color: var(--muted);
+  font-size: 14px;
+  opacity: 0;
+  transform: translateX(-4px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.section-card:hover .section-card-body::after {
+  opacity: 1;
+  transform: translateX(0);
+  color: var(--accent);
+}
+
+.section-group-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+/* 묶음 이름 뒤로 옅은 선을 그어 구분한다 */
+.section-group-title::after {
+  content: "";
+  flex: 1 1 auto;
+  height: 1px;
+  background: var(--line);
+}
+
+.addon-window[hidden] {
+  display: none;
+}
+
+/* 기본 페이지는 홈처럼 바탕 위에 바로 놓인다 */
+.section-landing {
+  padding: 18px 16px 24px;
+}
+
+/* 기본 페이지는 홈과 같은 껍데기(테두리·옅은 배경) 위에 카드만 놓는다.
+   정보·도구는 .addon-view가 격자라서 기본 페이지일 때는 한 칸으로 흐르게 둔다 */
+.addon-view:has(> .section-landing:not([hidden])) {
+  display: block;
+}
+
+/* 검색 칸 없이 제목만 있는 줄은 가로를 다 쓴다 (제목이 두 줄로 접히지 않게) */
+.toolbar:has(> .brand-block:only-child) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.toolbar:has(> .brand-block:only-child) .brand-block h1 {
+  white-space: nowrap;
+}
+
+/* 정보·계산기·시뮬레이터도 에타·DB와 같은 판 배경을 쓴다 (하위 메뉴 줄 뒤가 비지 않게) */
+#infoView,
+#calculatorView,
+#simulatorView {
+  border: 1px solid rgba(23, 33, 31, 0.12);
+  border-top: 0;
+  border-radius: 0 0 8px 8px;
+  background: rgba(247, 250, 247, 0.9);
+  box-shadow: var(--shadow);
+}
+
+/* 계수 → 대미지 두 단계 전환 */
+.dmg-steps {
+  display: flex;
+  gap: 8px;
+  margin: 0 16px 14px;
+  padding: 10px 0 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.dmg-step-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.dmg-step-tab span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--panel-strong);
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.dmg-step-tab.is-active {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+.dmg-step-tab.is-active span {
+  background: rgba(255, 255, 255, 0.24);
+  color: #fff;
+}
+
+.dmg-step[hidden] {
+  display: none;
 }

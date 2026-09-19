@@ -14,9 +14,9 @@
     <main class="app-shell">
       <nav class="top-tabs" aria-label="상단 메뉴">
         <button class="tab-button is-active" type="button" data-main-tab="home" aria-controls="homeView" aria-current="page">홈</button>
-        <button class="tab-button" type="button" data-main-tab="extra" aria-controls="extraView">테일즈 정보</button>
         <button class="tab-button" type="button" data-main-tab="eta" aria-controls="etaView">에타</button>
-        <button class="tab-button" type="button" data-main-tab="equipment" aria-controls="equipmentView">DB 검색</button>
+        <button class="tab-button" type="button" data-main-tab="info" aria-controls="infoView">정보</button>
+        <button class="tab-button" type="button" data-main-tab="equipment" aria-controls="equipmentView">DB</button>
         <button class="tab-button" type="button" data-main-tab="calculator" aria-controls="calculatorView">계산기</button>
         <button class="tab-button" type="button" data-main-tab="simulator" aria-controls="simulatorView">시뮬레이터</button>
         <button class="tab-button" type="button" data-main-tab="overlay" aria-controls="overlayView">테일즈 채팅 오버레이</button>
@@ -38,86 +38,28 @@
           </div>
         </div>
 
-        <div class="home-grid">
-          <article class="home-card">
-            <a class="home-shot" href="#/extra/seed" tabindex="-1" aria-hidden="true"><img src="./images/home/info.jpg" width="720" height="405" alt="" loading="lazy" decoding="async" /></a>
-            <div class="home-menu">
-              <h2>테일즈 정보</h2>
-              <div class="home-chips">
-              <a class="home-chip" href="#/extra/seed">주간 시드 계산기</a>
-              <a class="home-chip" href="#/extra/onekill">사냥터 1킬 계산기</a>
-              <a class="home-chip" href="#/extra/hit">필요 명중 계산기</a>
-              <a class="home-chip" href="#/extra/buff">버프 아이템 계산기</a>
-              </div>
+        <div class="home-lower">
+          <!-- 왼쪽: 문의·건의 글 목록 (문의 버튼과 같은 내용을 여기에도 그린다) -->
+          <section class="home-board">
+            <div class="home-board-head">
+              <h2>문의 · 건의</h2>
+              <button id="homeBoardWrite" class="home-board-write" type="button">글쓰기</button>
             </div>
-          </article>
+            <div id="homeBoardBody" class="board-body home-board-body"></div>
+          </section>
 
-          <article class="home-card">
-            <a class="home-shot" href="#/eta/ranking" tabindex="-1" aria-hidden="true"><img src="./images/home/eta.jpg" width="720" height="405" alt="" loading="lazy" decoding="async" /></a>
-            <div class="home-menu">
-              <h2>에타</h2>
-              <div class="home-chips">
-              <a class="home-chip" href="#/eta/ranking">에타 순위</a>
-              <a class="home-chip" href="#/eta/newcomers">진입 · 이탈</a>
-              <a class="home-chip" href="#/eta/population">인구 추이</a>
-              <a class="home-chip" href="#/eta/info">에타 정보</a>
-              <a class="home-chip" href="#/eta/calc">에타 계산기</a>
-              </div>
-            </div>
-          </article>
-
-          <article class="home-card">
-            <a class="home-shot" href="#/equipment/equipment" tabindex="-1" aria-hidden="true"><img src="./images/home/db.jpg" width="720" height="405" alt="" loading="lazy" decoding="async" /></a>
-            <div class="home-menu">
-              <h2>DB 검색</h2>
-              <div class="home-chips">
-              <a class="home-chip" href="#/equipment/equipment">장비 DB</a>
-              <a class="home-chip" href="#/equipment/ability">어빌리티 DB</a>
-              <a class="home-chip" href="#/equipment/avatar">아바타 DB</a>
-              </div>
-            </div>
-          </article>
-
-          <article class="home-card">
-            <a class="home-shot" href="#/calculator/equipment" tabindex="-1" aria-hidden="true"><img src="./images/home/calc.jpg" width="720" height="405" alt="" loading="lazy" decoding="async" /></a>
-            <div class="home-menu">
-              <h2>계산기</h2>
-              <div class="home-chips">
-              <a class="home-chip" href="#/calculator/equipment">장비 재료 계산기</a>
-              <a class="home-chip" href="#/calculator/inherit">상속서 계산기</a>
-              <a class="home-chip" href="#/calculator/coefficient">계수 계산기</a>
-              <a class="home-chip" href="#/calculator/damage">대미지 계산기</a>
-              </div>
-            </div>
-          </article>
-
-          <article class="home-card">
-            <a class="home-shot" href="#/simulator/encrypt" tabindex="-1" aria-hidden="true"><img src="./images/home/sim.jpg" width="720" height="405" alt="" loading="lazy" decoding="async" /></a>
-            <div class="home-menu">
-              <h2>시뮬레이터</h2>
-              <div class="home-chips">
-              <a class="home-chip" href="#/simulator/encrypt">인크립트</a>
-              <a class="home-chip" href="#/simulator/core">코어 강화</a>
-              <a class="home-chip" href="#/simulator/relic">신조 렐릭</a>
-              <a class="home-chip" href="#/simulator/enhance">장비 강화</a>
-              <a class="home-chip" href="#/simulator/hammer">에이라의 망치</a>
-              </div>
-            </div>
-          </article>
-
-          <article class="home-card">
-            <a class="home-shot" href="#/overlay" tabindex="-1" aria-hidden="true"><img src="./images/home/overlay.jpg" width="720" height="405" alt="" loading="lazy" decoding="async" /></a>
-            <div class="home-menu">
-              <h2>테일즈 채팅 오버레이</h2>
-              <div class="home-chips">
-              <a id="homeOverlayDownload" class="home-chip home-chip-primary" href="https://github.com/TWHome-Git/TWChatOverlay/releases/latest" target="_blank" rel="noopener noreferrer">최신 버전 다운로드</a>
-              <small id="homeOverlayMeta" class="home-chip-meta">Latest Release</small>
-              <a class="home-chip" href="#/overlay">사용 안내</a>
-              </div>
-            </div>
-          </article>
-
-
+          <!-- 오른쪽: 오버레이 소개. 버튼 없이 화면 사진을 다 보여주고, 누르면 안내로 간다 -->
+          <a class="home-overlay-card" href="#/overlay">
+            <span class="home-overlay-head">
+              <strong>테일즈 채팅 오버레이</strong>
+              <small id="homeOverlayMeta" class="home-overlay-meta">Latest Release</small>
+            </span>
+            <span class="home-overlay-shot">
+              <img src="./images/home/overlay-game.jpg" width="885" height="432" alt="테일즈 채팅 오버레이 실행 화면" loading="lazy" decoding="async" />
+            </span>
+          </a>
+          <!-- 버전 정보를 채우는 코드가 쓰는 자리. 화면에는 보이지 않는다 -->
+          <a id="homeOverlayDownload" href="https://github.com/TWHome-Git/TWChatOverlay/releases/latest" target="_blank" rel="noopener noreferrer" hidden>최신 버전 다운로드</a>
         </div>
       </section>
 
@@ -125,7 +67,7 @@
         <nav class="db-subtabs" aria-label="에타 메뉴">
           <button class="db-subtab is-active" type="button" data-eta-tab="ranking">에타 순위</button>
           <button class="db-subtab" type="button" data-eta-tab="newcomers">진입 · 이탈</button>
-          <button class="db-subtab" type="button" data-eta-tab="population">인구 추이</button>
+          <button class="db-subtab" type="button" data-eta-tab="population">인구 통계</button>
           <button class="db-subtab" type="button" data-eta-tab="info">에타 정보</button>
           <button class="db-subtab" type="button" data-eta-tab="calc">에타 계산기</button>
         </nav>
@@ -233,10 +175,10 @@
         </div>
 
         <div data-eta-panel="population" hidden>
-        <section class="toolbar pop-toolbar" aria-label="에타 인구 추이 조건">
+        <section class="toolbar pop-toolbar" aria-label="에타 인구 통계 조건">
           <div class="brand-block">
             <p class="eyebrow">TW DB</p>
-            <h1>에타 인구 추이</h1>
+            <h1>에타 인구 통계</h1>
           </div>
 
           <div class="pop-controls">
@@ -522,67 +464,71 @@
         </div>
       </section>
 
-      <section id="calculatorView" class="main-panel addon-view" data-main-panel="calculator" hidden>
-        <div class="addon-titlebar">
+      <section id="calculatorView" class="main-panel" data-main-panel="calculator" hidden>
+        <!-- 에타·DB와 같은 구성: 하위 메뉴 알약 + 제목 줄 + 내용 -->
+        <nav class="db-subtabs" aria-label="계산기 메뉴">
+          <button class="db-subtab is-active" type="button" data-calculator-tab="equipment">장비 재료</button>
+          <button class="db-subtab" type="button" data-calculator-tab="inherit">상속서</button>
+          <button class="db-subtab" type="button" data-calculator-tab="damage">계수 · 대미지</button>
+          <button class="db-subtab" type="button" data-calculator-tab="onekill">사냥터 1킬</button>
+          <button class="db-subtab" type="button" data-calculator-tab="hit">명중</button>
+        </nav>
+
+        <section class="toolbar" aria-label="계산기">
           <div class="brand-block">
             <p class="eyebrow">TW DB</p>
-            <h1>계산기</h1>
+            <h1 id="calculatorTitle">장비 재료</h1>
           </div>
-          <div class="addon-tab-field">
-            <span>계산기 메뉴</span>
-            <nav class="addon-subtabs" aria-label="계산기 메뉴">
-              <button class="addon-tab is-active" type="button" data-calculator-tab="equipment">장비 재료 계산기</button>
-              <button class="addon-tab" type="button" data-calculator-tab="inherit">상속서 계산기</button>
-              <button class="addon-tab" type="button" data-calculator-tab="coefficient">계수 계산기</button>
-              <button class="addon-tab" type="button" data-calculator-tab="damage">대미지 계산기</button>
-            </nav>
+        </section>
+
+        <section class="addon-content is-active sim-panel" data-calculator-panel="equipment" hidden>
+          <div class="sim-fields eqc-controls">
+            <label class="field"><span>부위</span><select id="eqcPart"></select></label>
+            <label class="field"><span>시작 장비</span><select id="eqcFrom"></select></label>
+            <label class="field"><span>목표 장비</span><select id="eqcTo"></select></label>
           </div>
-        </div>
-
-        <div class="addon-window">
-          <section class="addon-content sim-panel is-active" data-calculator-panel="equipment">
-            <div class="sim-fields eqc-controls">
-              <label class="field"><span>부위</span><select id="eqcPart"></select></label>
-              <label class="field"><span>시작 장비</span><select id="eqcFrom"></select></label>
-              <label class="field"><span>목표 장비</span><select id="eqcTo"></select></label>
-            </div>
-            <div id="eqcSteps" class="eqc-steps"></div>
-            <div id="eqcTotal" class="sim-summary"></div>
-          </section>
-
-          <section class="addon-content sim-panel" data-calculator-panel="inherit" hidden>
-            <div id="inhFormula" class="inherit-formula"></div>
-            <div class="sim-grid">
-              <div class="sim-controls">
-                <h3 class="inherit-heading">추출할 장비</h3>
-                <div id="inhEnchants" class="sim-fields"></div>
-                <div class="sim-fields">
-                  <label class="field"><span>인크립트 횟수</span><input id="inhIncrement" type="number" min="0" max="60" step="1" value="1" /></label>
-                  <div class="field inherit-total"><span>능력치 총합</span><output id="inhTotal">0</output></div>
-                </div>
-
-                <h3 class="inherit-heading">상속받을 장비</h3>
-                <div class="sim-row">
-                  <label class="sim-radio"><input type="radio" name="inhGrade" value="normal" checked /><span>일반</span></label>
-                  <label class="sim-radio"><input type="radio" name="inhGrade" value="abyss" /><span>어비스 이상</span></label>
-                  <label class="sim-radio"><input type="radio" name="inhGrade" value="eclipse" /><span>이클립스 이상</span></label>
-                  <label class="sim-check"><input id="inhFusionMax" type="checkbox" /><span>합성 횟수 MAX</span></label>
-                </div>
+          <div id="eqcSteps" class="eqc-steps"></div>
+          <div id="eqcTotal" class="sim-summary"></div>
+        </section>
+        <section class="addon-content sim-panel" data-calculator-panel="inherit" hidden>
+          <div id="inhFormula" class="inherit-formula"></div>
+          <div class="sim-grid">
+            <div class="sim-controls">
+              <h3 class="inherit-heading">추출할 장비</h3>
+              <div id="inhEnchants" class="sim-fields"></div>
+              <div class="sim-fields">
+                <label class="field"><span>인크립트 횟수</span><input id="inhIncrement" type="number" min="0" max="60" step="1" value="1" /></label>
+                <div class="field inherit-total"><span>능력치 총합</span><output id="inhTotal">0</output></div>
               </div>
 
-              <div class="inherit-result">
-                <div id="inhStatus" class="sim-status"></div>
-                <div id="inhSummary" class="sim-summary"></div>
-                <div class="sim-table-wrap"><table id="inhTable" class="sim-table"></table></div>
+              <h3 class="inherit-heading">상속받을 장비</h3>
+              <div class="sim-row">
+                <label class="sim-radio"><input type="radio" name="inhGrade" value="normal" checked /><span>일반</span></label>
+                <label class="sim-radio"><input type="radio" name="inhGrade" value="abyss" /><span>어비스 이상</span></label>
+                <label class="sim-radio"><input type="radio" name="inhGrade" value="eclipse" /><span>이클립스 이상</span></label>
+                <label class="sim-check"><input id="inhFusionMax" type="checkbox" /><span>합성 횟수 MAX</span></label>
               </div>
             </div>
-          </section>
 
-          <section class="addon-content" data-calculator-panel="coefficient" hidden>
+            <div class="inherit-result">
+              <div id="inhStatus" class="sim-status"></div>
+              <div id="inhSummary" class="sim-summary"></div>
+              <div class="sim-table-wrap"><table id="inhTable" class="sim-table"></table></div>
+            </div>
+          </div>
+        </section>
+        <!-- 계수와 대미지는 한 항목이다. 계수를 입력하면 그 값으로 대미지를 계산하므로 1·2단계로 이어서 쓴다 -->
+        <section class="addon-content sim-panel" data-calculator-panel="damage" hidden>
+          <nav class="dmg-steps" aria-label="대미지 계산 단계">
+            <button class="dmg-step-tab is-active" type="button" data-dmg-step-tab="coefficient"><span>1</span> 계수 입력</button>
+            <button class="dmg-step-tab" type="button" data-dmg-step-tab="damage"><span>2</span> 대미지</button>
+          </nav>
+
+          <div class="dmg-step is-active" data-dmg-step="coefficient">
             <div id="coefficientSelectView" class="coefficient-select">
               <div id="characterGrid" class="character-grid" aria-label="계수 계산기 캐릭터 선택"></div>
             </div>
-
+  
             <div id="coefficientDetailView" class="coefficient-detail" hidden>
               <div class="coefficient-detail-header">
                 <button id="coefficientBackButton" class="ghost-button" type="button">← 뒤로</button>
@@ -592,7 +538,7 @@
                 </div>
                 <div id="coefficientPresetGroup" class="preset-group" aria-label="프리셋 선택">
                   <span class="preset-label">프리셋</span>
-                  <button class="preset-button is-active" type="button" data-preset="1">1</button>
+                  <button class="preset-button" type="button" data-preset="1">1</button>
                   <button class="preset-button" type="button" data-preset="2">2</button>
                   <button class="preset-button" type="button" data-preset="3">3</button>
                 </div>
@@ -604,7 +550,7 @@
                   <select id="coefficientTypeSelect"></select>
                 </label>
               </div>
-
+  
               <div class="coefficient-grid">
                 <div class="coefficient-table-card">
                   <table class="coefficient-table" aria-label="부위별 계수 입력 테이블">
@@ -615,7 +561,7 @@
                   </table>
                   <div id="coefficientMainTotal" class="coefficient-maintotal" aria-label="합계"></div>
                 </div>
-
+  
                 <aside class="coefficient-side">
                   <table class="side-score-table side-stat-table" aria-label="스탯 · 덱스 입력">
                     <thead>
@@ -629,7 +575,7 @@
                     </thead>
                     <tbody id="coefficientStatBody"></tbody>
                   </table>
-
+  
                   <table class="side-score-table" aria-label="보조 계수 입력">
                     <thead>
                       <tr>
@@ -652,18 +598,18 @@
                   </label>
                 </aside>
               </div>
-
+  
               <p class="coefficient-pierce-title">방어 관통 <button id="pierceHelpButton" class="eta-help-button" type="button" title="방어 관통 안내" aria-label="방어 관통 안내">?</button></p>
               <div id="coefficientPierce" class="coefficient-pierce"></div>
             </div>
-          </section>
+          </div>
 
-          <section class="addon-content sim-panel" data-calculator-panel="damage" hidden>
+          <div class="dmg-step sim-panel" data-dmg-step="damage" hidden>
             <div id="dmgNoData" class="dmg-nodata">
               <strong>계수 계산기의 데이터를 입력하세요.</strong>
               <span>캐릭터를 선택하고 계수 계산을 진행하면 대미지 계산기에 자동 반영됩니다.</span>
             </div>
-
+  
             <div id="dmgBody" class="dmg-body" hidden>
               <p id="dmgStatWarn" class="dmg-warn" hidden></p>
               <div class="dmg-head">
@@ -678,16 +624,16 @@
                 </div>
                 <label class="field dmg-monster"><span>몬스터</span><select id="dmgMonster"></select></label>
               </div>
-
+  
               <div id="dmgResult" class="dmg-result"></div>
               <p class="dmg-pierce-title">방어 무시 발동 시 <small>한 방 기준 · 펫 강타는 10타 중 1~2타만 발동하므로 총 대미지로 환산하지 않습니다</small></p>
               <div id="dmgPierceResult" class="dmg-pierce"></div>
-
+  
               <details id="dmgBreakdown" class="dmg-breakdown" data-local-only hidden>
                 <summary>계산 과정 (일반 기준)</summary>
                 <div id="dmgBreakdownBody"></div>
               </details>
-
+  
               <div class="dmg-grid">
                 <section class="dmg-card">
                   <h3>기본 정보</h3>
@@ -702,7 +648,7 @@
                     <label class="dmg-row"><span class="dmg-row-label">특수 피해 감소율</span><input id="dmgSpecialReduction" type="number" value="0" /></label>
                   </div>
                 </section>
-
+  
                 <section class="dmg-card">
                   <h3>공격 피해량(이자벨) <span id="dmgAtk1Sum" class="dmg-badge">0% / 50%</span></h3>
                   <div class="dmg-rows">
@@ -714,7 +660,7 @@
                     <label class="dmg-row"><span class="dmg-row-label">기타</span><input id="dmgA1Etc" type="number" value="0" /></label>
                   </div>
                 </section>
-
+  
                 <section class="dmg-card">
                   <h3>공격 피해량(일반) <span id="dmgAtk2Sum" class="dmg-badge">0% / 30%</span></h3>
                   <div class="dmg-rows">
@@ -727,7 +673,7 @@
                     <label class="dmg-row"><span class="dmg-row-label">기타</span><input id="dmgA2Etc" type="number" value="0" /></label>
                   </div>
                 </section>
-
+  
                 <section class="dmg-card">
                   <h3>공격 피해량(캐릭터) <span id="dmgAtk4Sum" class="dmg-badge">0% / 80%</span></h3>
                   <div class="dmg-rows">
@@ -759,7 +705,7 @@
                   </div>
                 </section>
                 </div>
-
+  
                 <div class="dmg-stack">
                   <section class="dmg-card">
                   <h3>추가 피해량 <span id="dmgAddDmgSum" class="dmg-badge">0%</span></h3>
@@ -777,13 +723,13 @@
                   </div>
                 </section>
                 </div>
-
+  
                 <section class="dmg-card">
                   <h3>캐릭터 버프</h3>
                   <div id="dmgTraitChecks" class="dmg-rows dmg-trait-checks"></div>
                   <div id="dmgTraitList" class="dmg-trait-list"></div>
                 </section>
-
+  
                 <div class="dmg-stack">
                   <section class="dmg-card">
                   <h3>치명타 배율 <span id="dmgCritSum" class="dmg-badge">0%</span></h3>
@@ -806,160 +752,236 @@
                 </div>
               </div>
             </div>
-          </section>
-        </div>
+          </div>
+        </section>
+        <section class="addon-content" data-calculator-panel="onekill" hidden>
+          <div class="ok-body">
+            <p class="buff-section-title">사냥터</p>
+            <div id="okGroundRow" class="buff-base-row"></div>
+
+            <p class="buff-section-title">내 정보</p>
+            <!-- 기준: 에타 레벨표의 최대 대미지로 계산하거나, 1타 대미지를 직접 넣어 계산한다 -->
+            <div id="okModeRow" class="buff-base-row ok-mode-row" role="group" aria-label="계산 기준">
+              <button type="button" class="buff-base-btn" data-ok-mode="level">에타 레벨 기준</button>
+              <button type="button" class="buff-base-btn" data-ok-mode="damage">대미지 기준</button>
+            </div>
+            <!-- 두 칸 다 보이되, 고른 기준이 아닌 쪽은 비활성화한다 -->
+            <div class="ok-inputs ok-inputs-2">
+              <label class="field ok-field" data-ok-mode-field="level">
+                <span>에타 레벨</span>
+                <input id="okEtaLevel" type="number" min="1" max="100" step="1" inputmode="numeric" placeholder="1~100" value="1" />
+              </label>
+              <label class="field ok-field is-locked" data-ok-mode-field="damage">
+                <span>1타 대미지</span>
+                <input id="okDamage" type="text" inputmode="numeric" autocomplete="off" placeholder="예: 3,160,000" value="" disabled />
+              </label>
+            </div>
+            <div class="ok-inputs ok-inputs-2">
+              <label class="field ok-field">
+                <span>스킬 타수</span>
+                <select id="okHits">
+                  <option value="4" selected>4타</option>
+                  <option value="5">5타</option>
+                  <option value="6">6타</option>
+                </select>
+              </label>
+              <label class="field ok-field">
+                <span>무기 추가 대미지</span>
+                <input id="okWeapon" type="text" inputmode="numeric" autocomplete="off" placeholder="0" value="" />
+              </label>
+            </div>
+
+            <p class="buff-section-title">추가 대미지</p>
+            <div id="okExtraRow" class="ok-inputs ok-inputs-3"></div>
+
+            <div id="okResult" class="ok-result" aria-live="polite"></div>
+            <p class="ok-note">총 대미지 = (1타 대미지 × 타수 + 무기 추가 대미지) × (1 + 추가 대미지 % 합). 1타 대미지는 에타 레벨표의 최대 대미지를 쓰거나(에타 레벨 기준) 직접 넣습니다(대미지 기준). 몬스터 HP는 칸에서 직접 고칠 수 있습니다.</p>
+          </div>
+        </section>
+        <section class="addon-content" data-calculator-panel="hit" hidden>
+          <div class="ok-body hit-body">
+            <div class="hit-layout">
+              <section class="hit-box">
+                <p class="buff-section-title">능력치 계산</p>
+                <div id="hitStatArea"></div>
+              </section>
+              <section class="hit-box">
+                <p class="buff-section-title">장비 명중률 보정 합계</p>
+                <div id="hitEquipArea"></div>
+              </section>
+              <div class="hit-side">
+                <section class="hit-box">
+                  <p class="buff-section-title">사냥터</p>
+                  <div id="hitGroundArea"></div>
+                </section>
+                <section class="hit-box">
+                  <p class="buff-section-title">결과</p>
+                  <div id="hitResultArea" aria-live="polite"></div>
+                </section>
+              </div>
+            </div>
+          </div>
+        </section>
       </section>
 
-      <section id="simulatorView" class="main-panel addon-view" data-main-panel="simulator" hidden>
-        <div class="addon-titlebar">
+      <section id="simulatorView" class="main-panel" data-main-panel="simulator" hidden>
+        <!-- 에타·DB와 같은 구성: 하위 메뉴 알약 + 제목 줄 + 내용 -->
+        <nav class="db-subtabs" aria-label="시뮬레이터 메뉴">
+          <button class="db-subtab is-active" type="button" data-simulator-tab="encrypt">인크립트</button>
+          <button class="db-subtab" type="button" data-simulator-tab="core">코어 강화</button>
+          <button class="db-subtab" type="button" data-simulator-tab="relic">신조 렐릭</button>
+          <button class="db-subtab" type="button" data-simulator-tab="enhance">장비 강화</button>
+          <button class="db-subtab" type="button" data-simulator-tab="siena">시에나 증폭</button>
+          <button class="db-subtab" type="button" data-simulator-tab="hammer">에이라의 망치</button>
+        </nav>
+
+        <section class="toolbar" aria-label="시뮬레이터">
           <div class="brand-block">
             <p class="eyebrow">TW DB</p>
-            <h1>시뮬레이터</h1>
+            <h1 id="simulatorTitle">인크립트</h1>
           </div>
-          <div class="addon-tab-field">
-            <span>시뮬레이터 메뉴</span>
-            <nav class="addon-subtabs" aria-label="시뮬레이터 메뉴">
-              <button class="addon-tab is-active" type="button" data-simulator-tab="encrypt">인크립트</button>
-              <button class="addon-tab" type="button" data-simulator-tab="core">코어 강화</button>
-              <button class="addon-tab" type="button" data-simulator-tab="relic">신조 렐릭</button>
-              <button class="addon-tab" type="button" data-simulator-tab="enhance">장비 강화</button>
-              <button class="addon-tab" type="button" data-simulator-tab="hammer">에이라의 망치</button>
-            </nav>
+        </section>
+
+        <section class="addon-content is-active sim-panel" data-simulator-panel="encrypt" hidden>
+          <div class="sim-grid">
+            <div class="sim-controls">
+              <div class="sim-row">
+                <label class="sim-radio"><input type="radio" name="encInkType" value="vianu" checked /><span>비아누</span></label>
+                <label class="sim-radio"><input type="radio" name="encInkType" value="eta" /><span>에타</span></label>
+                <label class="sim-check"><input id="encElso" type="checkbox" /><span>엘소</span></label>
+                <label class="sim-check"><input id="encDiscount" type="checkbox" /><span>20% 할인</span></label>
+              </div>
+              <div id="encPresets" class="sim-presets"></div>
+              <div class="sim-fields">
+                <label class="field"><span id="encCostLabel">1회 비용 (만원)</span><input id="encBaseCost" type="text" value="666" /></label>
+                <label class="field"><span>현재 인크립트</span><input id="encStartInk" type="number" value="0" /></label>
+                <label class="field"><span>목표 인크립트</span><input id="encTargetInk" type="number" value="10" /></label>
+                <label class="field"><span>수동 횟수</span><input id="encManualCount" type="number" value="100" /></label>
+              </div>
+              <div class="sim-buttons">
+                <button id="encRunBatch" class="sim-btn" type="button">수동 인크립트</button>
+                <button id="encRunTarget" class="sim-btn primary" type="button">자동 인크립트</button>
+                <button id="encReset" class="sim-btn danger" type="button">리셋</button>
+              </div>
+              <div id="encStatus" class="sim-status"></div>
+            </div>
+            <div id="encLog" class="sim-log" aria-label="인크립트 로그"></div>
           </div>
-        </div>
-
-        <div class="addon-window">
-          <section class="addon-content is-active sim-panel" data-simulator-panel="encrypt">
-            <div class="sim-grid">
-              <div class="sim-controls">
-                <div class="sim-row">
-                  <label class="sim-radio"><input type="radio" name="encInkType" value="vianu" checked /><span>비아누</span></label>
-                  <label class="sim-radio"><input type="radio" name="encInkType" value="eta" /><span>에타</span></label>
-                  <label class="sim-check"><input id="encElso" type="checkbox" /><span>엘소</span></label>
-                  <label class="sim-check"><input id="encDiscount" type="checkbox" /><span>20% 할인</span></label>
-                </div>
-                <div id="encPresets" class="sim-presets"></div>
-                <div class="sim-fields">
-                  <label class="field"><span id="encCostLabel">1회 비용 (만원)</span><input id="encBaseCost" type="text" value="666" /></label>
-                  <label class="field"><span>현재 인크립트</span><input id="encStartInk" type="number" value="0" /></label>
-                  <label class="field"><span>목표 인크립트</span><input id="encTargetInk" type="number" value="10" /></label>
-                  <label class="field"><span>수동 횟수</span><input id="encManualCount" type="number" value="100" /></label>
-                </div>
-                <div class="sim-buttons">
-                  <button id="encRunBatch" class="sim-btn" type="button">수동 인크립트</button>
-                  <button id="encRunTarget" class="sim-btn primary" type="button">자동 인크립트</button>
-                  <button id="encReset" class="sim-btn danger" type="button">리셋</button>
-                </div>
-                <div id="encStatus" class="sim-status"></div>
+        </section>
+        <section class="addon-content sim-panel" data-simulator-panel="core" hidden>
+          <div class="sim-controls">
+            <div class="sim-row">
+              <div class="sim-toggle-group">
+                <label class="sim-toggle"><input type="radio" name="coreType" value="abyss" checked /><span>머큐리얼/어비스</span></label>
+                <label class="sim-toggle"><input type="radio" name="coreType" value="normal" /><span>이클립스/루비코나</span></label>
               </div>
-              <div id="encLog" class="sim-log" aria-label="인크립트 로그"></div>
+              <button id="coreRateButton" class="eta-help-button" type="button" title="강화 확률표" aria-label="강화 확률표">?</button>
             </div>
-          </section>
-
-          <section class="addon-content sim-panel" data-simulator-panel="core" hidden>
-            <div class="sim-controls">
-              <div class="sim-row">
-                <div class="sim-toggle-group">
-                  <label class="sim-toggle"><input type="radio" name="coreType" value="abyss" checked /><span>머큐리얼/어비스</span></label>
-                  <label class="sim-toggle"><input type="radio" name="coreType" value="normal" /><span>이클립스/루비코나</span></label>
-                </div>
-                <button id="coreRateButton" class="eta-help-button" type="button" title="강화 확률표" aria-label="강화 확률표">?</button>
+            <!-- 주스탯/부스탯, 시드/엘소는 하나만 고르는 큰 버튼(라디오를 감춘 라벨). 옆 체크는 별개 옵션 -->
+            <div class="sim-row">
+              <div class="sim-toggle-group">
+                <label class="sim-toggle"><input id="coreMainStat" type="radio" name="coreStat" value="main" checked /><span>주스탯</span></label>
+                <label class="sim-toggle"><input type="radio" name="coreStat" value="sub" /><span>부스탯</span></label>
               </div>
-              <!-- 주스탯/부스탯, 시드/엘소는 하나만 고르는 큰 버튼(라디오를 감춘 라벨). 옆 체크는 별개 옵션 -->
-              <div class="sim-row">
-                <div class="sim-toggle-group">
-                  <label class="sim-toggle"><input id="coreMainStat" type="radio" name="coreStat" value="main" checked /><span>주스탯</span></label>
-                  <label class="sim-toggle"><input type="radio" name="coreStat" value="sub" /><span>부스탯</span></label>
-                </div>
-                <label class="sim-check"><input id="coreHasDust" type="checkbox" /><span>가루 보유</span></label>
-              </div>
-              <div class="sim-row">
-                <div class="sim-toggle-group">
-                  <label class="sim-toggle"><input type="radio" name="coreFee" value="seed" checked /><span>시드 강화</span></label>
-                  <label class="sim-toggle"><input id="coreElso" type="radio" name="coreFee" value="elso" /><span>엘소 강화</span></label>
-                </div>
-                <label class="sim-check"><input id="coreDiscount" type="checkbox" /><span>강화 비용 20% 할인</span></label>
-              </div>
-              <div class="sim-fields">
-                <label class="field"><span>시작 단계</span><select id="coreStartStage"></select></label>
-                <label class="field"><span>목표 단계</span><select id="coreTargetStage"></select></label>
-                <label class="field" id="coreBoxPriceField"><span>상자 가격 (만원)</span><input id="coreBoxPrice" type="text" value="0" /></label>
-              </div>
-              <div class="sim-buttons">
-                <button id="coreSim" class="sim-btn" type="button">시뮬레이션</button>
-                <button id="coreCalc" class="sim-btn primary" type="button">기대값 계산</button>
-              </div>
+              <label class="sim-check"><input id="coreHasDust" type="checkbox" /><span>가루 보유</span></label>
             </div>
-            <div id="coreSummary" class="sim-summary"></div>
-            <div class="sim-table-wrap"><table id="coreTable" class="sim-table"></table></div>
-          </section>
-
-          <section class="addon-content sim-panel" data-simulator-panel="relic" hidden>
-            <div class="sim-controls">
-              <div class="sim-row">
-                <label class="sim-radio"><input type="radio" name="relicType" value="pendant" checked /><span>펜던트</span></label>
-                <label class="sim-radio"><input type="radio" name="relicType" value="bracelet" /><span>브레이슬릿</span></label>
-                <button id="relicRateButton" class="eta-help-button" type="button" title="강화 확률표" aria-label="강화 확률표">?</button>
+            <div class="sim-row">
+              <div class="sim-toggle-group">
+                <label class="sim-toggle"><input type="radio" name="coreFee" value="seed" checked /><span>시드 강화</span></label>
+                <label class="sim-toggle"><input id="coreElso" type="radio" name="coreFee" value="elso" /><span>엘소 강화</span></label>
               </div>
-              <div class="sim-fields">
-                <label class="field"><span>현재 레벨 (0~19)</span><input id="relicCurrent" type="number" value="0" /></label>
-                <label class="field"><span>목표 레벨 (1~20)</span><input id="relicTarget" type="number" value="20" /></label>
-                <label class="field"><span>강화 가능 단수 (1~20)</span><input id="relicDifficulty" type="number" value="20" /></label>
-              </div>
-              <div class="sim-buttons">
-                <button id="relicSim" class="sim-btn" type="button">시뮬레이션</button>
-                <button id="relicCalc" class="sim-btn primary" type="button">기대값 계산</button>
-              </div>
+              <label class="sim-check"><input id="coreDiscount" type="checkbox" /><span>강화 비용 20% 할인</span></label>
             </div>
-            <div id="relicSummary" class="sim-summary"></div>
-            <div class="sim-table-wrap"><table id="relicTable" class="sim-table"></table></div>
-          </section>
-          <section class="addon-content sim-panel" data-simulator-panel="hammer" hidden>
-            <div class="sim-controls">
-              <div class="sim-fields hammer-fields">
-                <label class="field"><span>원하는 능력치</span><select id="hammerStat"></select></label>
-                <label class="field"><span>목표 수치</span><input id="hammerTarget" type="number" min="1" step="1" inputmode="numeric" value="45" /></label>
-                <label class="field"><span>단계</span><select id="hammerSlots"></select></label>
-                <label class="field"><span>망치 1개 시세 (만 시드)</span><input id="hammerPrice" type="number" min="0" step="100" inputmode="numeric" value="8000" /></label>
-              </div>
-              <div class="sim-buttons">
-                <button id="hammerReset" class="sim-btn" type="button">초기화</button>
-                <button id="hammerAuto" class="sim-btn" type="button" title="추천 루트대로 목표 수치까지 자동으로 재설정합니다">자동 재설정</button>
-                <div class="hammer-roll-group" title="적은 횟수만큼 재설정합니다. 2회 이상이면 추천 루트에서 잠글 만한 줄이 뜨거나 목표를 채울 때 그 자리에서 멈춥니다">
-                  <label class="hammer-roll-count"><input id="hammerRollCount" type="number" min="1" max="1000" step="1" value="1" inputmode="numeric" aria-label="재설정 횟수" /><span>회</span></label>
-                  <button id="hammerRoll" class="sim-btn primary" type="button">재설정</button>
-                </div>
+            <div class="sim-fields">
+              <label class="field"><span>시작 단계</span><select id="coreStartStage"></select></label>
+              <label class="field"><span>목표 단계</span><select id="coreTargetStage"></select></label>
+              <label class="field" id="coreBoxPriceField"><span>상자 가격 (만원)</span><input id="coreBoxPrice" type="text" value="0" /></label>
+            </div>
+            <div class="sim-buttons">
+              <button id="coreSim" class="sim-btn" type="button">시뮬레이션</button>
+              <button id="coreCalc" class="sim-btn primary" type="button">기대값 계산</button>
+            </div>
+          </div>
+          <div id="coreSummary" class="sim-summary"></div>
+          <div class="sim-table-wrap"><table id="coreTable" class="sim-table"></table></div>
+        </section>
+        <section class="addon-content sim-panel" data-simulator-panel="relic" hidden>
+          <div class="sim-controls">
+            <div class="sim-row">
+              <label class="sim-radio"><input type="radio" name="relicType" value="pendant" checked /><span>펜던트</span></label>
+              <label class="sim-radio"><input type="radio" name="relicType" value="bracelet" /><span>브레이슬릿</span></label>
+              <button id="relicRateButton" class="eta-help-button" type="button" title="강화 확률표" aria-label="강화 확률표">?</button>
+            </div>
+            <div class="sim-fields">
+              <label class="field"><span>현재 레벨 (0~19)</span><input id="relicCurrent" type="number" value="0" /></label>
+              <label class="field"><span>목표 레벨 (1~20)</span><input id="relicTarget" type="number" value="20" /></label>
+              <label class="field"><span>강화 가능 단수 (1~20)</span><input id="relicDifficulty" type="number" value="20" /></label>
+            </div>
+            <div class="sim-buttons">
+              <button id="relicSim" class="sim-btn" type="button">시뮬레이션</button>
+              <button id="relicCalc" class="sim-btn primary" type="button">기대값 계산</button>
+            </div>
+          </div>
+          <div id="relicSummary" class="sim-summary"></div>
+          <div class="sim-table-wrap"><table id="relicTable" class="sim-table"></table></div>
+        </section>
+        <section class="addon-content sim-panel" data-simulator-panel="enhance" hidden>
+          <div class="sim-controls">
+            <div class="sim-fields">
+              <label class="field"><span>시작 단계</span><select id="enhStart"></select></label>
+              <label class="field"><span>목표 단계</span><select id="enhTarget"></select></label>
+            </div>
+            <div class="sim-buttons">
+              <button id="enhSim" class="sim-btn" type="button">시뮬레이션</button>
+              <button id="enhCalc" class="sim-btn primary" type="button">기대값 계산</button>
+            </div>
+          </div>
+          <div id="enhSummary" class="sim-summary"></div>
+          <div class="sim-table-wrap"><table id="enhTable" class="sim-table"></table></div>
+        </section>
+        <section class="addon-content sim-panel" data-simulator-panel="siena" hidden>
+          <div class="sim-controls">
+            <div class="sim-fields">
+              <label class="field"><span>시작 단계</span><select id="sienaStart"></select></label>
+              <label class="field"><span>목표 단계</span><select id="sienaTarget"></select></label>
+            </div>
+            <div class="sim-buttons">
+              <button id="sienaSim" class="sim-btn" type="button">시뮬레이션</button>
+              <button id="sienaCalc" class="sim-btn primary" type="button">기대값 계산</button>
+            </div>
+          </div>
+          <div id="sienaSummary" class="sim-summary"></div>
+          <div class="sim-table-wrap"><table id="sienaTable" class="sim-table"></table></div>
+        </section>
+        <section class="addon-content sim-panel" data-simulator-panel="hammer" hidden>
+          <div class="sim-controls">
+            <div class="sim-fields hammer-fields">
+              <label class="field"><span>원하는 능력치</span><select id="hammerStat"></select></label>
+              <label class="field"><span>목표 수치</span><input id="hammerTarget" type="number" min="1" step="1" inputmode="numeric" value="45" /></label>
+              <label class="field"><span>단계</span><select id="hammerSlots"></select></label>
+              <label class="field"><span>망치 1개 시세 (만 시드)</span><input id="hammerPrice" type="number" min="0" step="100" inputmode="numeric" value="8000" /></label>
+            </div>
+            <div class="sim-buttons">
+              <button id="hammerReset" class="sim-btn" type="button">초기화</button>
+              <button id="hammerAuto" class="sim-btn" type="button" title="추천 루트대로 목표 수치까지 자동으로 재설정합니다">자동 재설정</button>
+              <div class="hammer-roll-group" title="적은 횟수만큼 재설정합니다. 2회 이상이면 추천 루트에서 잠글 만한 줄이 뜨거나 목표를 채울 때 그 자리에서 멈춥니다">
+                <label class="hammer-roll-count"><input id="hammerRollCount" type="number" min="1" max="1000" step="1" value="1" inputmode="numeric" aria-label="재설정 횟수" /><span>회</span></label>
+                <button id="hammerRoll" class="sim-btn primary" type="button">재설정</button>
               </div>
             </div>
-            <div class="hammer-body">
-              <div class="hammer-board">
-                <div class="sim-table-wrap"><table id="hammerTable" class="sim-table hammer-table"></table></div>
-                <div id="hammerCost" class="hammer-cost"></div>
-              </div>
-              <div class="hammer-side">
-                <div id="hammerStatus" class="hammer-status"></div>
-                <div id="hammerPlan" class="hammer-plan"></div>
-                <div id="hammerLog" class="hammer-log" hidden></div>
-              </div>
+          </div>
+          <div class="hammer-body">
+            <div class="hammer-board">
+              <div class="sim-table-wrap"><table id="hammerTable" class="sim-table hammer-table"></table></div>
+              <div id="hammerCost" class="hammer-cost"></div>
             </div>
-          </section>
-
-          <section class="addon-content sim-panel" data-simulator-panel="enhance" hidden>
-            <div class="sim-controls">
-              <div class="sim-fields">
-                <label class="field"><span>시작 단계</span><select id="enhStart"></select></label>
-                <label class="field"><span>목표 단계</span><select id="enhTarget"></select></label>
-              </div>
-              <div class="sim-buttons">
-                <button id="enhSim" class="sim-btn" type="button">시뮬레이션</button>
-                <button id="enhCalc" class="sim-btn primary" type="button">기대값 계산</button>
-              </div>
+            <div class="hammer-side">
+              <div id="hammerStatus" class="hammer-status"></div>
+              <div id="hammerPlan" class="hammer-plan"></div>
+              <div id="hammerLog" class="hammer-log" hidden></div>
             </div>
-            <div id="enhSummary" class="sim-summary"></div>
-            <div class="sim-table-wrap"><table id="enhTable" class="sim-table"></table></div>
-          </section>
-
-        </div>
+          </div>
+        </section>
       </section>
 
       <section id="overlayView" class="main-panel addon-view" data-main-panel="overlay" hidden>
@@ -969,7 +991,6 @@
             <h1>테일즈 채팅 오버레이</h1>
           </div>
           <div class="addon-tab-field overlay-actions-field">
-            <span>다운로드</span>
             <div class="overlay-actions">
               <a id="overlayDownload" class="overlay-download" href="https://github.com/TWHome-Git/TWChatOverlay/releases/latest" target="_blank" rel="noopener noreferrer">
                 <strong>최신 버전 다운로드</strong>
@@ -987,99 +1008,24 @@
         </div>
       </section>
 
-      <section id="extraView" class="main-panel addon-view is-active" data-main-panel="extra">
-        <div class="addon-titlebar">
+      <section id="infoView" class="main-panel is-active" data-main-panel="info">
+        <!-- 에타·DB와 같은 구성: 위에 하위 메뉴 알약 버튼, 그 아래 제목 줄 -->
+        <nav class="db-subtabs" aria-label="정보 메뉴">
+          <button class="db-subtab is-active" type="button" data-info-tab="seed">주간 시드 한도</button>
+          <button class="db-subtab" type="button" data-info-tab="buff">버프 아이템</button>
+        </nav>
+
+        <section class="toolbar" aria-label="정보">
           <div class="brand-block">
             <p class="eyebrow">TW DB</p>
-            <h1>테일즈 정보</h1>
+            <h1 id="infoTitle">주간 시드 한도</h1>
           </div>
-          <div class="addon-tab-field">
-            <span>정보 메뉴</span>
-            <nav class="addon-subtabs" aria-label="정보 메뉴">
-              <button class="addon-tab is-active" type="button" data-extra-tab="seed">주간 시드 계산기</button>
-              <button class="addon-tab" type="button" data-extra-tab="onekill">사냥터 1킬 계산기</button>
-              <button class="addon-tab" type="button" data-extra-tab="hit">필요 명중 계산기</button>
-              <button class="addon-tab" type="button" data-extra-tab="buff">버프 아이템 계산기</button>
-            </nav>
-          </div>
-        </div>
+        </section>
 
-        <div class="addon-window">
-          <section class="addon-content is-active" data-extra-panel="seed">
+          <section class="addon-content is-active" data-info-panel="seed">
             <div id="seedBody" class="seed-body"></div>
           </section>
-
-          <section class="addon-content" data-extra-panel="onekill" hidden>
-            <div class="ok-body">
-              <p class="buff-section-title">사냥터</p>
-              <div id="okGroundRow" class="buff-base-row"></div>
-
-              <p class="buff-section-title">내 정보</p>
-              <!-- 기준: 에타 레벨표의 최대 대미지로 계산하거나, 1타 대미지를 직접 넣어 계산한다 -->
-              <div id="okModeRow" class="buff-base-row ok-mode-row" role="group" aria-label="계산 기준">
-                <button type="button" class="buff-base-btn is-active" data-ok-mode="level">에타 레벨 기준</button>
-                <button type="button" class="buff-base-btn" data-ok-mode="damage">대미지 기준</button>
-              </div>
-              <!-- 두 칸 다 보이되, 고른 기준이 아닌 쪽은 비활성화한다 -->
-              <div class="ok-inputs ok-inputs-2">
-                <label class="field ok-field" data-ok-mode-field="level">
-                  <span>에타 레벨</span>
-                  <input id="okEtaLevel" type="number" min="1" max="100" step="1" inputmode="numeric" placeholder="1~100" value="1" />
-                </label>
-                <label class="field ok-field is-locked" data-ok-mode-field="damage">
-                  <span>1타 대미지</span>
-                  <input id="okDamage" type="text" inputmode="numeric" autocomplete="off" placeholder="예: 3,160,000" value="" disabled />
-                </label>
-              </div>
-              <div class="ok-inputs ok-inputs-2">
-                <label class="field ok-field">
-                  <span>스킬 타수</span>
-                  <select id="okHits">
-                    <option value="4" selected>4타</option>
-                    <option value="5">5타</option>
-                    <option value="6">6타</option>
-                  </select>
-                </label>
-                <label class="field ok-field">
-                  <span>무기 추가 대미지</span>
-                  <input id="okWeapon" type="text" inputmode="numeric" autocomplete="off" placeholder="0" value="" />
-                </label>
-              </div>
-
-              <p class="buff-section-title">추가 대미지</p>
-              <div id="okExtraRow" class="ok-inputs ok-inputs-3"></div>
-
-              <div id="okResult" class="ok-result" aria-live="polite"></div>
-              <p class="ok-note">총 대미지 = (1타 대미지 × 타수 + 무기 추가 대미지) × (1 + 추가 대미지 % 합). 1타 대미지는 에타 레벨표의 최대 대미지를 쓰거나(에타 레벨 기준) 직접 넣습니다(대미지 기준). 몬스터 HP는 칸에서 직접 고칠 수 있습니다.</p>
-            </div>
-          </section>
-
-          <section class="addon-content" data-extra-panel="hit" hidden>
-            <div class="ok-body hit-body">
-              <div class="hit-layout">
-                <section class="hit-box">
-                  <p class="buff-section-title">능력치 계산</p>
-                  <div id="hitStatArea"></div>
-                </section>
-                <section class="hit-box">
-                  <p class="buff-section-title">장비 명중률 보정 합계</p>
-                  <div id="hitEquipArea"></div>
-                </section>
-                <div class="hit-side">
-                  <section class="hit-box">
-                    <p class="buff-section-title">사냥터</p>
-                    <div id="hitGroundArea"></div>
-                  </section>
-                  <section class="hit-box">
-                    <p class="buff-section-title">결과</p>
-                    <div id="hitResultArea" aria-live="polite"></div>
-                  </section>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <section class="addon-content" data-extra-panel="buff" hidden>
+          <section class="addon-content" data-info-panel="buff" hidden>
             <nav class="buff-subtabs" aria-label="버프 종류">
               <button class="buff-tab is-active" type="button" data-buff-tab="exp">경험치 버프</button>
               <button class="buff-tab" type="button" data-buff-tab="rare">레어 버프</button>

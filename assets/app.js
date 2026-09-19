@@ -23,7 +23,7 @@ const SNAPSHOT_URL = "./data/equipment-snapshot.json";
 const CDN_ROOT = "https://cdn.jsdelivr.net/gh/TWHome-Git/TWPage@";
 const CDN_AVATAR_ROOT = `${CDN_ROOT}v1.0.15/`;
 const CDN_EQUIP_ROOT = `${CDN_ROOT}v2.0.8/`;
-const CDN_ETC_ROOT = `${CDN_ROOT}v3.0.6/`;
+const CDN_ETC_ROOT = `${CDN_ROOT}v3.0.7/`;
 
 const IMAGE_BASE = `${CDN_EQUIP_ROOT}equipment-images/`;
 const CHARACTER_IMAGE_BASE = `${CDN_ETC_ROOT}character-images/`;
@@ -342,6 +342,12 @@ const els = {
   mainPanels: document.querySelectorAll("[data-main-panel]"),
   dbTabButtons: document.querySelectorAll("[data-db-tab]"),
   dbPanels: document.querySelectorAll("[data-db-panel]"),
+  calculatorTabButtons: document.querySelectorAll("[data-calculator-tab]"),
+  calculatorPanels: document.querySelectorAll("[data-calculator-panel]"),
+  calculatorTitle: document.querySelector("#calculatorTitle"),
+  simulatorTabButtons: document.querySelectorAll("[data-simulator-tab]"),
+  simulatorPanels: document.querySelectorAll("[data-simulator-panel]"),
+  simulatorTitle: document.querySelector("#simulatorTitle"),
   abilityCategorySelect: document.querySelector("#abilityCategorySelect"),
   abilitySearchInput: document.querySelector("#abilitySearchInput"),
   abilityCount: document.querySelector("#abilityCount"),
@@ -361,10 +367,9 @@ const els = {
   avatarListTableWrap: document.querySelector("#avatarListTableWrap"),
   avatarListWrap: document.querySelector(".avatar-list-wrap"),
   avatarDetailCard: document.querySelector("#avatarDetailCard"),
-  calculatorTabButtons: document.querySelectorAll("[data-calculator-tab]"),
-  calculatorPanels: document.querySelectorAll("[data-calculator-panel]"),
-  extraTabButtons: document.querySelectorAll("[data-extra-tab]"),
-  extraPanels: document.querySelectorAll("[data-extra-panel]"),
+  infoTabButtons: document.querySelectorAll("[data-info-tab]"),
+  infoTitle: document.querySelector("#infoTitle"),
+  infoPanels: document.querySelectorAll("[data-info-panel]"),
   buffTabButtons: document.querySelectorAll("[data-buff-tab]"),
   buffPanels: document.querySelectorAll("[data-buff-panel]"),
   seedBody: document.getElementById("seedBody"),
@@ -382,8 +387,7 @@ const els = {
   rareBaseBox: document.querySelector("#rareBaseBox"),
   rareResultBox: document.querySelector("#rareResultBox"),
   rareBuffBody: document.querySelector("#rareBuffBody"),
-  simulatorTabButtons: document.querySelectorAll("[data-simulator-tab]"),
-  simulatorPanels: document.querySelectorAll("[data-simulator-panel]"),
+
   overlayReadme: document.querySelector("#overlayReadme"),
   overlayDownload: document.querySelector("#overlayDownload"),
   overlayReleaseMeta: document.querySelector("#overlayReleaseMeta"),
@@ -481,17 +485,35 @@ const els = {
 // 메인 탭별 기본 하위 탭. 하위 탭이 기본값이면 주소에서 뺀다.
 const ROUTE_DEFAULT_SUB = {
   home: "",
-  extra: "seed",
+  info: "seed",
   eta: "ranking",
   equipment: "equipment",
-  calculator: "coefficient",
+  calculator: "equipment",
   simulator: "encrypt",
   overlay: "",
 };
 
+// 옛 주소 → 지금 자리. 예전에 "테일즈 정보(extra)"에 있던 화면들이 정보·계산기로 나뉘어서,
+// 밖에 퍼진 링크와 북마크가 깨지지 않게 여기서 넘겨준다. 키가 "탭/하위탭"이면 그 하위탭만, "탭"이면 전체를 옮긴다.
+const ROUTE_MOVED = {
+  "extra/onekill": { main: "calculator", sub: "onekill" },
+  "extra/hit": { main: "calculator", sub: "hit" },
+  extra: { main: "info" },
+  "tools/calc": { main: "calculator" },
+  "tools/sim": { main: "simulator" },
+  "tools/encrypt": { main: "simulator", sub: "encrypt" },
+  "tools/core": { main: "simulator", sub: "core" },
+  "tools/relic": { main: "simulator", sub: "relic" },
+  "tools/enhance": { main: "simulator", sub: "enhance" },
+  "tools/hammer": { main: "simulator", sub: "hammer" },
+  tools: { main: "calculator" },
+  "calculator/coefficient": { main: "calculator", sub: "damage" },
+  "tools/coefficient": { main: "calculator", sub: "damage" },
+};
+
 // 하위 탭을 어느 버튼 묶음에서 읽고 어느 함수로 여는지
 const ROUTE_SUB = {
-  extra: { attr: "extraTab", open: (k) => activateExtraTab(k) },
+  info: { attr: "infoTab", open: (k) => activateInfoTab(k) },
   eta: { attr: "etaTab", open: (k) => activateEtaTab(k) },
   equipment: { attr: "dbTab", open: (k) => activateDbTab(k) },
   calculator: { attr: "calculatorTab", open: (k) => activateCalculatorTab(k) },
@@ -503,6 +525,9 @@ const ROUTE_SUB = {
 const routeNameOut = (name) => String(name || "").replace(/^[♠♣♥♦★☆◆■]+\s*/, "").trim();
 const routeNameKey = (name) => routeNameOut(name).replace(/\s+/g, " ").toLowerCase();
 
+const ACTIVE_SUB = {};
+
+// 카드 목록만 있는 화면들 — 버튼이 없고, 바깥 흰 칸과 메뉴 줄을 감춘다
 const route = {
   applying: false, // 주소를 화면에 반영하는 중 — 이때는 주소를 다시 쓰지 않는다
   pending: null,   // 데이터가 아직 안 와서 못 연 항목 { sub, item }
@@ -517,7 +542,7 @@ function routeActiveKey(attr) {
 function routeCurrent() {
   const main = routeActiveKey("mainTab");
   if (!main) return null;
-  const sub = ROUTE_SUB[main] ? routeActiveKey(ROUTE_SUB[main].attr) : "";
+  const sub = ROUTE_SUB[main] ? (ACTIVE_SUB[main] ?? routeActiveKey(ROUTE_SUB[main].attr)) : "";
 
   let item = "";
   if (main === "equipment") {
@@ -552,9 +577,11 @@ function routeParse() {
   const parts = raw.split("/").map((x) => {
     try { return decodeURIComponent(x); } catch { return x; }
   });
-  const main = parts[0] || "";
+  const moved = ROUTE_MOVED[`${parts[0]}/${parts[1] || ""}`] || ROUTE_MOVED[parts[0]];
+  const main = moved ? moved.main : (parts[0] || "");
   if (!document.querySelector(`[data-main-tab="${CSS.escape(main)}"]`)) return null;
-  return { main, sub: parts[1] || ROUTE_DEFAULT_SUB[main] || "", item: parts.slice(2).join("/") };
+  const sub = moved ? (moved.sub || parts[1] || "") : parts[1];
+  return { main, sub: sub || ROUTE_DEFAULT_SUB[main] || "", item: parts.slice(2).join("/") };
 }
 
 // 주소 → 화면. 항목은 데이터가 와야 열 수 있으므로 못 찾으면 미뤄 둔다.
@@ -564,7 +591,10 @@ function routeApply(r) {
   try {
     activateMainTab(r.main);
     const sub = ROUTE_SUB[r.main];
-    if (sub && r.sub && document.querySelector(`[data-${sub.attr.replace(/[A-Z]/g, (c) => "-" + c.toLowerCase())}="${CSS.escape(r.sub)}"]`)) {
+    // 기본 페이지("home")는 누를 버튼이 없으므로 버튼 확인을 건너뛴다
+    const hasButton = (key) =>
+      !!document.querySelector(`[data-${sub.attr.replace(/[A-Z]/g, (c) => "-" + c.toLowerCase())}="${CSS.escape(key)}"]`);
+    if (sub && r.sub && hasButton(r.sub)) {
       sub.open(r.sub);
     }
     route.pending = r.item ? { sub: r.sub, item: r.item } : null;
@@ -572,6 +602,7 @@ function routeApply(r) {
   } finally {
     route.applying = false;
   }
+  routeWrite(); // 옛 주소로 들어왔으면 지금 자리의 주소로 바꿔 둔다
   visitTrack();
 }
 
@@ -680,7 +711,9 @@ async function boot() {
   activateMainTab("home");
   activateCalculatorTab("equipment");
   activateSimulatorTab("encrypt");
-  activateExtraTab("seed");
+  activateInfoTab("seed");
+  activateEtaTab("ranking");
+  activateDbTab("equipment");
   revealLocalOnly();
   wireEvents();
   setAvatarViewMode(avatar.viewMode); // 저장된 선택을 버튼에 반영
@@ -1546,7 +1579,7 @@ function renderEtaNewcomers() {
 
   els.etaNewRange.textContent = etaNew.baseDate
     ? (etaNew.prevDate
-        ? `${etaNew.prevDate} → ${etaNew.baseDate} (하루 차이)`
+        ? `${etaNew.prevDate} → ${etaNew.baseDate}`
         : `${etaNew.baseDate} (이전 날짜 없음)`)
     : "날짜를 불러오는 중입니다";
 
@@ -1628,7 +1661,7 @@ function ensureEtaInfo() {
 }
 
 // ── 에타 정보 페이지 ([?] 버튼 → 조견표·레벨별 상세) ──
-// ── 에타 인구 추이 ──
+// ── 에타 인구 통계 ──
 // 날짜별 스냅샷은 하루치가 1MB 가까워 브라우저에서 기간만큼 받을 수 없다.
 // 캐릭터별 인원수만 미리 집계해 둔 파일을 쓴다(73일에 17KB).
 const ETA_POPULATION_URL = "./assets/eta-population.json";
@@ -1674,6 +1707,7 @@ const etaInfo = { data: null, loading: false };
 // DB 탭과 같은 방식. 정보/계산기 둘 다 같은 eta_info.json을 쓰므로
 // 어느 쪽을 처음 열든 그때 한 번만 받아 온다.
 function activateEtaTab(key) {
+  ACTIVE_SUB.eta = key;
   els.etaTabButtons.forEach((button) => {
     button.classList.toggle("is-active", button.dataset.etaTab === key);
   });
@@ -1745,7 +1779,7 @@ function wireEtaPopulation() {
   });
 }
 
-// 인구 추이 탭과 홈 요약이 같은 파일을 쓴다. 동시에 불려도 한 번만 받도록 진행 중인 요청을 돌려준다.
+// 인구 통계 탭과 홈 요약이 같은 파일을 쓴다. 동시에 불려도 한 번만 받도록 진행 중인 요청을 돌려준다.
 let etaPopPromise = null;
 
 function loadEtaPopulation() {
@@ -1761,9 +1795,9 @@ function loadEtaPopulation() {
       if (!etaPop.server) etaPop.server = popServerNames()[0] || "";
       renderEtaPopulation();
     } catch (error) {
-      console.warn("에타 인구 추이 로딩 실패", error);
+      console.warn("에타 인구 통계 로딩 실패", error);
       if (els.popChart) {
-        els.popChart.innerHTML = `<div class="empty-state"><strong>인구 추이를 불러오지 못했습니다</strong><span>잠시 후 다시 시도해주세요.</span></div>`;
+        els.popChart.innerHTML = `<div class="empty-state"><strong>인구 통계를 불러오지 못했습니다</strong><span>잠시 후 다시 시도해주세요.</span></div>`;
       }
     } finally {
       etaPop.loading = false;
@@ -2325,6 +2359,17 @@ function wireEtaCalc() {
   });
 }
 
+// 부재료는 "제네로 젬마 40개 + 레이티아의 시든 꽃 40개 + …" 꼴이다.
+// 재료 하나가 이름 중간에서 잘리지 않도록 재료마다 묶고, 좁은 화면에서는 " + " 자리에서만 줄이 나뉘게 한다.
+function etaSubHtml(sub) {
+  const text = String(sub || "").trim();
+  if (!text) return "";
+  return text
+    .split(/\s*\+\s*/)
+    .map((part) => `<span class="eta-sub-item">${escapeHtml(part)}</span>`)
+    .join(' <span class="eta-sub-plus">+</span> ');
+}
+
 function renderEtaInfo() {
   const { summary, levels } = etaInfo.data;
 
@@ -2342,20 +2387,28 @@ function renderEtaInfo() {
     </tbody>
   `;
 
+  // 한 행에 두 가지가 섞여 있다: 재료는 "이 레벨 → 다음 레벨"에 드는 값, 능력치는 그 레벨에 도달했을 때의 값.
+  // 그래서 LV 칸에 "1 → 2"로 적고 머리글을 두 묶음으로 나눈다. 마지막 레벨은 올라갈 곳이 없어 번호만 적는다.
+  const hasNext = (row) => row.exp && row.exp !== "-";
   els.etaLevelTable.innerHTML = `
     <thead>
       <tr>
-        <th>LV</th><th>필요 경험치</th><th>필요 SEED</th><th>부재료</th><th>경험의 정수</th>
-        <th>최대 대미지</th><th>최대 HP</th><th>최대 방어력</th><th>최대 스탯</th><th>각성 대미지</th>
+        <th rowspan="2">LV</th>
+        <th colspan="4" class="eta-info-group">다음 레벨까지 필요</th>
+        <th colspan="5" class="eta-info-group">현재 레벨 최대 능력치</th>
+      </tr>
+      <tr>
+        <th>경험치</th><th>SEED</th><th>부재료</th><th>경험의 정수</th>
+        <th>대미지</th><th>HP</th><th>방어력</th><th>스탯</th><th>각성</th>
       </tr>
     </thead>
     <tbody>
       ${levels.map((row) => `
         <tr>
-          <th>${row.lv}</th>
+          <th class="eta-info-lv">${hasNext(row) ? `${row.lv} <span class="eta-info-arrow">→</span> ${row.lv + 1}` : `${row.lv}`}</th>
           <td data-label="필요 경험치">${escapeHtml(row.exp)}</td>
           <td data-label="필요 SEED">${escapeHtml(row.seed)}</td>
-          <td class="eta-info-sub" data-label="부재료">${escapeHtml(row.sub || "")}</td>
+          <td class="eta-info-sub" data-label="부재료">${etaSubHtml(row.sub)}</td>
           <td data-label="경험의 정수">${escapeHtml(row.water)}</td>
           <td data-label="최대 대미지">${escapeHtml(row.dmg)}</td>
           <td data-label="최대 HP">${escapeHtml(row.hp)}</td>
@@ -2502,6 +2555,7 @@ function etaRowsHtml(rows) {
 
 // DB 검색 서브탭 (장비 / 어빌리티 / 아바타)
 function activateDbTab(key) {
+  ACTIVE_SUB.equipment = key;
   els.dbTabButtons.forEach((button) => {
     button.classList.toggle("is-active", button.dataset.dbTab === key);
   });
@@ -3042,10 +3096,31 @@ function renderAbilityList() {
   }).join("");
 }
 
+// 계산기 탭 — 하위 메뉴 알약으로 도구를 바꾼다 (에타·DB와 같은 구성)
+const CALCULATOR_TITLES = { equipment: "장비 재료", inherit: "상속서", damage: "계수 · 대미지", onekill: "사냥터 1킬", hit: "명중" };
+
+// 계수 → 대미지는 이어지는 두 단계다. 계수 값을 넣어야 대미지가 계산되므로 한 화면 안에서 오간다.
+function activateDamageStep(step) {
+  document.querySelectorAll("[data-dmg-step-tab]").forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.dmgStepTab === step);
+  });
+  document.querySelectorAll("[data-dmg-step]").forEach((panel) => {
+    const isActive = panel.dataset.dmgStep === step;
+    panel.hidden = !isActive;
+    panel.classList.toggle("is-active", isActive);
+  });
+  if (step === "damage") {
+    if (!etaInfo.data && !etaInfo.loading) loadEtaInfo().then(dmgRefresh);
+    dmgRefresh();
+  }
+}
+
 function activateCalculatorTab(key) {
-  // 아직 공개하지 않은 탭은 버튼이 숨겨져 있다. 주소로 바로 들어와도 열리지 않게 막는다
+  // 아직 공개하지 않은 도구는 버튼이 숨겨져 있다. 주소로 바로 들어와도 열리지 않게 막는다
   const target = [...els.calculatorTabButtons].find((b) => b.dataset.calculatorTab === key);
-  if (target?.hidden) key = "equipment";
+  if (!target || target.hidden) key = "equipment";
+  ACTIVE_SUB.calculator = key;
+  if (els.calculatorTitle && CALCULATOR_TITLES[key]) els.calculatorTitle.textContent = CALCULATOR_TITLES[key];
 
   els.calculatorTabButtons.forEach((button) => {
     button.classList.toggle("is-active", button.dataset.calculatorTab === key);
@@ -3055,19 +3130,26 @@ function activateCalculatorTab(key) {
     panel.hidden = !isActive;
     panel.classList.toggle("is-active", isActive);
   });
+
   if (key === "damage") {
     // 대미지 상한이 에타 정보에 있어 같이 받아 둔다
     if (!etaInfo.data && !etaInfo.loading) loadEtaInfo().then(dmgRefresh);
     dmgRefresh();
   }
+  if (key === "onekill") oneKillCalc.load();
+  if (key === "hit") hitCalc.load();
 
   routeWrite();
 }
 
+// 시뮬레이터 탭
+const SIMULATOR_TITLES = { encrypt: "인크립트", core: "코어 강화", relic: "신조 렐릭", enhance: "장비 강화", siena: "시에나 증폭", hammer: "에이라의 망치" };
+
 function activateSimulatorTab(key) {
-  // 아직 공개하지 않은 탭은 버튼이 숨겨져 있다. 주소로 바로 들어와도 열리지 않게 막는다
   const target = [...els.simulatorTabButtons].find((b) => b.dataset.simulatorTab === key);
-  if (target?.hidden) key = "encrypt";
+  if (!target || target.hidden) key = "encrypt";
+  ACTIVE_SUB.simulator = key;
+  if (els.simulatorTitle && SIMULATOR_TITLES[key]) els.simulatorTitle.textContent = SIMULATOR_TITLES[key];
 
   els.simulatorTabButtons.forEach((button) => {
     button.classList.toggle("is-active", button.dataset.simulatorTab === key);
@@ -3081,20 +3163,22 @@ function activateSimulatorTab(key) {
   routeWrite();
 }
 
-function activateExtraTab(key) {
-  els.extraTabButtons.forEach((button) => {
-    button.classList.toggle("is-active", button.dataset.extraTab === key);
+const INFO_TITLES = { seed: "주간 시드 한도", buff: "버프 아이템" };
+
+function activateInfoTab(key) {
+  ACTIVE_SUB.info = key;
+  if (els.infoTitle && INFO_TITLES[key]) els.infoTitle.textContent = INFO_TITLES[key];
+  els.infoTabButtons.forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.infoTab === key);
   });
-  els.extraPanels.forEach((panel) => {
-    const isActive = panel.dataset.extraPanel === key;
+  els.infoPanels.forEach((panel) => {
+    const isActive = panel.dataset.infoPanel === key;
     panel.hidden = !isActive;
     panel.classList.toggle("is-active", isActive);
   });
   // 버프 탭은 처음 열릴 때 기본 하위 탭(경험치)을 그린다
   if (key === "buff") expBuff.load();
   if (key === "seed") seedCalc.load();
-  if (key === "onekill") oneKillCalc.load();
-  if (key === "hit") hitCalc.load();
 
   routeWrite();
 }
@@ -4669,10 +4753,11 @@ async function loadOverlayRelease() {
 
 // ── 홈 ──
 // 첫 화면. 메뉴 카드는 index.html에 적혀 있고, 여기서는 위쪽 요약 숫자만 채운다.
-// 인구 요약은 인구 추이 탭과 같은 집계 파일(37KB)을 쓰고, 오버레이 버전은 릴리스 API를 쓴다.
+// 인구 요약은 인구 통계 탭과 같은 집계 파일(37KB)을 쓰고, 오버레이 버전은 릴리스 API를 쓴다.
 const home = { stats: "idle", release: "idle", visits: "idle", lastUpdate: null }; // lastUpdate: 넥슨 랭킹 Last Update "yyyy-MM-dd HH:mm:ss"
 
 function loadHomeTab() {
+  boardLoadList(false);   // 홈에도 글 목록을 보여준다
   if (home.stats === "idle") loadHomeStats();
   if (home.release === "idle") loadHomeRelease();
   if (home.visits === "idle") loadHomeVisits();
@@ -6201,7 +6286,12 @@ function updateDerived() {
 function wireEvents() {
   els.mainTabTriggers.forEach((button) => {
     button.addEventListener("click", () => {
-      activateMainTab(button.dataset.mainTab);
+      const key = button.dataset.mainTab;
+      activateMainTab(key);
+      // 상단 탭을 누르면 그 탭의 기본 페이지부터 보여준다 (직전에 보던 화면으로 바로 들어가지 않는다)
+      const sub = ROUTE_SUB[key];
+      if (sub) sub.open(ROUTE_DEFAULT_SUB[key] || "home");
+      else routeWrite();
     });
   });
 
@@ -6320,9 +6410,13 @@ function wireEvents() {
     });
   });
 
-  els.extraTabButtons.forEach((button) => {
+  document.querySelectorAll("[data-dmg-step-tab]").forEach((button) => {
+    button.addEventListener("click", () => activateDamageStep(button.dataset.dmgStepTab));
+  });
+
+  els.infoTabButtons.forEach((button) => {
     button.addEventListener("click", () => {
-      activateExtraTab(button.dataset.extraTab);
+      activateInfoTab(button.dataset.infoTab);
     });
   });
 
@@ -8071,6 +8165,88 @@ function simCapped(total) {
   return total >= SIM_ATTEMPT_CAP;
 }
 
+// ── 운 백분위 ────────────────────────────────────────────────
+// 기대값과의 차이만 보면 이번 판이 흔한 편인지 드문 편인지 알 수 없다.
+// 시도 횟수의 분포(기하/음이항의 합)는 오른쪽으로 크게 치우쳐 정규 근사가 맞지 않으므로
+// 같은 조건을 여러 판 굴려 보고(몬테카를로) 나보다 적게 굴린 판의 비율을 센다.
+// 굴림이 많은 조건에서는 판수를 줄여 화면이 멈추지 않게 한다.
+const SIM_LUCK_DRAW_BUDGET = 3000000;
+
+// 몬테카를로용 기하분포. 한 판을 보여주는 simDrawAttempts와 달리 역함수로 한 번에 뽑는다
+function simLuckDraw(rate) {
+  if (rate >= 1) return 1;
+  const n = Math.ceil(Math.log(1 - Math.random()) / Math.log(1 - rate));
+  return Math.min(SIM_ATTEMPT_CAP, Math.max(1, n));
+}
+
+// 굴려 둔 판들(samples) 가운데 내 결과(actual)가 몇 등인지. 값이 작을수록 운이 좋은 지표여야 한다
+function simLuckFromSamples(samples, actual) {
+  if (!samples || samples.length < 50 || !(actual > 0)) return null;
+  let luckier = 0, same = 0, sum = 0, sumSq = 0;
+  for (const value of samples) {
+    sum += value;
+    sumSq += value * value;
+    if (value < actual) luckier += 1;
+    else if (value === actual) same += 1;
+  }
+  const mean = sum / samples.length;
+  const sd = Math.sqrt(Math.max(0, sumSq / samples.length - mean * mean));
+  if (!(sd > 0)) return null;
+  // 상위 % = 나보다 운이 좋았던 판의 비율. 동률은 절반만 센다
+  const top = Math.min(99.9, Math.max(0.1, ((luckier + same / 2) / samples.length) * 100));
+  return { top, z: (mean - actual) / sd, rank: Math.max(1, Math.min(100, Math.round(top))), trials: samples.length };
+}
+
+// steps: [{ rate, successes }] (successes 없으면 1회 성공). actual: 이번 판에 실제로 굴린 총 시도
+function simLuckStats(steps, actual) {
+  const plan = steps.filter((step) => step.rate > 0 && step.rate < 1);
+  if (!plan.length || !(actual > 0)) return null;
+  const perTrial = plan.reduce((n, step) => n + (step.successes || 1), 0);
+  const trials = Math.max(800, Math.min(6000, Math.round(SIM_LUCK_DRAW_BUDGET / Math.max(1, perTrial))));
+  const samples = [];
+  for (let t = 0; t < trials; t += 1) {
+    let total = 0;
+    for (const step of plan) {
+      const need = step.successes || 1;
+      for (let k = 0; k < need; k += 1) total += simLuckDraw(step.rate);
+    }
+    samples.push(total);
+  }
+  return simLuckFromSamples(samples, actual);
+}
+
+// 정규분포 모양 막대에 내 위치를 ◆로 찍는다
+function simLuckGraph(z) {
+  const levels = "▁▂▃▄▅▆▇█";
+  // 막대는 줄바꿈이 안 되므로 폰에서는 개수를 줄여 폭을 맞춘다
+  const n = window.matchMedia("(max-width: 560px)").matches ? 19 : 33;
+  const chars = [];
+  for (let i = 0; i < n; i++) {
+    const x = -3 + (6 * i) / (n - 1);
+    const y = Math.exp(-0.5 * x * x);
+    let lv = Math.round((levels.length - 1) * y);
+    lv = Math.max(0, Math.min(levels.length - 1, lv));
+    chars.push(levels[lv]);
+  }
+  const cz = Math.max(-3, Math.min(3, z));
+  // 운이 좋을수록(z 큼) 왼쪽에 표시 → "상위 %" 텍스트 방향과 일치 (왼쪽=운 좋음)
+  let mark = Math.round(((-cz + 3) / 6) * (n - 1));
+  mark = Math.max(0, Math.min(n - 1, mark));
+  chars[mark] = "◆";
+  return chars.join("");
+}
+
+// 결과 요약 맨 아래에 붙이는 운 표기
+function simLuckRow(stats) {
+  if (!stats) return "";
+  return `<div class="sim-luck" title="같은 조건으로 ${stats.trials.toLocaleString("ko-KR")}판을 굴려 견준 순위입니다">`
+    + `<div>운 순위: 100명 중 <b>${stats.rank}등</b> (상위 ${stats.top.toFixed(1)}%)</div>`
+    + `<div class="sim-luck-bar">`
+    + `<div class="sim-graph-legend"><span>운 좋음</span><span>평균</span><span>운 나쁨</span></div>`
+    + `<div class="sim-graph">${simLuckGraph(stats.z)}</div>`
+    + `</div></div>`;
+}
+
 function simIcon(file, size = 18) {
   return `<img class="sim-icon" src="${SIM_IMG_BASE}${encodeURIComponent(file)}" alt="" width="${size}" height="${size}" loading="lazy" />`;
 }
@@ -8086,6 +8262,7 @@ function initSimulators() {
     "coreBoxPrice", "coreBoxPriceField", "coreCalc", "coreSim", "coreSummary", "coreTable", "coreElso", "coreDiscount",
     "relicCurrent", "relicTarget", "relicDifficulty", "relicCalc", "relicSim", "relicSummary", "relicTable",
     "enhStart", "enhTarget", "enhCalc", "enhSim", "enhSummary", "enhTable",
+    "sienaStart", "sienaTarget", "sienaCalc", "sienaSim", "sienaSummary", "sienaTable",
     "hammerStat", "hammerSlots", "hammerTarget", "hammerPrice", "hammerRoll", "hammerRollCount", "hammerReset", "hammerAuto",
     "hammerTable", "hammerCost", "hammerStatus", "hammerPlan", "hammerLog",
     "relicRateButton", "coreRateButton",
@@ -8103,6 +8280,7 @@ function initSimulators() {
   wireHammerSim();
   wireRelicSim();
   wireEnhanceSim();
+  wireSienaSim();
   // 상속·장비 제작은 계산기 탭 화면이지만 입력 요소를 simEls로 함께 잡아 두어 여기서 엮는다
   wireInheritSim();
   wireEquipCraft();
@@ -8389,25 +8567,6 @@ function encLuckStats() {
   const rank = Math.min(10000, Math.max(1, Math.round((percentile / 100) * 10000)));
   return { z, percentile, rank };
 }
-function encLuckGraph(z) {
-  const levels = "▁▂▃▄▅▆▇█";
-  // 막대는 줄바꿈이 안 되므로 폰에서는 개수를 줄여 폭을 맞춘다
-  const n = window.matchMedia("(max-width: 560px)").matches ? 19 : 33;
-  const chars = [];
-  for (let i = 0; i < n; i++) {
-    const x = -3 + (6 * i) / (n - 1);
-    const y = Math.exp(-0.5 * x * x);
-    let lv = Math.round((levels.length - 1) * y);
-    lv = Math.max(0, Math.min(levels.length - 1, lv));
-    chars.push(levels[lv]);
-  }
-  const cz = Math.max(-3, Math.min(3, z));
-  // 운이 좋을수록(z 큼) 왼쪽에 표시 → "상위 %" 텍스트 방향과 일치 (왼쪽=운 좋음)
-  let mark = Math.round(((-cz + 3) / 6) * (n - 1));
-  mark = Math.max(0, Math.min(n - 1, mark));
-  chars[mark] = "◆";
-  return chars.join("");
-}
 function encRefreshStatus() {
   const isEta = encIsEta();
   const chance = encGetChance(encSim.currentInk, isEta);
@@ -8429,7 +8588,7 @@ function encRefreshStatus() {
     const luckText = `운 순위: 100명 중 <span class="sim-status-strong">${rank}등</span> (상위 ${topPercent.toFixed(1)}%)`;
     rows.push(`<div>${luckText}</div>`);
     rows.push(`<div class="sim-graph-legend"><span>운 좋음</span><span>평균</span><span>운 나쁨</span></div>`);
-    rows.push(`<div class="sim-graph">${encLuckGraph(luck.z)}</div>`);
+    rows.push(`<div class="sim-graph">${simLuckGraph(luck.z)}</div>`);
   }
   simEls.encStatus.innerHTML = rows.join("");
 }
@@ -8754,11 +8913,17 @@ function coreRun(sampled) {
 
   const model = runOne(false);
   const scale = (t, n) => ({ dust: t.dust * n, crystal: t.crystal * n, seedCost: t.seedCost * n, elso: t.elso * n });
-  let one, six;
+  let one, six, luck = null;
   if (sampled) {
     // 코어 6개는 각각 따로 뽑아서 더한다 (1개 결과 × 6이 아니라)
     const runs = Array.from({ length: CORE_SLOT_COUNT }, () => runOne(true));
     one = runs[0];
+    // 운 순위는 이번에 굴린 그대로(코어 6개 전부)를 기준으로 낸다
+    const luckSteps = [];
+    for (let slot = 0; slot < CORE_SLOT_COUNT; slot += 1) {
+      for (let i = startIdx + 1; i <= targetIdx; i++) luckSteps.push({ rate: coreStages[i].rate });
+    }
+    luck = simLuckStats(luckSteps, runs.reduce((a, r) => a + r.rows.reduce((b, x) => b + x.attempts, 0), 0));
     six = runs.reduce((acc, r) => ({
       dust: acc.dust + r.total.dust, crystal: acc.crystal + r.total.crystal,
       seedCost: acc.seedCost + r.total.seedCost, elso: acc.elso + r.total.elso,
@@ -8770,7 +8935,7 @@ function coreRun(sampled) {
 
   coreRenderTable(one.rows, useElso);
   coreRenderSummary({
-    isMainStat, startIdx, targetIdx, sampled, useElso, discount,
+    isMainStat, startIdx, targetIdx, sampled, useElso, discount, luck,
     one: one.total, six, modelOne: model.total, modelSix: scale(model.total, CORE_SLOT_COUNT),
   });
 }
@@ -8827,7 +8992,8 @@ function coreRenderSummary(s) {
     `<div class="sim-summary-cols">` +
     `<div class="sim-summary-col"><span class="sim-summary-label">코어 1개</span>${mats(s.one, s.modelOne)}</div>` +
     `<div class="sim-summary-col"><span class="sim-summary-label">코어 ${CORE_SLOT_COUNT}개 전체${s.sampled ? " (각각 뽑아 합산)" : ""}</span>${mats(s.six, s.modelSix)}</div>` +
-    `</div>`;
+    `</div>` +
+    simLuckRow(s.luck);
 }
 function wireCoreSim() {
   coreStages = coreBuildStages(coreIsAbyss());
@@ -9133,6 +9299,8 @@ function hammerRoute(solved, startValues, target, slots, price, statKey, runs = 
   }
   if (!totals.length) return null;
   return {
+    // 다 채운 뒤 "이번 판이 몇 등인지" 셀 때 쓴다 (중앙값만으로는 순위를 알 수 없다)
+    costs: totals,
     cost: hammerMedian(totals),
     rolls: hammerMedian(rollCounts),
     hammers: hammerMedian(hammerCounts),
@@ -9320,6 +9488,7 @@ function renderHammerPlan() {
           ["기대값", `${hammerStatValue(base.cost, base.hammers, base.rolls)} <small>(${hammer.autoBase ? "입력한 상태에서" : "처음부터"} ${formatNumber(hammer.target)}까지, 중앙값)</small>`],
           ...(hammer.rolls ? [["차이", gaps.length ? gaps.map(([label, delta]) => `${label} ${delta}`).join(" · ") : "없음"]] : []),
         ])}
+        ${hammer.rolls ? simLuckRow(simLuckFromSamples(base.costs, used)) : ""}
       ` : ""}`;
     return;
   }
@@ -9710,6 +9879,8 @@ function relicRun(sampled) {
   const costs = relicCosts(isPendant);
 
   const rows = [];
+  const luckSteps = [];
+  let totalAttempts = 0;
   let totalPowder = 0, totalEssence = 0, totalMoonStone = 0, totalMoonPiece = 0;
   const model = { powder: 0, moonPiece: 0 };
   let reached = currentLevel;
@@ -9726,6 +9897,8 @@ function relicRun(sampled) {
       ? simDrawUntil(cost.required, chance)
       : cost.required / chance;
     const modelAttempt = cost.required / chance;
+    luckSteps.push({ rate: chance, successes: cost.required });
+    totalAttempts += expected;
     model.powder += modelAttempt * cost.powder;
     model.moonPiece += modelAttempt * cost.moonPiece;
     const powder = expected * cost.powder;
@@ -9761,6 +9934,7 @@ function relicRun(sampled) {
   }
   let html = `<div class="sim-summary-title">| ${escapeHtml(name)} | ${escapeHtml(relicFmtLevel(currentLevel))} → ${escapeHtml(relicFmtLevel(targetLevel))} | ${escapeHtml(relicFmtLevel(reached))} MAX | ${sampled ? "시뮬레이션" : "기대값"} |</div>`;
   html += `<div class="sim-summary-mats">${mats.join("")}</div>`;
+  if (sampled) html += simLuckRow(simLuckStats(luckSteps, totalAttempts));
   if (stopReason) html += `<div class="sim-summary-note">※ ${escapeHtml(stopReason)}</div>`;
   simEls.relicSummary.innerHTML = html;
 }
@@ -9956,6 +10130,7 @@ function enhRun(sampled) {
   }
 
   const rows = [];
+  const luckSteps = [];
   let total = 0, totalStone = 0, totalSeed = 0;
   const model = { total: 0, stone: 0, seed: 0 };
 
@@ -9964,6 +10139,7 @@ function enhRun(sampled) {
     const rate = enhRate(level);
     const attempt = sampled ? simDrawAttempts(rate) : 1 / rate;
     const expected = 1 / rate;
+    luckSteps.push({ rate });
 
     total += attempt;
     totalStone += attempt * step.stone;
@@ -9994,7 +10170,8 @@ function enhRun(sampled) {
 
   simEls.enhSummary.innerHTML =
     `<div class="sim-summary-title">| ${start}단계 → ${target}단계 | ${sampled ? "시뮬레이션" : "기대값"} |</div>`
-    + `<div class="sim-summary-mats">${mats.join("")}</div>`;
+    + `<div class="sim-summary-mats">${mats.join("")}</div>`
+    + (sampled ? simLuckRow(simLuckStats(luckSteps, total)) : "");
 }
 
 function enhRenderTable(rows, sampled) {
@@ -10039,6 +10216,147 @@ function enhPopulateSelects() {
   simEls.enhStart.innerHTML = stages(ENH_BASE, ENH_TOP - 1);
   simEls.enhTarget.innerHTML = stages(ENH_BASE + 1, ENH_TOP);
   simEls.enhTarget.value = String(ENH_TOP);
+}
+
+
+// ── 시에나 증폭 시뮬 ─────────────────
+// 1~10단계. 실패해도 단계가 떨어지지 않으므로 단계마다 성공할 때까지 굴린 횟수만 세면 된다.
+// 재료(힌덴의 가루·장인의 혼)와 비용(시드·엘소)은 시도할 때마다 든다.
+// 기대값과 시뮬레이션을 나란히 보면 이번 판이 운이 좋았는지 나빴는지 알 수 있다.
+const SIENA_STEPS = [
+  { from: 1, rate: 0.80, hinden: 12, soul: 0, seed: 110000000, elso: 16500 },
+  { from: 2, rate: 0.60, hinden: 14, soul: 0, seed: 121000000, elso: 18150 },
+  { from: 3, rate: 0.40, hinden: 16, soul: 0, seed: 133100000, elso: 19965 },
+  { from: 4, rate: 0.20, hinden: 19, soul: 0, seed: 146410000, elso: 21961 },
+  { from: 5, rate: 0.10, hinden: 26, soul: 0, seed: 175692000, elso: 26353 },
+  { from: 6, rate: 0.03, hinden: 36, soul: 0, seed: 210830400, elso: 31623 },
+  { from: 7, rate: 0.02, hinden: 50, soul: 1, seed: 252996480, elso: 37950 },
+  { from: 8, rate: 0.01, hinden: 70, soul: 2, seed: 303595776, elso: 45518 },
+  { from: 9, rate: 0.005, hinden: 119, soul: 3, seed: 455393664, elso: 68306 },
+];
+
+const SIENA_TOP = 10;
+
+const sienaStep = (level) => SIENA_STEPS.find((step) => step.from === level);
+
+function sienaFmtPct(rate) {
+  const pct = Math.round(rate * 100000) / 1000;
+  return `${pct < 1 ? pct.toFixed(1) : String(pct)}%`;
+}
+
+// 시뮬레이션 값은 실제로 굴린 횟수라 정수다. 기대값만 소수로 보여준다
+function sienaFmtCount(value, sampled) {
+  if (sampled || value >= 100) return Math.round(value).toLocaleString("ko-KR");
+  return value.toFixed(value >= 10 ? 1 : 2);
+}
+
+function sienaRun(sampled) {
+  const start = parseInt(simEls.sienaStart.value, 10);
+  const target = parseInt(simEls.sienaTarget.value, 10);
+  if (start >= target) {
+    alert("목표 단계는 시작 단계보다 높아야 합니다.");
+    return;
+  }
+
+  const rows = [];
+  const luckSteps = [];
+  let total = 0, hinden = 0, soul = 0, seed = 0, elso = 0;
+  const model = { total: 0, hinden: 0, soul: 0, seed: 0, elso: 0 };
+
+  for (let level = start; level < target; level += 1) {
+    const step = sienaStep(level);
+    if (!step) continue;
+    const attempt = sampled ? simDrawAttempts(step.rate) : 1 / step.rate;
+    const expected = 1 / step.rate;
+    luckSteps.push({ rate: step.rate });
+
+    total += attempt;
+    hinden += attempt * step.hinden;
+    soul += attempt * step.soul;
+    seed += attempt * step.seed;
+    elso += attempt * step.elso;
+    model.total += expected;
+    model.hinden += expected * step.hinden;
+    model.soul += expected * step.soul;
+    model.seed += expected * step.seed;
+    model.elso += expected * step.elso;
+
+    rows.push({
+      level,
+      rate: step.rate,
+      attempt,
+      expected,
+      total,
+      hinden: attempt * step.hinden,
+      soul: attempt * step.soul,
+      seed: attempt * step.seed,
+      elso: attempt * step.elso,
+    });
+  }
+
+  sienaRenderTable(rows, sampled);
+
+  const n = (value) => sienaFmtCount(value, sampled);
+  const gap = (value, expected, unit) => (sampled ? simDelta(value, expected, unit) : "");
+  const mats = [
+    `<span>${sampled ? "총" : "기대"} 시도 ${n(total)}회${gap(total, model.total)}</span>`,
+    `<span>${simIcon("힌덴의가루.png", 24)}${n(hinden)}개${gap(hinden, model.hinden)}</span>`,
+    `<span>${simIcon("시드.png", 24)}${formatMan(seed / 10000)}${gap(seed / 100000000, model.seed / 100000000, "억")}</span>`,
+    `<span>엘소 ${n(elso)}${gap(elso, model.elso)}</span>`,
+  ];
+
+  // 장인의 혼은 개수 단위라 정수로 보여주고, 안 드는 구간만 고르면 줄에서 아예 뺀다
+  if (soul > 0) {
+    mats.splice(2, 0, `<span>${simIcon("장인의혼.png", 24)}${Math.ceil(soul).toLocaleString("ko-KR")}개${gap(soul, model.soul)}</span>`);
+  }
+
+  simEls.sienaSummary.innerHTML =
+    `<div class="sim-summary-title">| ${start}단계 → ${target}단계 | ${sampled ? "시뮬레이션" : "기대값"} |</div>`
+    + `<div class="sim-summary-mats">${mats.join("")}</div>`
+    + (sampled ? simLuckRow(simLuckStats(luckSteps, total)) : "");
+}
+
+function sienaRenderTable(rows, sampled) {
+  const head = ["단계", "성공 확률", sampled ? "시도" : "기대 시도", "누적 시도",
+    `${simIcon("힌덴의가루.png")}힌덴의 가루`, `${simIcon("장인의혼.png")}장인의 혼`, `${simIcon("시드.png")}시드`, "엘소"];
+  // 폰에서는 표를 카드로 펴므로 셀마다 이름을 달아둔다 (머리글이 안 보인다)
+  const labels = ["단계", "성공 확률", "시도", "누적 시도", "힌덴의 가루", "장인의 혼", "시드", "엘소"];
+  const n = (value) => sienaFmtCount(value, sampled);
+  const body = rows.map((row) => {
+    const cells = [
+      `${row.level} → ${row.level + 1}`,
+      sienaFmtPct(row.rate),
+      `${n(row.attempt)}회`,
+      `${n(row.total)}회`,
+      `${n(row.hinden)}개`,
+      row.soul > 0 ? `${Math.ceil(row.soul).toLocaleString("ko-KR")}개` : "-",
+      formatMan(row.seed / 10000),
+      n(row.elso),
+    ];
+    return "<tr>" + cells
+      .map((cell, i) => `<td data-label="${escapeHtml(labels[i])}">${escapeHtml(cell)}</td>`)
+      .join("") + "</tr>";
+  }).join("");
+  simEls.sienaTable.innerHTML =
+    `<thead><tr>${head.map((h) => `<th><span class="sim-th">${h}</span></th>`).join("")}</tr></thead><tbody>${body}</tbody>`;
+}
+
+function sienaPopulateSelects() {
+  const stages = (from, to) => {
+    let html = "";
+    for (let i = from; i <= to; i += 1) html += `<option value="${i}">${i}단계</option>`;
+    return html;
+  };
+  simEls.sienaStart.innerHTML = stages(1, SIENA_TOP - 1);
+  simEls.sienaTarget.innerHTML = stages(2, SIENA_TOP);
+  simEls.sienaTarget.value = String(SIENA_TOP);
+}
+
+function wireSienaSim() {
+  if (!simEls.sienaStart) return;
+  sienaPopulateSelects();
+  simEls.sienaCalc.addEventListener("click", () => sienaRun(false));
+  simEls.sienaSim?.addEventListener("click", () => sienaRun(true));
 }
 
 function wireEnhanceSim() {
@@ -10091,6 +10409,9 @@ const boardEls = {
   button: document.querySelector("#boardOpenButton"),
   modal: document.querySelector("#boardModal"),
   body: document.querySelector("#boardBody"),
+  // 홈 화면에 같이 그리는 자리. 창을 열지 않아도 글 목록이 보인다
+  homeBody: document.querySelector("#homeBoardBody"),
+  homeWrite: document.querySelector("#homeBoardWrite"),
 };
 
 const boardApi = (params) => `${BOARD_API_URL}?${new URLSearchParams(params)}`;
@@ -10451,6 +10772,7 @@ function boardRender() {
     : board.view === "write" ? boardWriteHtml()
     : boardListHtml();
   boardEls.body.innerHTML = notice + error + view;
+  if (boardEls.homeBody) boardEls.homeBody.innerHTML = notice + error + view;
 }
 
 function boardSetView(view) {
@@ -10497,6 +10819,31 @@ function wireBoard() {
     if (event.target.id !== "boardForm") return;
     event.preventDefault();
     boardSubmit(event.target);
+  });
+
+  // 홈에 그린 게시판도 같은 동작 (목록 거르기, 글 열기, 글쓰기)
+  if (boardEls.homeBody) {
+    boardEls.homeBody.addEventListener("click", (event) => {
+      const filter = event.target.closest("[data-board-filter]");
+      if (filter) {
+        board.category = filter.dataset.boardFilter;
+        return boardRender();
+      }
+      const viewButton = event.target.closest("[data-board-view]");
+      if (viewButton) return boardSetView(viewButton.dataset.boardView);
+      const item = event.target.closest("[data-board-post]");
+      if (item) boardOpenPost(item.dataset.boardPost);
+    });
+    boardEls.homeBody.addEventListener("submit", (event) => {
+      if (event.target.id !== "boardForm") return;
+      event.preventDefault();
+      boardSubmit(event.target);
+    });
+  }
+  // 홈의 글쓰기 버튼은 창을 열어 글쓰기 화면부터 보여준다
+  boardEls.homeWrite?.addEventListener("click", () => {
+    boardEls.modal.hidden = false;
+    boardSetView("write");
   });
 }
 
