@@ -5811,6 +5811,36 @@ img.dmg-chk-icon {
   background: var(--accent);
 }
 
+/* 부위 라벨 옆에 이솔렛 전용 토글을 흥정 토글과 같은 모양으로 붙인다 */
+.eqc-part-head {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.eqc-part-head .eqc-haggle[hidden] {
+  display: none;
+}
+
+.eqc-part-head > label:first-child {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* .field input 규칙(폭 100%, 높이 38px)이 체크박스에 먹지 않게 되돌린다 */
+.eqc-part-head .eqc-haggle input {
+  width: 12px;
+  min-height: 0;
+  height: 12px;
+  padding: 0;
+}
+
+.eqc-part-head .eqc-haggle span {
+  color: inherit;
+  font-size: 11px;
+}
+
 .eqc-mat-calc {
   display: grid;
   grid-template-columns: minmax(84px, 1fr) auto;

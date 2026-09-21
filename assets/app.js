@@ -8269,7 +8269,7 @@ function initSimulators() {
     "rateModal", "rateModalTitle", "rateModalNote", "rateModalBody",
     "inhFormula", "inhEnchants", "inhIncrement", "inhTotal", "inhFusionMax",
     "inhStatus", "inhSummary", "inhTable",
-    "eqcPart", "eqcFrom", "eqcTo", "eqcSteps", "eqcTotal",
+    "eqcPart", "eqcFrom", "eqcTo", "eqcSteps", "eqcTotal", "eqcIsolet", "eqcIsoletField",
   ].forEach((id) => (simEls[id] = q(id)));
 
   wireRateModal();
@@ -11113,6 +11113,21 @@ const EQC_RECIPE_TEXT = `
 이클립스 부츠 | 어비스 부츠 | 가짜 달여왕 군단의 각갑 파편 3 | 달의 약초 100 | 가공된 달의 광물(1) 1 | 룬의 원석(20) 1 | 가짜 달여왕 군단의 인장(6) 1
 `;
 
+// 이솔렛 전용 무기·손목. 무기와 손목이 같은 재료를 쓰고 아카드에서 시작한다
+const EQC_ISOLET_TEXT = `
+무기
+인퍼널 무기 | 아카드 무기 | 수르트의 무기 파편 1 | 환상초 5
+아퀼루스 무기 | 인퍼널 무기 | 프시키의 파편 - 파괴 2 | 시트린 5 | 태청금액신단 3
+어비스 무기 | 아퀼루스 무기 | 고대 기사의 무기 파편 3 | 요새 수호자의 보석 파편 2 | 심연의 핵 1 | 아크론 혈투의 증표(50) 1
+이클립스 무기 | 어비스 무기 | 가짜 달여왕 군단의 무기 파편 2 | 달의 약초 50 | 가공된 달의 광물(1) 1 | 룬의 원석(10) 1 | 가짜 달여왕 군단의 인장(3) 1
+
+손목
+인퍼널 손목 | 아카드 손목 | 수르트의 무기 파편 1 | 환상초 5
+아퀼루스 손목 | 인퍼널 손목 | 프시키의 파편 - 파괴 2 | 시트린 5 | 태청금액신단 3
+어비스 손목 | 아퀼루스 손목 | 고대 기사의 무기 파편 3 | 요새 수호자의 보석 파편 2 | 심연의 핵 1 | 아크론 혈투의 증표(50) 1
+이클립스 손목 | 어비스 손목 | 가짜 달여왕 군단의 무기 파편 2 | 달의 약초 50 | 가공된 달의 광물(1) 1 | 룬의 원석(10) 1 | 가짜 달여왕 군단의 인장(3) 1
+`;
+
 const EQC_PRICE_KEY = "tw-equip-craft-price-v1";
 const EQC_HAGGLE_KEY = "tw-equip-craft-haggle-v1";
 
@@ -11120,6 +11135,8 @@ const EQC_HAGGLE_KEY = "tw-equip-craft-haggle-v1";
 const EQC_FIXED_PRICES = {
   "가공된 달의 광물(1)": { base: 100000, haggle: 80000 },
   "룬의 원석(20)": { base: 600000, haggle: 520000 },
+  // 이솔렛 전용 이클립스는 10개만 든다. 20개 묶음 값의 절반으로 친다
+  "룬의 원석(10)": { base: 300000, haggle: 260000 },
 };
 
 // "고대 기사의 무기 파편 5" → { name, count }. 이름에 공백이 많아 뒤에서 자른다
@@ -11154,12 +11171,19 @@ function eqcParseRecipes(text) {
 }
 
 const EQC_RECIPES = eqcParseRecipes(EQC_RECIPE_TEXT);
+const EQC_ISOLET_RECIPES = eqcParseRecipes(EQC_ISOLET_TEXT);
 const EQC_PARTS = [...EQC_RECIPES.keys()];
 
-const eqc = { part: EQC_PARTS[0] || "", from: "", to: "", prices: {}, haggle: {} };
+const eqc = { part: EQC_PARTS[0] || "", from: "", to: "", isolet: false, prices: {}, haggle: {} };
+
+// 이솔렛 체크는 전용 제작표가 있는 부위(무기·손목)에서만 먹는다
+function eqcIsIsolet() {
+  return eqc.isolet && EQC_ISOLET_RECIPES.has(eqc.part);
+}
 
 function eqcPart() {
-  return EQC_RECIPES.get(eqc.part) || { steps: [], tiers: [] };
+  const table = eqcIsIsolet() ? EQC_ISOLET_RECIPES : EQC_RECIPES;
+  return table.get(eqc.part) || { steps: [], tiers: [] };
 }
 
 // 첫 단계는 시작 장비를 사서 넣어야 하니 재료에 포함한다.
@@ -11196,8 +11220,15 @@ function eqcWritePrices() {
 function renderEqcSelects() {
   if (!simEls.eqcPart) return;
 
-  simEls.eqcPart.innerHTML = EQC_PARTS.map((p) => optionHtml(p, p)).join("");
+  // 이솔렛이 켜져 있으면 전용 제작표가 있는 부위 이름 뒤에 표시를 붙인다
+  simEls.eqcPart.innerHTML = EQC_PARTS.map((p) =>
+    optionHtml(p, eqc.isolet && EQC_ISOLET_RECIPES.has(p) ? `${p}(이솔렛)` : p)).join("");
   simEls.eqcPart.value = eqc.part;
+
+  if (simEls.eqcIsoletField) {
+    simEls.eqcIsoletField.hidden = !EQC_ISOLET_RECIPES.has(eqc.part);
+    simEls.eqcIsolet.checked = eqc.isolet;
+  }
 
   const { tiers } = eqcPart();
   // 시작은 마지막 단계를 뺀 나머지, 목표는 시작보다 위쪽
@@ -11351,6 +11382,12 @@ function wireEquipCraft() {
   simEls.eqcTo.addEventListener("change", () => {
     eqc.to = simEls.eqcTo.value;
     renderEqcResult();
+  });
+  // 이솔렛은 시작 장비가 달라(아카드) 시작·목표를 다시 고른다. 목표는 같은 이름이면 유지된다
+  simEls.eqcIsolet?.addEventListener("change", () => {
+    eqc.isolet = simEls.eqcIsolet.checked;
+    eqc.from = "";
+    renderEquipCraft();
   });
 
   // 가격을 칠 때마다 다시 그리면 입력 중인 칸이 사라져 포커스가 튄다.
