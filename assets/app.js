@@ -10590,9 +10590,9 @@ function auraSpend(book, times = 1) {
   aura.used[book] += times;
 }
 
-// 책을 캐시로 산다면 얼마인지(아직 로컬에서만 보여준다). 기대값은 소수 횟수라 "약"을 붙인다
+// 책을 캐시로 산다면 얼마인지. 기대값은 소수 횟수라 "약"을 붙인다
 function auraCashText(book, times, approx = false) {
-  if (!IS_LOCAL || !(times > 0)) return "";
+  if (!(times > 0)) return "";
   const cash = formatNumber(Math.round(times * AURA_BOOKS[book].cash));
   return ` <small class="aura-cash">(${approx ? "약 " : ""}${cash} 캐시)</small>`;
 }
