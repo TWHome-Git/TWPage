@@ -10401,8 +10401,8 @@ const AURA_GRADE_RANK = { "하": 0, "중": 1, "상": 2 };
 const AURA_GRADE_CLASS = { "하": "is-low", "중": "is-mid", "상": "is-high" };
 // 시드는 만 단위(formatMan), 엘소는 개수
 const AURA_BOOKS = {
-  ret: { name: "환류의 서", icon: "환류의서.png", seed: 100, elso: 150 },
-  jung: { name: "정환의 서", icon: "정환의서.png", seed: 10000, elso: 15000 },
+  ret: { name: "환류의 서", icon: "환류의서.png", seed: 100, elso: 150, cash: 584 },
+  jung: { name: "정환의 서", icon: "정환의서.png", seed: 10000, elso: 15000, cash: 1300 },
 };
 const AURA_IMG_BASE = SIM_IMG_BASE;
 const auraBookIcon = (book) => `<img class="aura-book-icon" src="${AURA_IMG_BASE}${encodeURIComponent(AURA_BOOKS[book].icon)}" alt="" />`;
@@ -10588,6 +10588,13 @@ function auraOptionHtml(option, changed) {
 
 function auraSpend(book, times = 1) {
   aura.used[book] += times;
+}
+
+// 책을 캐시로 산다면 얼마인지(아직 로컬에서만 보여준다). 기대값은 소수 횟수라 "약"을 붙인다
+function auraCashText(book, times, approx = false) {
+  if (!IS_LOCAL || !(times > 0)) return "";
+  const cash = formatNumber(Math.round(times * AURA_BOOKS[book].cash));
+  return ` <small class="aura-cash">(${approx ? "약 " : ""}${cash} 캐시)</small>`;
 }
 
 // 금액 차이. 기대값보다 많이 썼으면 빨강(+), 적게 썼으면 초록(−)
@@ -10781,8 +10788,8 @@ function renderAura() {
   const rows = [];
   if (auto) {
     const name = `${auraBookIcon(auto.book)}${AURA_BOOKS[auto.book].name}`;
-    rows.push(["기대값", `<b>${auraCostText(auto.book, auto.expected)}</b> · ${name} <b>${formatNumber(Math.round(auto.expected))}회</b>`]);
-    rows.push(["이번 결과", `<b>${auraCostText(auto.book, auto.n)}</b> · ${name} <b>${formatNumber(auto.n)}회</b>`]);
+    rows.push(["기대값", `<b>${auraCostText(auto.book, auto.expected)}</b> · ${name} <b>${formatNumber(Math.round(auto.expected))}회</b>${auraCashText(auto.book, auto.expected, true)}`]);
+    rows.push(["이번 결과", `<b>${auraCostText(auto.book, auto.n)}</b> · ${name} <b>${formatNumber(auto.n)}회</b>${auraCashText(auto.book, auto.n)}`]);
     const gaps = [
       ["비용", auraCostDelta(auto.book, auto.n, auto.expected)],
       ["재설정", simDelta(auto.n, auto.expected, "회")],
@@ -10790,7 +10797,7 @@ function renderAura() {
     rows.push(["차이", gaps.length ? gaps.map(([k, v]) => `${k} ${v}`).join(" · ") : "기대값과 같음"]);
   }
   // 지금 고른 아이템 하나만: 그 아이템을 쓴 횟수와 금액
-  rows.push(["누적 사용", `<b>${auraCostText(aura.book, aura.used[aura.book])}</b> · ${auraBookIcon(aura.book)}${AURA_BOOKS[aura.book].name} <b>${formatNumber(aura.used[aura.book])}회</b>`]);
+  rows.push(["누적 사용", `<b>${auraCostText(aura.book, aura.used[aura.book])}</b> · ${auraBookIcon(aura.book)}${AURA_BOOKS[aura.book].name} <b>${formatNumber(aura.used[aura.book])}회</b>${auraCashText(aura.book, aura.used[aura.book])}`]);
 
   const html = (aura.stopNote ? `<p class="aura-stop-note">${aura.stopNote}</p>` : "")
     + (auto ? `<p class="aura-auto-head"><b>자동 재설정 완료</b></p>` : "")
