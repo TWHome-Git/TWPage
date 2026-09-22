@@ -6,7 +6,7 @@
     <title>TW DB</title>
     <!-- 이미지 CDN. 첫 이미지 요청 전에 DNS+TLS를 미리 끝내둔다 -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
-    <link rel="stylesheet" href="./assets/styles.css?v=20260922-aura-open" />
+    <link rel="stylesheet" href="./assets/styles.css?v=20260922-aura-reset" />
     <!-- 모바일 전용. media 속성 덕에 넓은 화면에서는 렌더링을 막지 않는다 -->
     <link rel="stylesheet" href="./assets/mobile.css?v=20260918-hammer" media="(max-width: 720px)" />
   </head>
@@ -967,13 +967,12 @@
         </section>
         <section class="addon-content sim-panel" data-simulator-panel="sienaaura" hidden>
           <div class="sim-controls">
-            <div class="sim-row aura-top">
+            <div class="sim-row">
               <div class="sim-toggle-group" aria-label="시에나 단계">
                 <label class="sim-toggle"><input type="radio" name="auraSlots" value="1" checked /><span>시에나 3단계</span></label>
                 <label class="sim-toggle"><input type="radio" name="auraSlots" value="2" /><span>시에나 7단계</span></label>
                 <label class="sim-toggle"><input type="radio" name="auraSlots" value="3" /><span>시에나 10단계</span></label>
               </div>
-              <button id="auraReset" class="sim-btn aura-reset" type="button">초기화</button>
             </div>
             <div class="sim-row">
               <div class="sim-toggle-group" aria-label="재설정 아이템">
@@ -993,6 +992,7 @@
               <div id="auraTargets" class="aura-targets"></div>
             </div>
             <div class="sim-buttons">
+              <button id="auraReset" class="sim-btn" type="button">초기화</button>
               <button id="auraAuto" class="sim-btn" type="button" title="환류의 서는 목표 옵션이 모두 나올 때까지, 정환의 서는 고른 슬롯에 목표 옵션이 나올 때까지 재설정합니다">자동 재설정</button>
               <div class="hammer-roll-group" title="적은 횟수만큼 재설정합니다. 위에서 고른 목표 옵션이 나오면 그 자리에서 멈춥니다">
                 <label class="hammer-roll-count"><input id="auraRollCount" type="number" min="1" max="10000" step="1" value="1" inputmode="numeric" aria-label="재설정 횟수" /><span>회</span></label>
@@ -1135,7 +1135,7 @@
       </div>
     </template>
 
-    <script src="./assets/app.js?v=20260922-aura-cash4" type="module"></script>
+    <script src="./assets/app.js?v=20260922-luckpos2" type="module"></script>
     <!-- GoatCounter 방문자 분석 (localhost 방문은 count.js가 기본으로 집계 제외)
          자동 집계를 끄고 app.js의 라우터가 탭 단위 경로(/eta/ranking 등)로 직접 보낸다 -->
     <script>window.goatcounter = { no_onload: true };</script>

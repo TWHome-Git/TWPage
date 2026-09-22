@@ -8196,7 +8196,27 @@ function simLuckFromSamples(samples, actual) {
   if (!(sd > 0)) return null;
   // 상위 % = 나보다 운이 좋았던 판의 비율. 동률은 절반만 센다
   const top = Math.min(99.9, Math.max(0.1, ((luckier + same / 2) / samples.length) * 100));
-  return { top, z: (mean - actual) / sd, rank: Math.max(1, Math.min(100, Math.round(top))), trials: samples.length };
+  // 막대 위 ◆ 위치는 순위(상위 %)를 종 모양의 같은 넓이 지점으로 옮겨 찍는다.
+  // 평균과의 차이/표준편차로 찍으면 치우친 분포(시도 횟수)에서 상위 9%가 가운데 가까이 찍혀 글과 어긋난다
+  return { top, z: -simProbit(top / 100), rank: Math.max(1, Math.min(100, Math.round(top))), trials: samples.length };
+}
+
+// 표준정규분포의 역함수(누적확률 p → z). Acklam 근사, 오차 1e-9 수준
+function simProbit(p) {
+  const q = Math.min(1 - 1e-9, Math.max(1e-9, p));
+  const a = [-39.69683028665376, 220.9460984245205, -275.9285104469687, 138.357751867269, -30.66479806614716, 2.506628277459239];
+  const b = [-54.47609879822406, 161.5858368580409, -155.6989798598866, 66.80131188771972, -13.28068155288572];
+  const c = [-0.007784894002430293, -0.3223964580411365, -2.400758277161838, -2.549732539343734, 4.374664141464968, 2.938163982698783];
+  const d = [0.007784695709041462, 0.3224671290700398, 2.445134137142996, 3.754408661907416];
+  const lo = 0.02425;
+  if (q < lo) {
+    const r = Math.sqrt(-2 * Math.log(q));
+    return (((((c[0] * r + c[1]) * r + c[2]) * r + c[3]) * r + c[4]) * r + c[5]) / ((((d[0] * r + d[1]) * r + d[2]) * r + d[3]) * r + 1);
+  }
+  if (q > 1 - lo) return -simProbit(1 - q);
+  const r = q - 0.5;
+  const t = r * r;
+  return (((((a[0] * t + a[1]) * t + a[2]) * t + a[3]) * t + a[4]) * t + a[5]) * r / (((((b[0] * t + b[1]) * t + b[2]) * t + b[3]) * t + b[4]) * t + 1);
 }
 
 // steps: [{ rate, successes }] (successes 없으면 1회 성공). actual: 이번 판에 실제로 굴린 총 시도

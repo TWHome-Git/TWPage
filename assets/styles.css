@@ -7998,18 +7998,6 @@ img.dmg-chk-icon {
 }
 
 /* ── 시뮬레이터 > 시에나 기운 ─────────────────────────────────── */
-/* 초기화는 단계 줄 오른쪽 끝에 작게 */
-.aura-top {
-  justify-content: space-between;
-}
-
-.sim-btn.aura-reset {
-  flex: 0 0 auto;
-  min-height: 32px;
-  padding: 0 14px;
-  font-size: 12px;
-}
-
 /* 환류의 서·정환의 서 아이콘 */
 .aura-book-icon {
   width: 20px;
