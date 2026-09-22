@@ -9065,7 +9065,8 @@ const hammerIncluded = (statKey) => HAMMER_INCLUDES[statKey] || [statKey];
 const HAMMER_SLOT_MAX = 10;         // 단계는 1~10단계
 const HAMMER_SEED_PER_LOCK = 1_000_000;  // 잠금 k개 → 시드 (k+1) × 100만
 const HAMMER_PRICE_DEFAULT = 80_000_000; // 망치 1개 기본 시세 (시드)
-const HAMMER_RUNS = 400;            // 추천 계산에 쓰는 시뮬레이션 판 수
+// 기대값·운 순위·단계표에 쓰는 모의 판 수. 300판이면 기대값이 ±7%쯤 흔들려 5,000판으로 굴린다(오차 ±1.5% 안쪽)
+const HAMMER_RUNS = 5000;
 
 // 잠금 k개일 때 드는 비용. 망치는 (k ÷ 2 내림) + 1개
 const hammerSeedCost = (locks) => (locks + 1) * HAMMER_SEED_PER_LOCK;
@@ -9255,7 +9256,7 @@ function hammerSolve(target, slots, price, statKey) {
 }
 
 // 푼 기준대로 실제로 굴려 보며 단계별 예상치를 모은다
-function hammerRoute(solved, startValues, target, slots, price, statKey, runs = 300) {
+function hammerRoute(solved, startValues, target, slots, price, statKey, runs = HAMMER_RUNS) {
   const dist = hammerValueDist(statKey);
   const hit = dist.reduce((sum, d) => sum + d.p, 0);
   const { policy, maxLock } = solved;
@@ -9325,9 +9326,10 @@ function hammerRoute(solved, startValues, target, slots, price, statKey, runs = 
   return {
     // 다 채운 뒤 "이번 판이 몇 등인지" 셀 때 쓴다 (중앙값만으로는 순위를 알 수 없다)
     costs: totals,
-    cost: hammerMedian(totals),
-    rolls: hammerMedian(rollCounts),
-    hammers: hammerMedian(hammerCounts),
+    // 기대값은 평균. 굴린 횟수 분포가 오른쪽으로 길게 늘어져 중앙값은 평균보다 낮게 나온다
+    cost: hammerMean(totals),
+    rolls: hammerMean(rollCounts),
+    hammers: hammerMean(hammerCounts),
     stages: [...stageBag.entries()].sort((a, b) => a[0] - b[0]).map(([k, bag]) => ({
       locks: k,
       // 그 단계에서 실제로 쓴 기준 (단계가 시작될 때의 남은 수치로 정해진다)
@@ -9337,6 +9339,10 @@ function hammerRoute(solved, startValues, target, slots, price, statKey, runs = 
       end: bag.end.length ? hammerMedian(bag.end) : null,
     })),
   };
+}
+
+function hammerMean(list) {
+  return list.length ? list.reduce((a, b) => a + b, 0) / list.length : 0;
 }
 
 function hammerMedian(list) {
@@ -9387,9 +9393,19 @@ function hammerSolved() {
   return hammerSolveCache.solved;
 }
 
+// 수천 판을 굴리므로 화면을 그릴 때마다 다시 풀지 않는다. 조건과 가진 값이 같으면 앞 결과를 쓴다
+let hammerPlanCache = null;
 function hammerBestPlan() {
-  const solved = hammerSolved();
   const have = hammer.lines.map((line, i) => (hammerCounts(i) ? line.value : 0)).filter(Boolean);
+  const key = `${hammerCondKey()}|${[...have].sort((a, b) => b - a).join(",")}`;
+  if (hammerPlanCache && hammerPlanCache.key === key) return hammerPlanCache.plan;
+  const plan = hammerBestPlanFresh(have);
+  hammerPlanCache = { key, plan };
+  return plan;
+}
+
+function hammerBestPlanFresh(have) {
+  const solved = hammerSolved();
   const pick = hammerBestKeep(solved, have, hammer.target);
   if (!pick) return null;
   const route = hammerRoute(solved, pick.kept, hammer.target, hammer.slots, hammer.price, hammer.stat);
@@ -9509,7 +9525,7 @@ function renderHammerPlan() {
       <p class="hammer-plan-done"><b>목표를 채웠습니다.</b> 더 올리려면 목표치를 높여 보세요.</p>
       ${base ? `
         ${hammerStatRows([
-          ["기대값", `${hammerStatValue(base.cost, base.hammers, base.rolls)} <small>(${hammer.autoBase ? "입력한 상태에서" : "처음부터"} ${formatNumber(hammer.target)}까지, 중앙값)</small>`],
+          ["기대값", `${hammerStatValue(base.cost, base.hammers, base.rolls)} <small>(${hammer.autoBase ? "입력한 상태에서" : "처음부터"} ${formatNumber(hammer.target)}까지, 평균)</small>`],
           ...(hammer.rolls ? [["차이", gaps.length ? gaps.map(([label, delta]) => `${label} ${delta}`).join(" · ") : "없음"]] : []),
         ])}
         ${hammer.rolls ? simLuckRow(simLuckFromSamples(base.costs, used)) : ""}
@@ -9554,7 +9570,7 @@ function renderHammerPlan() {
   }
 
   simEls.hammerPlan.innerHTML = `
-    ${hammerStatRows([["남은 기대값", `${hammerStatValue(plan.cost, plan.hammers, plan.rolls)} <small>(목표까지, 중앙값)</small>`]])}
+    ${hammerStatRows([["남은 기대값", `${hammerStatValue(plan.cost, plan.hammers, plan.rolls)} <small>(목표까지, 평균)</small>`]])}
     <p class="hammer-plan-now">${nowText}</p>
     <table class="sim-table hammer-plan-table">
       <thead><tr><th>잠금</th><th>이때 잠글 값</th><th>재설정</th><th>비용</th><th>단계 끝 누적</th></tr></thead>
@@ -9650,7 +9666,7 @@ function hammerAuto() {
   const before = { rolls: hammer.rolls, seed: hammer.seed, hammers: hammer.hammers };
   // 수치를 직접 입력해 둔 채로 시작했다면 다 채운 뒤에도 "그 상태에서의 기대값"과 견주도록 남겨 둔다
   hammer.autoBase = !before.rolls && best.have.length
-    ? { cost: best.cost, rolls: best.rolls, hammers: best.hammers, key: hammerCondKey() }
+    ? { cost: best.cost, rolls: best.rolls, hammers: best.hammers, costs: best.costs, key: hammerCondKey() }
     : null;
   const stages = [];   // 잠금 개수가 바뀔 때마다 한 칸. 단계마다 얼마를 썼는지 남긴다
   // 누적 수치는 "잠가 둔 합"으로 적는다. 잠그지 않은 줄은 다음 판에 사라지므로 남는 값이 아니다
