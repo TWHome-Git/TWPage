@@ -23,7 +23,7 @@ const SNAPSHOT_URL = "./data/equipment-snapshot.json";
 const CDN_ROOT = "https://cdn.jsdelivr.net/gh/TWHome-Git/TWPage@";
 const CDN_AVATAR_ROOT = `${CDN_ROOT}v1.0.15/`;
 const CDN_EQUIP_ROOT = `${CDN_ROOT}v2.0.8/`;
-const CDN_ETC_ROOT = `${CDN_ROOT}v3.0.7/`;
+const CDN_ETC_ROOT = `${CDN_ROOT}v3.0.8/`;
 
 const IMAGE_BASE = `${CDN_EQUIP_ROOT}equipment-images/`;
 const CHARACTER_IMAGE_BASE = `${CDN_ETC_ROOT}character-images/`;
@@ -10404,8 +10404,7 @@ const AURA_BOOKS = {
   ret: { name: "환류의 서", icon: "환류의서.png", seed: 100, elso: 150 },
   jung: { name: "정환의 서", icon: "정환의서.png", seed: 10000, elso: 15000 },
 };
-// 아직 공개 전이라 CDN 태그에 없는 아이콘은 저장소 images/에서 바로 읽는다(로컬 전용). 공개할 때 CDN으로 옮긴다
-const AURA_IMG_BASE = IS_LOCAL ? "./images/" : SIM_IMG_BASE;
+const AURA_IMG_BASE = SIM_IMG_BASE;
 const auraBookIcon = (book) => `<img class="aura-book-icon" src="${AURA_IMG_BASE}${encodeURIComponent(AURA_BOOKS[book].icon)}" alt="" />`;
 const AURA_LOG_MAX = 3; // 최근 기록만 보여준다
 
