@@ -7996,3 +7996,327 @@ img.dmg-chk-icon {
 .dmg-step[hidden] {
   display: none;
 }
+
+/* ── 시뮬레이터 > 시에나 기운 ─────────────────────────────────── */
+/* 초기화는 단계 줄 오른쪽 끝에 작게 */
+.aura-top {
+  justify-content: space-between;
+}
+
+.sim-btn.aura-reset {
+  flex: 0 0 auto;
+  min-height: 32px;
+  padding: 0 14px;
+  font-size: 12px;
+}
+
+/* 환류의 서·정환의 서 아이콘 */
+.aura-book-icon {
+  width: 20px;
+  height: 20px;
+  margin-right: 5px;
+  object-fit: contain;
+  vertical-align: -5px;
+}
+
+.aura-log .aura-book-icon,
+.aura-stats .aura-book-icon {
+  width: 16px;
+  height: 16px;
+  margin-right: 3px;
+  vertical-align: -3px;
+}
+
+.aura-price {
+  margin-left: 4px;
+  font-size: 12px;
+  font-weight: 800;
+  opacity: 0.85;
+}
+
+.aura-goal {
+  display: grid;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.aura-goal-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  font-size: 13px;
+}
+
+.aura-goal-head small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.aura-targets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+}
+
+.aura-goal-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.aura-goal-n {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.aura-goal-row select {
+  min-height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.aura-goal-row select:disabled {
+  color: var(--muted);
+  background: var(--panel-strong);
+}
+
+/* 현재 → 결과를 두 칸으로 나란히. 다른 시뮬과 같은 흰 카드 */
+.aura-window {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.aura-board {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+}
+
+.aura-col h4 {
+  margin: 0 0 8px;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.aura-col ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.aura-col li > label,
+.aura-col li > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 3px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.aura-col li > label {
+  cursor: pointer;
+}
+
+.aura-col li > label:hover {
+  border-color: var(--accent);
+}
+
+/* 정환의 서로 바꿀 슬롯 */
+.aura-col li > label:has(input:checked) {
+  border-color: var(--accent);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.aura-col li b {
+  flex: 0 0 auto;
+  min-width: 38px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.aura-col input[type="radio"] {
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.aura-radio-gap {
+  width: 13px;
+}
+
+.aura-col li.is-dim {
+  opacity: 0.45;
+}
+
+.aura-col li.is-locked > label,
+.aura-col li.is-locked > div {
+  border-style: dashed;
+  background: var(--panel-strong);
+  cursor: default;
+}
+
+.aura-opt {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  font-weight: 700;
+}
+
+.aura-opt small {
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(23, 33, 31, 0.08);
+  font-size: 10px;
+}
+
+.aura-opt.is-empty {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.aura-opt.is-low { color: var(--ink); }
+.aura-opt.is-mid { color: #1f6fb2; }
+.aura-opt.is-high { color: #b7791f; }
+
+/* 바뀐 슬롯은 옅은 강조색으로 */
+.aura-col li.is-changed > div,
+.aura-col li.is-changed > label {
+  border-color: var(--accent);
+  background: rgba(15, 111, 99, 0.06);
+}
+
+.aura-col h4 small {
+  margin-left: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+/* 목표로 고른 옵션 */
+.aura-opt.is-goal::before {
+  content: "★";
+  margin-right: 2px;
+  color: var(--accent);
+}
+
+/* 왼쪽 현재 옵션, 오른쪽 비용·운 순위를 반씩 */
+.aura-body {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  align-items: start;
+}
+
+@media (max-width: 720px) {
+  .aura-body {
+    grid-template-columns: 1fr;
+  }
+}
+
+.aura-cost {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-strong);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.aura-cost b {
+  color: var(--ink);
+}
+
+.aura-stop-note {
+  margin: 0;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.aura-auto-head {
+  margin: 0;
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.aura-stats {
+  margin: 0;
+  color: var(--ink);
+}
+
+.aura-log[hidden] {
+  display: none;
+}
+
+.aura-log {
+  display: grid;
+  gap: 4px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.aura-log li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  font-size: 12px;
+}
+
+.aura-log-n {
+  color: var(--muted);
+}
+
+.aura-log-book {
+  font-weight: 700;
+}
+
+.aura-log-opts {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+}
+
+
+/* 도박문제 상담 센터 안내. 제목 줄 오른쪽에 붉은 글씨로 */
+.gamble-notice {
+  display: grid;
+  justify-self: end;
+  gap: 2px;
+  color: #c53030;
+  font-size: 13px;
+  text-align: right;
+}
+
+.gamble-notice[hidden] {
+  display: none;
+}
+
+.gamble-notice b {
+  font-weight: 800;
+}

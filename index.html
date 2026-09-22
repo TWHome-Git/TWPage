@@ -6,7 +6,7 @@
     <title>TW DB</title>
     <!-- 이미지 CDN. 첫 이미지 요청 전에 DNS+TLS를 미리 끝내둔다 -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
-    <link rel="stylesheet" href="./assets/styles.css?v=20260921-isolet3" />
+    <link rel="stylesheet" href="./assets/styles.css?v=20260922-aura21" />
     <!-- 모바일 전용. media 속성 덕에 넓은 화면에서는 렌더링을 막지 않는다 -->
     <link rel="stylesheet" href="./assets/mobile.css?v=20260918-hammer" media="(max-width: 720px)" />
   </head>
@@ -838,6 +838,7 @@
           <button class="db-subtab" type="button" data-simulator-tab="relic">신조 렐릭</button>
           <button class="db-subtab" type="button" data-simulator-tab="enhance">장비 강화</button>
           <button class="db-subtab" type="button" data-simulator-tab="siena">시에나 증폭</button>
+          <button class="db-subtab" type="button" data-simulator-tab="sienaaura" data-local-only hidden>시에나 기운</button>
           <button class="db-subtab" type="button" data-simulator-tab="hammer">에이라의 망치</button>
         </nav>
 
@@ -845,6 +846,11 @@
           <div class="brand-block">
             <p class="eyebrow">TW DB</p>
             <h1 id="simulatorTitle">인크립트</h1>
+          </div>
+          <!-- 확률형 재설정 시뮬(시에나 기운)에서만 보인다 -->
+          <div id="simGambleNotice" class="gamble-notice" hidden>
+            <b>여기에서 떴다고 게임에서도 뜨진 않아요.</b>
+            <span>🎲 멈추고 싶을 땐 1336 (무료)</span>
           </div>
         </section>
 
@@ -958,6 +964,49 @@
           </div>
           <div id="sienaSummary" class="sim-summary"></div>
           <div class="sim-table-wrap"><table id="sienaTable" class="sim-table"></table></div>
+        </section>
+        <section class="addon-content sim-panel" data-simulator-panel="sienaaura" hidden>
+          <div class="sim-controls">
+            <div class="sim-row aura-top">
+              <div class="sim-toggle-group" aria-label="시에나 단계">
+                <label class="sim-toggle"><input type="radio" name="auraSlots" value="1" checked /><span>시에나 3단계</span></label>
+                <label class="sim-toggle"><input type="radio" name="auraSlots" value="2" /><span>시에나 7단계</span></label>
+                <label class="sim-toggle"><input type="radio" name="auraSlots" value="3" /><span>시에나 10단계</span></label>
+              </div>
+              <button id="auraReset" class="sim-btn aura-reset" type="button">초기화</button>
+            </div>
+            <div class="sim-row">
+              <div class="sim-toggle-group" aria-label="재설정 아이템">
+                <label class="sim-toggle"><input type="radio" name="auraBook" value="ret" checked /><span><img class="aura-book-icon" data-aura-icon="환류의서.png" alt="" />환류의 서</span></label>
+                <label class="sim-toggle"><input type="radio" name="auraBook" value="jung" /><span><img class="aura-book-icon" data-aura-icon="정환의서.png" alt="" />정환의 서</span></label>
+              </div>
+              <div class="sim-toggle-group" aria-label="비용">
+                <label class="sim-toggle"><input type="radio" name="auraPay" value="seed" checked /><span>시드 <small id="auraSeedPrice" class="aura-price"></small></span></label>
+                <label class="sim-toggle"><input type="radio" name="auraPay" value="elso" /><span>엘소 <small id="auraElsoPrice" class="aura-price"></small></span></label>
+              </div>
+            </div>
+            <div class="aura-goal">
+              <div class="aura-goal-head">
+                <b>자동 재설정 목표</b>
+                <small id="auraTargetNote"></small>
+              </div>
+              <div id="auraTargets" class="aura-targets"></div>
+            </div>
+            <div class="sim-buttons">
+              <button id="auraAuto" class="sim-btn" type="button" title="환류의 서는 목표 옵션이 모두 나올 때까지, 정환의 서는 고른 슬롯에 목표 옵션이 나올 때까지 재설정합니다">자동 재설정</button>
+              <div class="hammer-roll-group" title="적은 횟수만큼 재설정합니다. 위에서 고른 목표 옵션이 나오면 그 자리에서 멈춥니다">
+                <label class="hammer-roll-count"><input id="auraRollCount" type="number" min="1" max="10000" step="1" value="1" inputmode="numeric" aria-label="재설정 횟수" /><span>회</span></label>
+                <button id="auraRoll" class="sim-btn primary" type="button">재설정</button>
+              </div>
+            </div>
+          </div>
+          <div class="aura-body">
+            <div class="aura-window">
+              <div id="auraBoard" class="aura-board"></div>
+            </div>
+            <div id="auraCost" class="aura-cost"></div>
+          </div>
+          <ol id="auraLog" class="aura-log" aria-label="재설정 기록" hidden></ol>
         </section>
         <section class="addon-content sim-panel" data-simulator-panel="hammer" hidden>
           <div class="sim-controls">
@@ -1086,7 +1135,7 @@
       </div>
     </template>
 
-    <script src="./assets/app.js?v=20260921-isolet3" type="module"></script>
+    <script src="./assets/app.js?v=20260922-aura24" type="module"></script>
     <!-- GoatCounter 방문자 분석 (localhost 방문은 count.js가 기본으로 집계 제외)
          자동 집계를 끄고 app.js의 라우터가 탭 단위 경로(/eta/ranking 등)로 직접 보낸다 -->
     <script>window.goatcounter = { no_onload: true };</script>

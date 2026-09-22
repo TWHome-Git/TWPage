@@ -3143,13 +3143,15 @@ function activateCalculatorTab(key) {
 }
 
 // 시뮬레이터 탭
-const SIMULATOR_TITLES = { encrypt: "인크립트", core: "코어 강화", relic: "신조 렐릭", enhance: "장비 강화", siena: "시에나 증폭", hammer: "에이라의 망치" };
+const SIMULATOR_TITLES = { encrypt: "인크립트", core: "코어 강화", relic: "신조 렐릭", enhance: "장비 강화", siena: "시에나 증폭", sienaaura: "시에나 기운", hammer: "에이라의 망치" };
 
 function activateSimulatorTab(key) {
   const target = [...els.simulatorTabButtons].find((b) => b.dataset.simulatorTab === key);
   if (!target || target.hidden) key = "encrypt";
   ACTIVE_SUB.simulator = key;
   if (els.simulatorTitle && SIMULATOR_TITLES[key]) els.simulatorTitle.textContent = SIMULATOR_TITLES[key];
+  const gamble = document.getElementById("simGambleNotice");
+  if (gamble) gamble.hidden = key !== "sienaaura";
 
   els.simulatorTabButtons.forEach((button) => {
     button.classList.toggle("is-active", button.dataset.simulatorTab === key);
@@ -8263,6 +8265,7 @@ function initSimulators() {
     "relicCurrent", "relicTarget", "relicDifficulty", "relicCalc", "relicSim", "relicSummary", "relicTable",
     "enhStart", "enhTarget", "enhCalc", "enhSim", "enhSummary", "enhTable",
     "sienaStart", "sienaTarget", "sienaCalc", "sienaSim", "sienaSummary", "sienaTable",
+    "auraBoard", "auraRoll", "auraAuto", "auraReset", "auraCost", "auraLog", "auraTargets", "auraTargetNote", "auraSeedPrice", "auraElsoPrice", "auraRollCount",
     "hammerStat", "hammerSlots", "hammerTarget", "hammerPrice", "hammerRoll", "hammerRollCount", "hammerReset", "hammerAuto",
     "hammerTable", "hammerCost", "hammerStatus", "hammerPlan", "hammerLog",
     "relicRateButton", "coreRateButton",
@@ -8281,6 +8284,7 @@ function initSimulators() {
   wireRelicSim();
   wireEnhanceSim();
   wireSienaSim();
+  wireAuraSim();
   // 상속·장비 제작은 계산기 탭 화면이지만 입력 요소를 simEls로 함께 잡아 두어 여기서 엮는다
   wireInheritSim();
   wireEquipCraft();
@@ -10352,6 +10356,506 @@ function sienaPopulateSelects() {
   simEls.sienaTarget.value = String(SIENA_TOP);
 }
 
+// ── 시에나의 기운 추가 옵션 재설정 시뮬 ───────────────────────────
+//
+// 확률표: https://static.tales.nexon.com/Probability/Game/16-1#mk-3
+// 3·7·10단계에 슬롯이 하나씩 열린다. 슬롯끼리는 같은 종류(등급 무관)가 나오지 않고,
+// 나온 종류는 빼고 남은 확률을 다시 100%로 나눠 뽑는다.
+// 환류의 서는 모든 슬롯을 앞에서부터 차례로 다시 뽑고, 정환의 서는 고른 슬롯 하나만 다시 뽑는다.
+const auraRange = (a, b) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
+
+// [종류, 등급, 획득 확률(%), 나올 수 있는 값(동일 확률)]
+const AURA_TABLE = [
+  ["공격력 증가", "하", 0.9, [1, 2]],
+  ["방어력 증가", "하", 5, [1, 2]],
+  ["방어 무시 공격 확률", "하", 0.4, [1]],
+  ["중딜레이 감소", "하", 0.4, [0.5]],
+  ["모든 스탯 증가", "하", 5, auraRange(5, 10)],
+  ["크리티컬 발동 확률 증가", "하", 5, auraRange(1, 3)],
+  ["HP 증가", "하", 10, auraRange(5, 9)],
+  ["MP 증가", "하", 10, auraRange(1, 5)],
+  ["SP 증가", "하", 10, auraRange(1, 5)],
+  ["공격력 증가", "중", 0.42, auraRange(3, 5)],
+  ["방어력 증가", "중", 3, auraRange(3, 5)],
+  ["방어 무시 공격 확률", "중", 0.1, [2]],
+  ["중딜레이 감소", "중", 0.1, [1]],
+  ["모든 스탯 증가", "중", 3, auraRange(11, 20)],
+  ["크리티컬 발동 확률 증가", "중", 3, auraRange(4, 7)],
+  ["HP 증가", "중", 8, auraRange(10, 14)],
+  ["MP 증가", "중", 8, auraRange(6, 10)],
+  ["SP 증가", "중", 8, auraRange(6, 10)],
+  ["공격력 증가", "상", 0.05, auraRange(8, 10)],
+  ["방어력 증가", "상", 0.57, auraRange(8, 10)],
+  ["방어 무시 공격 확률", "상", 0.03, [3]],
+  ["중딜레이 감소", "상", 0.03, [2]],
+  ["모든 스탯 증가", "상", 0.5, auraRange(21, 30)],
+  ["크리티컬 발동 확률 증가", "상", 0.5, auraRange(8, 10)],
+  ["HP 증가", "상", 6, auraRange(15, 20)],
+  ["MP 증가", "상", 6, auraRange(11, 15)],
+  ["SP 증가", "상", 6, auraRange(11, 15)],
+].map(([type, grade, rate, values]) => ({ type, grade, rate, values }));
+
+const AURA_TYPES = [...new Set(AURA_TABLE.map((row) => row.type))];
+const AURA_STAGES = [3, 7, 10];
+const AURA_GRADE_RANK = { "하": 0, "중": 1, "상": 2 };
+const AURA_GRADE_CLASS = { "하": "is-low", "중": "is-mid", "상": "is-high" };
+// 시드는 만 단위(formatMan), 엘소는 개수
+const AURA_BOOKS = {
+  ret: { name: "환류의 서", icon: "환류의서.png", seed: 100, elso: 150 },
+  jung: { name: "정환의 서", icon: "정환의서.png", seed: 10000, elso: 15000 },
+};
+// 아직 공개 전이라 CDN 태그에 없는 아이콘은 저장소 images/에서 바로 읽는다(로컬 전용). 공개할 때 CDN으로 옮긴다
+const AURA_IMG_BASE = IS_LOCAL ? "./images/" : SIM_IMG_BASE;
+const auraBookIcon = (book) => `<img class="aura-book-icon" src="${AURA_IMG_BASE}${encodeURIComponent(AURA_BOOKS[book].icon)}" alt="" />`;
+const AURA_LOG_MAX = 3; // 최근 기록만 보여준다
+
+const aura = {
+  slots: 1,       // 처음엔 시에나 3단계(슬롯 1개)
+  pay: "seed",
+  book: "ret",
+  options: [],
+  changed: [],    // 직전 재설정에서 바뀐 슬롯
+  pick: 0,        // 정환의 서로 바꿀 슬롯
+  // 자동 재설정 목표. 줄마다 종류와 최소 수치를 고른다(종류가 빈 줄은 목표 아님)
+  goals: [{ type: "", min: 0 }, { type: "", min: 0 }, { type: "", min: 0 }],
+  used: { ret: 0, jung: 0 },
+  auto: null,     // 마지막 자동 재설정 결과
+  stopNote: "",   // 여러 번 재설정하다 목표가 나와 멈췄을 때 안내
+  log: [],
+};
+
+// 이미 나온 종류는 빼고 남은 확률 비율대로 하나 뽑는다
+function auraRollOption(excludeTypes) {
+  const pool = AURA_TABLE.filter((row) => !excludeTypes.includes(row.type));
+  const total = pool.reduce((sum, row) => sum + row.rate, 0);
+  let r = Math.random() * total;
+  let row = pool[pool.length - 1];
+  for (const candidate of pool) {
+    r -= candidate.rate;
+    if (r < 0) { row = candidate; break; }
+  }
+  const value = row.values[Math.floor(Math.random() * row.values.length)];
+  return { type: row.type, grade: row.grade, value };
+}
+
+// 환류의 서: 첫 슬롯부터 차례로, 앞 슬롯에서 나온 종류를 빼 가며 뽑는다
+function auraRollAll(count) {
+  const out = [];
+  for (let i = 0; i < count; i += 1) out.push(auraRollOption(out.map((o) => o.type)));
+  return out;
+}
+
+// 정환의 서: 나머지 슬롯에 있는 종류만 빼고 그 슬롯을 다시 뽑는다
+function auraRollSlot(options, slot) {
+  const next = options.slice();
+  next[slot] = auraRollOption(options.filter((_, i) => i !== slot).map((o) => o.type));
+  return next;
+}
+
+// 종류별로 나올 수 있는 수치(작은 것부터). 수치 콤보 박스와 확률 계산에 쓴다
+const AURA_VALUES = Object.fromEntries(AURA_TYPES.map((type) => [type,
+  [...new Set(AURA_TABLE.filter((row) => row.type === type).flatMap((row) => row.values))].sort((a, b) => a - b)]));
+
+// 지금 유효한 목표. 열린 줄 수만큼만 보고, 같은 종류는 한 번만 센다
+function auraTargets() {
+  const seen = new Set();
+  return aura.goals.slice(0, auraTargetMax()).filter((goal) => {
+    if (!goal.type || seen.has(goal.type)) return false;
+    seen.add(goal.type);
+    return true;
+  });
+}
+
+function auraGoalFor(type) {
+  return auraTargets().find((goal) => goal.type === type);
+}
+
+function auraMeets(option) {
+  const goal = option && auraGoalFor(option.type);
+  return !!goal && option.value >= goal.min;
+}
+
+function auraDone(options) {
+  return auraTargets().every((goal) => options.some((o) => o.type === goal.type && o.value >= goal.min));
+}
+
+// 한 줄(등급)에서 최소 수치 이상이 나올 비율. 값은 줄 안에서 같은 확률
+function auraRowOk(row, min) {
+  return row.rate * row.values.filter((v) => v >= min).length / row.values.length;
+}
+
+// 환류의 서 한 번으로 목표를 모두 채울 확률과, "채운 결과"를 바로 뽑는 함수.
+// 종류 순서를 전부 늘어놓고 더한다(9P3 = 504가지).
+function auraRetModel() {
+  const typeRate = {};
+  const typeOk = {};
+  const targets = auraTargets();
+  AURA_TABLE.forEach((row) => {
+    typeRate[row.type] = (typeRate[row.type] || 0) + row.rate;
+    const goal = targets.find((g) => g.type === row.type);
+    if (goal) typeOk[row.type] = (typeOk[row.type] || 0) + auraRowOk(row, goal.min);
+  });
+  // 이 종류가 이번 슬롯에 (목표 수치를 채우며) 나올 확률
+  const stepP = (type, remain) => (typeRate[type] / remain)
+    * (typeOk[type] !== undefined ? typeOk[type] / typeRate[type] : 1);
+  const memo = new Map();
+  const walk = (k, used, remain) => {
+    if (k === aura.slots) return targets.every((g) => used.includes(g.type)) ? 1 : 0;
+    const key = `${k}|${[...used].sort().join(",")}`;
+    if (memo.has(key)) return memo.get(key);
+    let sum = 0;
+    for (const type of AURA_TYPES) {
+      if (used.includes(type)) continue;
+      const p = stepP(type, remain);
+      if (p > 0) sum += p * walk(k + 1, [...used, type], remain - typeRate[type]);
+    }
+    memo.set(key, sum);
+    return sum;
+  };
+  const total = AURA_TYPES.reduce((sum, t) => sum + typeRate[t], 0);
+
+  // 성공한 판 하나를 성공 조건부 확률대로 뽑는다. 실패 판은 결과에 남지 않으니 굴릴 필요가 없다
+  const sample = () => {
+    const used = [];
+    let remain = total;
+    for (let k = 0; k < aura.slots; k += 1) {
+      const weights = AURA_TYPES.map((type) => (used.includes(type) ? 0
+        : stepP(type, remain) * walk(k + 1, [...used, type], remain - typeRate[type])));
+      const type = AURA_TYPES[auraPickWeighted(weights)];
+      used.push(type);
+      remain -= typeRate[type];
+    }
+    return used.map((type) => {
+      const goal = targets.find((g) => g.type === type);
+      return auraRollOfType(type, goal ? goal.min : -Infinity);
+    });
+  };
+  return { chance: walk(0, [], total), sample };
+}
+
+function auraPickWeighted(weights) {
+  const total = weights.reduce((a, b) => a + b, 0);
+  let r = Math.random() * total;
+  for (let i = 0; i < weights.length; i += 1) {
+    r -= weights[i];
+    if (r < 0 && weights[i] > 0) return i;
+  }
+  return weights.findLastIndex((w) => w > 0);
+}
+
+// 정해진 종류로, 최소 수치 이상인 옵션 하나(등급·값은 그 조건 안에서 확률대로)
+function auraRollOfType(type, min) {
+  const rows = AURA_TABLE.filter((row) => row.type === type);
+  const row = rows[auraPickWeighted(rows.map((r) => auraRowOk(r, min)))];
+  const values = row.values.filter((v) => v >= min);
+  return { type, grade: row.grade, value: values[Math.floor(Math.random() * values.length)] };
+}
+
+// 성공까지 걸린 횟수(기하분포). 확률이 아주 작아도 한 번에 뽑는다
+function auraGeom(p) {
+  if (p >= 1) return 1;
+  return Math.max(1, Math.ceil(Math.log(1 - Math.random()) / Math.log1p(-p)));
+}
+
+// 정환의 서 한 번으로 고른 슬롯에 목표가 나올 확률. 다른 슬롯의 종류는 빠진 채로 뽑는다
+function auraJungChance(options, slot) {
+  const others = options.filter((_, i) => i !== slot).map((o) => o.type);
+  const pool = AURA_TABLE.filter((row) => !others.includes(row.type));
+  const total = pool.reduce((sum, row) => sum + row.rate, 0);
+  const goal = auraTargets()[0];
+  const ok = goal ? pool.filter((row) => row.type === goal.type)
+    .reduce((sum, row) => sum + auraRowOk(row, goal.min), 0) : 0;
+  return total > 0 ? ok / total : 0;
+}
+
+// 운 비교용: 매번 같은 확률이라 기하분포로 여러 판을 바로 뽑는다
+function auraLuckSamples(chance) {
+  const samples = [];
+  if (chance > 0) for (let t = 0; t < 3000; t += 1) samples.push(auraGeom(chance));
+  return samples;
+}
+
+function auraFormat(option) {
+  if (option.type === "모든 스탯 증가") return `${option.type} +${option.value}`;
+  if (option.type === "중딜레이 감소") return `${option.type} +${option.value.toFixed(2)}%`;
+  return `${option.type} +${option.value}%`;
+}
+
+function auraOptionHtml(option, changed) {
+  if (!option) return `<span class="aura-opt is-empty">????</span>`;
+  return `<span class="aura-opt ${AURA_GRADE_CLASS[option.grade]}${changed ? " is-changed" : ""}${auraMeets(option) ? " is-goal" : ""}">`
+    + `${escapeHtml(auraFormat(option))}<small>${option.grade}</small></span>`;
+}
+
+function auraSpend(book, times = 1) {
+  aura.used[book] += times;
+}
+
+// 금액 차이. 기대값보다 많이 썼으면 빨강(+), 적게 썼으면 초록(−)
+function auraCostDelta(book, actual, expected) {
+  const cost = AURA_BOOKS[book];
+  const unit = aura.pay === "seed" ? cost.seed : cost.elso;
+  const gap = Math.round(actual * unit) - Math.round(expected * unit);
+  if (!gap) return "";
+  const text = aura.pay === "seed" ? formatMan(Math.abs(gap)) : formatNumber(Math.abs(gap));
+  return `<b class="sim-delta ${gap > 0 ? "up" : "down"}">${gap > 0 ? "+" : "−"}${text}</b>`;
+}
+
+function auraCostText(book, times) {
+  const cost = AURA_BOOKS[book];
+  return aura.pay === "seed"
+    ? `${formatMan(cost.seed * times)} 시드`
+    : `${formatNumber(Math.round(cost.elso * times))} 엘소`;
+}
+
+function auraPushLog(text, options, changed) {
+  aura.log.unshift({ n: aura.used.ret + aura.used.jung, book: aura.book, text, options, changed });
+  aura.log.length = Math.min(aura.log.length, AURA_LOG_MAX);
+}
+
+function auraChangedSlots(before, after) {
+  return after.map((o, i) => i).filter((i) => {
+    const a = before[i];
+    const b = after[i];
+    return !a || a.type !== b.type || a.grade !== b.grade || a.value !== b.value;
+  });
+}
+
+const AURA_ROLL_MAX = 10000;
+
+// 지금 고른 아이템 기준으로 목표를 채웠는지. 환류는 목표 전부, 정환은 고른 슬롯에 목표 하나
+function auraGoalMet(options, book, slot) {
+  if (!auraTargets().length) return false;
+  return book === "ret" ? auraDone(options) : auraMeets(options[slot]);
+}
+
+// 적은 횟수만큼 재설정한다. 결과는 바로 적용되고, 목표 옵션이 나오면 남은 횟수는 쓰지 않고 멈춘다
+function auraRoll() {
+  const book = aura.book;
+  const slot = Math.min(aura.pick, aura.slots - 1);
+  const want = Math.min(AURA_ROLL_MAX, Math.max(1, Math.floor(Number(simEls.auraRollCount.value) || 1)));
+  simEls.auraRollCount.value = String(want);
+  aura.stopNote = "";
+  let done = 0;
+  for (let k = 0; k < want; k += 1) {
+    const before = aura.options;
+    auraSpend(book);
+    aura.options = book === "ret" ? auraRollAll(aura.slots) : auraRollSlot(before, slot);
+    aura.changed = book === "ret" ? aura.options.map((o, i) => i) : [slot];
+    auraPushLog(
+      book === "ret" ? AURA_BOOKS.ret.name : `${AURA_BOOKS.jung.name} (${AURA_STAGES[slot]}단계)`,
+      aura.options, aura.changed);
+    done += 1;
+    if (auraGoalMet(aura.options, book, slot)) {
+      if (want > 1) aura.stopNote = `목표 옵션이 나와 ${formatNumber(done)}회째에서 멈췄습니다. (${formatNumber(want)}회 중)`;
+      break;
+    }
+  }
+  renderAura();
+}
+
+// 환류의 서: 고른 목표가 모두 나올 때까지 전체를 굴린다.
+// 정환의 서: 고른 슬롯 하나만, 목표 옵션 하나가 그 슬롯에 나올 때까지 굴린다.
+function auraAuto() {
+  if (!auraTargets().length) {
+    alert("자동 재설정으로 노릴 옵션을 먼저 골라 주세요.");
+    return;
+  }
+  const book = aura.book;
+  const slot = Math.min(aura.pick, aura.slots - 1);
+  const goal = (options) => (book === "ret" ? auraDone(options) : auraMeets(options[slot]));
+  if (goal(aura.options)) {
+    alert("이미 목표를 달성했습니다.");
+    return;
+  }
+  const model = book === "ret" ? auraRetModel() : null;
+  const chance = book === "ret" ? model.chance : auraJungChance(aura.options, slot);
+  if (!(chance > 0)) {
+    alert(book === "ret"
+      ? "이 조합은 나올 수 없습니다."
+      : "다른 슬롯에 같은 종류의 옵션이 있어 이 슬롯에는 나올 수 없습니다.");
+    return;
+  }
+  // 매 회 결과는 서로 독립이라, 실제로 하나씩 굴린 것과 같은 분포로
+  // 걸린 횟수(기하분포)와 마지막 성공 결과를 바로 뽑는다. 확률이 아주 낮아도 멈추지 않는다
+  const start = aura.options;
+  const n = auraGeom(chance);
+  let options;
+  if (book === "ret") {
+    options = model.sample();
+  } else {
+    const goalType = auraTargets()[0];
+    options = start.slice();
+    options[slot] = auraRollOfType(goalType.type, goalType.min);
+  }
+  auraSpend(book, n);
+  aura.stopNote = "";
+  aura.options = options;
+  aura.changed = book === "ret" ? auraChangedSlots(start, options) : [slot];
+  aura.auto = {
+    book, n,
+    expected: 1 / chance,
+    luck: simLuckFromSamples(auraLuckSamples(chance), n),
+  };
+  const where = book === "jung" ? ` (${AURA_STAGES[slot]}단계)` : "";
+  // 자동 재설정은 한 번의 결과로 본다. 앞선 기록은 지우고 이번 결과 한 줄만 남긴다
+  aura.log = [];
+  auraPushLog(`자동 재설정 · ${AURA_BOOKS[book].name}${where} ${formatNumber(n)}회`, options, aura.changed);
+  renderAura();
+}
+
+// 처음 옵션은 증폭으로 이미 받은 셈이라 비용 없이 뽑는다
+function auraReset() {
+  aura.options = auraRollAll(aura.slots);
+  aura.changed = [];
+  aura.pick = Math.min(aura.pick, aura.slots - 1);
+  aura.used = { ret: 0, jung: 0 };
+  aura.auto = null;
+  aura.stopNote = "";
+  aura.log = [];
+  renderAura();
+}
+
+// 3단계(슬롯 1개)나 정환의 서(슬롯 하나만 바꿈)는 목표를 1개만 고른다
+function auraTargetMax() {
+  return aura.slots === 1 || aura.book === "jung" ? 1 : aura.slots;
+}
+
+function auraValueText(type, value) {
+  if (type === "모든 스탯 증가") return String(value);
+  return `${type === "중딜레이 감소" ? value.toFixed(2) : value}%`;
+}
+
+// 목표 줄: [종류] [최소 수치]. 수치는 그 종류에 나올 수 있는 값만 보여준다
+function renderAuraTargets() {
+  const max = auraTargetMax();
+  const taken = (i) => aura.goals.slice(0, max).filter((g, j) => j !== i && g.type).map((g) => g.type);
+  simEls.auraTargets.innerHTML = aura.goals.slice(0, max).map((goal, i) => {
+    const values = goal.type ? AURA_VALUES[goal.type] : [];
+    const types = AURA_TYPES.filter((t) => !taken(i).includes(t));
+    return `<div class="aura-goal-row" data-aura-goal="${i}">
+      ${max > 1 ? `<span class="aura-goal-n">목표 ${i + 1}</span>` : ""}
+      <select data-aura-goal-type aria-label="목표 옵션">
+        <option value="">${i === 0 ? "옵션 선택" : "선택 안 함"}</option>
+        ${types.map((t) => `<option value="${escapeHtml(t)}"${t === goal.type ? " selected" : ""}>${escapeHtml(t)}</option>`).join("")}
+      </select>
+      <select data-aura-goal-min aria-label="최소 수치"${goal.type ? "" : " disabled"}>
+        ${values.map((v, k) => `<option value="${v}"${v === goal.min ? " selected" : ""}>${auraValueText(goal.type, v)}${k < values.length - 1 ? " 이상" : ""}</option>`).join("")}
+      </select>
+    </div>`;
+  }).join("");
+  simEls.auraTargetNote.textContent = max === 1
+    ? (aura.book === "jung" ? "고른 슬롯에 나올 때까지" : "1개")
+    : `최대 ${max}개`;
+}
+
+function renderAura() {
+  if (!simEls.auraBoard) return;
+  const jung = aura.book === "jung";
+
+  const current = AURA_STAGES.map((stage, i) => {
+    const open = i < aura.slots;
+    if (!open) return `<li class="is-locked"><div><b>${stage}단계</b>${auraOptionHtml(null, false)}</div></li>`;
+    const changed = aura.changed.includes(i);
+    const option = auraOptionHtml(aura.options[i], changed);
+    if (!jung) return `<li class="${changed ? "is-changed" : ""}"><div><b>${stage}단계</b>${option}</div></li>`;
+    return `<li class="${changed ? "is-changed" : ""}"><label>`
+      + `<input type="radio" name="auraPick" value="${i}"${aura.pick === i ? " checked" : ""} title="정환의 서로 바꿀 슬롯" />`
+      + `<b>${stage}단계</b>${option}</label></li>`;
+  }).join("");
+
+  simEls.auraBoard.innerHTML = `
+    <div class="aura-col">
+      <h4>현재 옵션${jung ? ` <small>바꿀 슬롯을 고르세요</small>` : ""}</h4>
+      <ul>${current}</ul>
+    </div>`;
+
+  renderAuraTargets();
+
+  // 결제 버튼에 지금 고른 아이템 1회 값을 붙인다
+  const book = AURA_BOOKS[aura.book];
+  simEls.auraSeedPrice.textContent = formatMan(book.seed);
+  simEls.auraElsoPrice.textContent = formatNumber(book.elso);
+
+  // 에이라의 망치 결과 칸과 같은 "라벨 : 값" 행. 기대값·이번 결과·차이를 같은 형식으로 위아래에 맞춘다
+  const auto = aura.auto;
+  const rows = [];
+  if (auto) {
+    const name = `${auraBookIcon(auto.book)}${AURA_BOOKS[auto.book].name}`;
+    rows.push(["기대값", `<b>${auraCostText(auto.book, auto.expected)}</b> · ${name} <b>${formatNumber(Math.round(auto.expected))}회</b>`]);
+    rows.push(["이번 결과", `<b>${auraCostText(auto.book, auto.n)}</b> · ${name} <b>${formatNumber(auto.n)}회</b>`]);
+    const gaps = [
+      ["비용", auraCostDelta(auto.book, auto.n, auto.expected)],
+      ["재설정", simDelta(auto.n, auto.expected, "회")],
+    ].filter(([, v]) => v);
+    rows.push(["차이", gaps.length ? gaps.map(([k, v]) => `${k} ${v}`).join(" · ") : "기대값과 같음"]);
+  }
+  // 지금 고른 아이템 하나만: 그 아이템을 쓴 횟수와 금액
+  rows.push(["누적 사용", `<b>${auraCostText(aura.book, aura.used[aura.book])}</b> · ${auraBookIcon(aura.book)}${AURA_BOOKS[aura.book].name} <b>${formatNumber(aura.used[aura.book])}회</b>`]);
+
+  const html = (aura.stopNote ? `<p class="aura-stop-note">${aura.stopNote}</p>` : "")
+    + (auto ? `<p class="aura-auto-head"><b>자동 재설정 완료</b></p>` : "")
+    + `<dl class="hammer-plan-stats aura-stats">${rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("")}</dl>`
+    + (auto ? simLuckRow(auto.luck) : "");
+  simEls.auraCost.innerHTML = html;
+
+  simEls.auraLog.innerHTML = aura.log.map((entry) => `
+    <li>
+      <span class="aura-log-n">#${formatNumber(entry.n)}</span>
+      <span class="aura-log-book">${auraBookIcon(entry.book)}${escapeHtml(entry.text)}</span>
+      <span class="aura-log-opts">${entry.options.map((o, i) => auraOptionHtml(o, entry.changed.includes(i))).join("")}</span>
+    </li>`).join("");
+  simEls.auraLog.hidden = !aura.log.length;
+}
+
+function wireAuraSim() {
+  if (!simEls.auraBoard) return;
+  document.querySelectorAll("[data-aura-icon]").forEach((img) => {
+    img.src = `${AURA_IMG_BASE}${encodeURIComponent(img.dataset.auraIcon)}`;
+  });
+  document.querySelectorAll('input[name="auraSlots"]').forEach((input) => {
+    input.addEventListener("change", () => {
+      aura.slots = Number(input.value);
+      auraReset();
+    });
+  });
+  document.querySelectorAll('input[name="auraPay"]').forEach((input) => {
+    input.addEventListener("change", () => {
+      aura.pay = input.value;
+      renderAura();
+    });
+  });
+  document.querySelectorAll('input[name="auraBook"]').forEach((input) => {
+    input.addEventListener("change", () => {
+      aura.book = input.value;
+      renderAura();
+    });
+  });
+  simEls.auraBoard.addEventListener("change", (event) => {
+    const input = event.target.closest('input[name="auraPick"]');
+    if (input) aura.pick = Number(input.value);
+  });
+  simEls.auraTargets.addEventListener("change", (event) => {
+    const row = event.target.closest("[data-aura-goal]");
+    if (!row) return;
+    const goal = aura.goals[Number(row.dataset.auraGoal)];
+    if (event.target.matches("[data-aura-goal-type]")) {
+      goal.type = event.target.value;
+      goal.min = goal.type ? AURA_VALUES[goal.type][0] : 0;
+    } else if (event.target.matches("[data-aura-goal-min]")) {
+      goal.min = Number(event.target.value);
+    }
+    renderAura();
+  });
+  simEls.auraRoll.addEventListener("click", auraRoll);
+  simEls.auraRollCount.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") auraRoll();
+  });
+  simEls.auraAuto.addEventListener("click", auraAuto);
+  simEls.auraReset.addEventListener("click", auraReset);
+  auraReset();
+}
+
 function wireSienaSim() {
   if (!simEls.sienaStart) return;
   sienaPopulateSelects();
@@ -11273,6 +11777,8 @@ function eqcUnitPrice(name) {
 const EQC_TIER_ICON = { "무기": "핸드벨", "갑옷": "로브", "손목": "암릿", "투구": "헬름" };
 
 function eqcIconName(name) {
+  // 이솔렛 전용 아카드 손목은 아이콘이 따로 없어 아카드 무기 그림을 쓴다
+  if (clean(name) === "아카드 손목") return "아카드 무기";
   const match = /^(인퍼널|아퀼루스|어비스|이클립스)\s+(무기|갑옷|손목|투구)$/u.exec(clean(name));
   return match ? `${match[1]} ${EQC_TIER_ICON[match[2]]}` : name;
 }
