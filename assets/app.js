@@ -8195,10 +8195,10 @@ function simLuckFromSamples(samples, actual) {
   const sd = Math.sqrt(Math.max(0, sumSq / samples.length - mean * mean));
   if (!(sd > 0)) return null;
   // 상위 % = 나보다 운이 좋았던 판의 비율. 동률은 절반만 센다
-  const top = Math.min(99.9, Math.max(0.1, ((luckier + same / 2) / samples.length) * 100));
+  const top = Math.min(99.99, Math.max(0.01, ((luckier + same / 2) / samples.length) * 100));
   // 막대 위 ◆ 위치는 순위(상위 %)를 종 모양의 같은 넓이 지점으로 옮겨 찍는다.
   // 평균과의 차이/표준편차로 찍으면 치우친 분포(시도 횟수)에서 상위 9%가 가운데 가까이 찍혀 글과 어긋난다
-  return { top, z: -simProbit(top / 100), rank: Math.max(1, Math.min(100, Math.round(top))), trials: samples.length };
+  return { top, z: -simProbit(top / 100), rank: simLuckRank(top), trials: samples.length };
 }
 
 // 표준정규분포의 역함수(누적확률 p → z). Acklam 근사, 오차 1e-9 수준
@@ -8258,11 +8258,17 @@ function simLuckGraph(z) {
   return chars.join("");
 }
 
+// 순위는 10,000명 기준으로 센다. 100명 기준이면 상위 97.7%와 99%가 같은 "98~99등"으로 뭉개진다
+const SIM_LUCK_PEOPLE = 10000;
+const simLuckRank = (top) => Math.max(1, Math.min(SIM_LUCK_PEOPLE, Math.round((top / 100) * SIM_LUCK_PEOPLE)));
+const simLuckText = (rank, top, strong = "b") =>
+  `운 순위: ${SIM_LUCK_PEOPLE.toLocaleString("ko-KR")}명 중 <${strong === "b" ? "b" : 'span class="sim-status-strong"'}>${rank.toLocaleString("ko-KR")}등</${strong === "b" ? "b" : "span"}> (상위 ${top.toFixed(2)}%)`;
+
 // 결과 요약 맨 아래에 붙이는 운 표기
 function simLuckRow(stats) {
   if (!stats) return "";
   return `<div class="sim-luck" title="같은 조건으로 ${stats.trials.toLocaleString("ko-KR")}판을 굴려 견준 순위입니다">`
-    + `<div>운 순위: 100명 중 <b>${stats.rank}등</b> (상위 ${stats.top.toFixed(1)}%)</div>`
+    + `<div>${simLuckText(stats.rank, stats.top)}</div>`
     + `<div class="sim-luck-bar">`
     + `<div class="sim-graph-legend"><span>운 좋음</span><span>평균</span><span>운 나쁨</span></div>`
     + `<div class="sim-graph">${simLuckGraph(stats.z)}</div>`
@@ -8606,10 +8612,9 @@ function encRefreshStatus() {
   rows.push(`<div>누적 비용: ${encFmtCost(encSim.totalCost)}</div>`);
   const luck = encLuckStats();
   if (luck) {
-    // 표시용: 상위 % = 100 - percentile(나보다 운 나쁜 사람 비율) → 100명 중 등수(순위)로 표현
+    // 표시용: 상위 % = 100 - percentile(나보다 운 나쁜 사람 비율) → 10,000명 중 등수(순위)로 표현
     const topPercent = Math.max(0, Math.min(100, 100 - luck.percentile));
-    const rank = Math.max(1, Math.min(100, Math.round(topPercent)));
-    const luckText = `운 순위: 100명 중 <span class="sim-status-strong">${rank}등</span> (상위 ${topPercent.toFixed(1)}%)`;
+    const luckText = simLuckText(simLuckRank(topPercent), topPercent, "span");
     rows.push(`<div>${luckText}</div>`);
     rows.push(`<div class="sim-graph-legend"><span>운 좋음</span><span>평균</span><span>운 나쁨</span></div>`);
     rows.push(`<div class="sim-graph">${simLuckGraph(luck.z)}</div>`);
