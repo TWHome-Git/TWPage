@@ -8308,3 +8308,26 @@ img.dmg-chk-icon {
 .gamble-notice b {
   font-weight: 800;
 }
+
+/* 에타 순위 갱신일 옆: 이 기간 라피스·설계자의 반지 소모량 */
+.eta-lapis-use {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.eta-lapis-use[hidden] {
+  display: none;
+}
+
+.eta-lapis-icon {
+  width: 16px;
+  height: 16px;
+  margin-right: 3px;
+  object-fit: contain;
+  vertical-align: -3px;
+}
+
+.eta-lapis-use b {
+  color: var(--ink);
+  font-weight: 700;
+}

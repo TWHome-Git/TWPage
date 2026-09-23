@@ -429,6 +429,7 @@ const els = {
   etaDateSelect: document.querySelector("#etaDateSelect"),
   etaCount: document.querySelector("#etaCount"),
   etaUpdatedDate: document.querySelector("#etaUpdatedDate"),
+  etaLapisUse: document.querySelector("#etaLapisUse"),
   etaCompareSelect: document.querySelector("#etaCompareSelect"),
   etaTabButtons: document.querySelectorAll("[data-eta-tab]"),
   etaPanels: document.querySelectorAll("[data-eta-panel]"),
@@ -447,6 +448,7 @@ const els = {
   popServerTabs: document.querySelector("#popServerTabs"),
   popTotal: document.querySelector("#popTotal"),
   popRangeLabel: document.querySelector("#popRangeLabel"),
+  popLapisUse: document.querySelector("#popLapisUse"),
   popChart: document.querySelector("#popChart"),
   popEmpty: document.querySelector("#popEmpty"),
   popLegend: document.querySelector("#popLegend"),
@@ -1284,12 +1286,18 @@ function etaPrevIndexDate(baseDate) {
   const pad = (value) => String(value).padStart(2, "0");
   const target = `${base.getFullYear()}-${pad(base.getMonth() + 1)}-${pad(base.getDate())}`;
   const dates = Object.keys(eta.index).filter((d) => d <= target).sort();
-  return dates[dates.length - 1] || null;
+  if (dates.length) return dates[dates.length - 1];
+  eta.prevShort = true;   // 요청한 기간만큼 자료가 없어 더 짧은 기간과 견줬다
+  // 그만큼 거슬러 올라갈 자료가 없으면(수집 시작 전) 가진 것 중 가장 오래된 날과 견준다.
+  // 아무 표시도 안 하는 것보다 "있는 데까지"라도 보여 주는 편이 낫다
+  const older = Object.keys(eta.index).filter((d) => d < baseDate).sort();
+  return older[0] || null;
 }
 
 async function loadEtaPreviousRankings(seq) {
   eta.prevServers = null;
   eta.prevDate = null;
+  eta.prevShort = false;
 
   try {
     await loadEtaIndex();
@@ -1311,6 +1319,28 @@ async function loadEtaPreviousRankings(seq) {
 }
 
 // 현재 서버·카테고리 기준으로 일주일 전 순위·정수를 계산 (검색어는 순위에 영향 없음)
+// 레벨업에 드는 재료. 키는 "그 레벨에서 다음 레벨로" (20 → 21에 라피스 1개)
+const ETA_LEVEL_COST = {
+  20: { lapis: 1 },
+  40: { lapis: 3 },
+  60: { lapis: 3 },
+  80: { lapis: 3 },
+  90: { lapis: 5, ring: 1 },
+};
+
+// 이전 레벨에서 지금 레벨까지 올리며 쓴 재료
+function etaLevelCost(from, to) {
+  let lapis = 0;
+  let ring = 0;
+  for (let level = from; level < to; level += 1) {
+    const cost = ETA_LEVEL_COST[level];
+    if (!cost) continue;
+    lapis += cost.lapis || 0;
+    ring += cost.ring || 0;
+  }
+  return { lapis, ring };
+}
+
 function etaPrevRankMap() {
   const prevRows = eta.prevServers?.[eta.server];
   if (!prevRows || !prevRows.length) return null;
@@ -1459,7 +1489,8 @@ async function loadEtaMoves() {
   if (etaMoves.data || etaMoves.loading) return etaMoves.data;
   etaMoves.loading = true;
   try {
-    const response = await fetch(ETA_MOVES_URL);
+    // 매일 바뀌는 파일이라 캐시를 그대로 쓰지 않고 바뀌었는지 서버에 물어본다(안 바뀌었으면 304)
+    const response = await fetch(ETA_MOVES_URL, { cache: "no-cache" });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     etaMoves.data = await response.json();
   } catch (error) {
@@ -1692,6 +1723,7 @@ const POP_ALL_SERVERS = "통합";
 
 const etaPop = {
   days: null,        // { "yyyy-MM-dd": { 서버: { 캐릭터코드: [구간별 인원] } } }
+  cost: null,        // { "yyyy-MM-dd": { 서버: { 캐릭터코드: [구간을 넘어간 인원] } } }
   loading: false,
   server: "",
   range: "3m",
@@ -1788,10 +1820,12 @@ function loadEtaPopulation() {
   etaPop.loading = true;
   etaPopPromise = (async () => {
     try {
-      const response = await fetch(ETA_POPULATION_URL);
+      // 매일 바뀌는 파일이라 캐시를 그대로 쓰지 않고 바뀌었는지 서버에 물어본다(안 바뀌었으면 304)
+      const response = await fetch(ETA_POPULATION_URL, { cache: "no-cache" });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const payload = await response.json();
       etaPop.days = payload?.days || {};
+      etaPop.cost = payload?.cost || null;
       if (!etaPop.server) etaPop.server = popServerNames()[0] || "";
       renderEtaPopulation();
     } catch (error) {
@@ -1942,6 +1976,7 @@ function renderEtaPopulation() {
   if (reason) {
     els.popTotal.textContent = "0명";
     els.popRangeLabel.textContent = reason;
+    if (els.popLapisUse) els.popLapisUse.hidden = true;
     return;
   }
 
@@ -1952,8 +1987,50 @@ function renderEtaPopulation() {
   els.popRangeLabel.textContent = `${dates[0]} ~ ${dates[dates.length - 1]} · ${dates.length}일`
     + (clipped ? " · 서버가 모두 수집된 날부터" : "");
 
+  renderPopLapisUse(dates, shown);
   els.popChart.innerHTML = popChartSvg(dates, shown);
   wirePopChartHover(dates, shown);
+}
+
+// 날짜별 소모량은 파일을 만들 때 사람마다 어제·오늘 레벨을 견줘 세어 둔 값이다.
+// cost[날짜][서버][캐릭터코드] = [20→21 인원, 40→41, 60→61, 80→81, 90→91]
+// 넘어간 구간(20→21이면 21-40 구간)이 켜져 있을 때만 센다.
+const POP_COST_ITEMS = [{ lapis: 1 }, { lapis: 3 }, { lapis: 3 }, { lapis: 3 }, { lapis: 5, ring: 1 }];
+
+function renderPopLapisUse(dates, shown) {
+  const box = els.popLapisUse;
+  if (!box) return;
+  const cost = etaPop.cost;
+  // 그 날짜의 값은 "전날 대비"라 기간의 첫날은 빼고 더한다
+  const span = dates.slice(1).filter((date) => cost?.[date]);
+  if (!cost || !span.length || !shown.length) {
+    box.hidden = true;
+    return;
+  }
+  const codes = shown.map((series) => String(series.code));
+  let lapis = 0;
+  let ring = 0;
+  span.forEach((date) => {
+    popActiveServers().forEach((name) => {
+      const server = cost[date]?.[name];
+      if (!server) return;
+      codes.forEach((code) => {
+        const counts = server[code];
+        if (!counts) return;
+        counts.forEach((people, index) => {
+          if (!people || !etaPop.bands.has(index + 1)) return;
+          lapis += people * POP_COST_ITEMS[index].lapis;
+          ring += people * (POP_COST_ITEMS[index].ring || 0);
+        });
+      });
+    });
+  });
+  const base = IS_LOCAL ? "./images/" : SIM_IMG_BASE;
+  const icon = (file) => `<img class="eta-lapis-icon" src="${base}${encodeURIComponent(file)}" alt="" width="16" height="16" loading="lazy" />`;
+  box.hidden = false;
+  box.title = `${span[0]} ~ ${span[span.length - 1]} 레벨업에 쓴 양`;
+  box.innerHTML = `이 기간 소모 ${icon("에오니스_라피스.png")}라피스 <b>${formatNumber(lapis)}개</b>`
+    + ` · ${icon("설계자의_반지.png")}설계자의 반지 <b>${formatNumber(ring)}개</b>`;
 }
 
 function renderPopRangeButtons() {
@@ -2484,6 +2561,7 @@ function renderEtaRanking() {
     : ranked;
 
   els.etaCount.textContent = `${visible.length.toLocaleString("ko-KR")}명`;
+  renderEtaLapisUse(ranked, prevMap);
 
   if (!visible.length) {
     els.etaRankingBody.innerHTML = `
@@ -2551,6 +2629,35 @@ function etaRowsHtml(rows) {
       </tr>
     `;
   }).join("");
+}
+
+// 갱신일 옆에 이 기간 동안 쓴 라피스·설계자의 반지 (증감 기준과 같은 기간)
+function renderEtaLapisUse(rows, prevMap) {
+  const box = els.etaLapisUse;
+  if (!box) return;
+  if (!prevMap) {
+    box.hidden = true;
+    return;
+  }
+  let lapis = 0;
+  let ring = 0;
+  rows.forEach((row) => {
+    if (!row.prev || row.level <= row.prev.level) return;
+    const cost = etaLevelCost(row.prev.level, row.level);
+    lapis += cost.lapis;
+    ring += cost.ring;
+  });
+  box.hidden = false;
+  box.title = eta.prevDate ? `${eta.prevDate} 대비 레벨업에 쓴 양` : "";
+  // 아직 CDN 태그에 없는 아이콘은 로컬에서 저장소 images/를 바로 읽는다(공개할 때 태그를 올린다)
+  const base = IS_LOCAL ? "./images/" : SIM_IMG_BASE;
+  const icon = (file) => `<img class="eta-lapis-icon" src="${base}${encodeURIComponent(file)}" alt="" width="16" height="16" loading="lazy" />`;
+  // 기간을 글로도 적는다. 증감 기준을 바꾸면 이 말도 같이 바뀐다.
+  // 그만큼 거슬러 올라갈 자료가 없으면 실제로 견준 날짜를 적는다
+  const spanText = { 1: "금일", 7: "최근 1주일", 30: "최근 1달" }[eta.compareDays] || `최근 ${eta.compareDays}일`;
+  const label = eta.prevShort ? `${eta.prevDate} 이후` : spanText;
+  box.innerHTML = `${label} 소모 ${icon("에오니스_라피스.png")}라피스 <b>${formatNumber(lapis)}개</b>`
+    + ` · ${icon("설계자의_반지.png")}설계자의 반지 <b>${formatNumber(ring)}개</b>`;
 }
 
 // DB 검색 서브탭 (장비 / 어빌리티 / 아바타)
@@ -10837,8 +10944,17 @@ function renderAura() {
     ].filter(([, v]) => v);
     rows.push(["차이", gaps.length ? gaps.map(([k, v]) => `${k} ${v}`).join(" · ") : "기대값과 같음"]);
   }
-  // 지금 고른 아이템 하나만: 그 아이템을 쓴 횟수와 금액
-  rows.push(["누적 사용", `<b>${auraCostText(aura.book, aura.used[aura.book])}</b> · ${auraBookIcon(aura.book)}${AURA_BOOKS[aura.book].name} <b>${formatNumber(aura.used[aura.book])}회</b>${auraCashText(aura.book, aura.used[aura.book])}`]);
+  // 환류·정환을 섞어 쓰면 금액과 캐시는 둘을 합치고, 횟수는 쓴 아이템마다 적는다
+  const usedBooks = ["ret", "jung"].filter((b) => aura.used[b] > 0);
+  const shownBooks = usedBooks.length ? usedBooks : [aura.book];
+  const spent = shownBooks.reduce((sum, b) => {
+    const cost = AURA_BOOKS[b];
+    return sum + aura.used[b] * (aura.pay === "seed" ? cost.seed : cost.elso);
+  }, 0);
+  const spentText = aura.pay === "seed" ? `${formatMan(spent)} 시드` : `${formatNumber(spent)} 엘소`;
+  const cashSum = shownBooks.reduce((sum, b) => sum + aura.used[b] * AURA_BOOKS[b].cash, 0);
+  const counts = shownBooks.map((b) => `${auraBookIcon(b)}${AURA_BOOKS[b].name} <b>${formatNumber(aura.used[b])}회</b>`).join(" · ");
+  rows.push(["누적 사용", `<b>${spentText}</b> · ${counts}${cashSum > 0 ? ` <small class="aura-cash">(${formatNumber(cashSum)} 캐시)</small>` : ""}`]);
 
   const html = (aura.stopNote ? `<p class="aura-stop-note">${aura.stopNote}</p>` : "")
     + (auto ? `<p class="aura-auto-head"><b>자동 재설정 완료</b></p>` : "")
