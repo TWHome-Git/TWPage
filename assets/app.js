@@ -339,6 +339,8 @@ const els = {
   homeStats: document.querySelector("#homeStats"),
   homeOverlayDownload: document.querySelector("#homeOverlayDownload"),
   homeOverlayMeta: document.querySelector("#homeOverlayMeta"),
+  homeEtaCheckerDownload: document.querySelector("#homeEtaCheckerDownload"),
+  homeEtaCheckerMeta: document.querySelector("#homeEtaCheckerMeta"),
   mainPanels: document.querySelectorAll("[data-main-panel]"),
   dbTabButtons: document.querySelectorAll("[data-db-tab]"),
   dbPanels: document.querySelectorAll("[data-db-panel]"),
@@ -391,6 +393,9 @@ const els = {
   overlayReadme: document.querySelector("#overlayReadme"),
   overlayDownload: document.querySelector("#overlayDownload"),
   overlayReleaseMeta: document.querySelector("#overlayReleaseMeta"),
+  etaCheckerReadme: document.querySelector("#etaCheckerReadme"),
+  etaCheckerDownload: document.querySelector("#etaCheckerDownload"),
+  etaCheckerReleaseMeta: document.querySelector("#etaCheckerReleaseMeta"),
   characterGrid: document.querySelector("#characterGrid"),
   coefficientSelectView: document.querySelector("#coefficientSelectView"),
   coefficientDetailView: document.querySelector("#coefficientDetailView"),
@@ -493,6 +498,7 @@ const ROUTE_DEFAULT_SUB = {
   calculator: "equipment",
   simulator: "encrypt",
   overlay: "",
+  etachecker: "",
 };
 
 // 옛 주소 → 지금 자리. 예전에 "테일즈 정보(extra)"에 있던 화면들이 정보·계산기로 나뉘어서,
@@ -1154,8 +1160,8 @@ function activateMainTab(key) {
     loadEtaRankings();
   }
 
-  if (key === "overlay") {
-    loadOverlayTab();
+  if (REPO_TABS[key]) {
+    loadRepoTab(REPO_TABS[key]);
   }
 
   if (key === "home") {
@@ -4794,34 +4800,49 @@ const hitCalc = (() => {
 })();
 
 // ══════════════════════════════════════════════════════════════
-//  TWChatOverlay 탭 — GitHub README + 최신 릴리스 다운로드
+//  프로그램 탭 (TWChatOverlay · TWEtaChecker) — GitHub README + 최신 릴리스 다운로드
+//  저장소만 다르고 화면 구성은 같아서, 저장소별 설정을 두고 같은 코드로 그린다.
 // ══════════════════════════════════════════════════════════════
 
-const OVERLAY_REPO = "TWHome-Git/TWChatOverlay";
-const OVERLAY_REPO_URL = `https://github.com/${OVERLAY_REPO}`;
-const OVERLAY_RAW_BASE = `https://raw.githubusercontent.com/${OVERLAY_REPO}/HEAD/`;
-const OVERLAY_README_API = `https://api.github.com/repos/${OVERLAY_REPO}/readme`;
-const OVERLAY_RELEASE_API = `https://api.github.com/repos/${OVERLAY_REPO}/releases/latest`;
+function repoTab(key, name, repo, asset, ids) {
+  return {
+    key,
+    name,
+    repoUrl: `https://github.com/${repo}`,
+    rawBase: `https://raw.githubusercontent.com/${repo}/HEAD/`,
+    readmeApi: `https://api.github.com/repos/${repo}/readme`,
+    releaseApi: `https://api.github.com/repos/${repo}/releases/latest`,
+    asset,        // 릴리스 첨부 중 내려받기 링크로 쓸 파일
+    ids,          // 탭 화면과 홈 카드의 요소 키 (els)
+    // "idle"일 때만 요청한다. 실패하면 다시 "idle"로 되돌려서 탭을 다시 눌렀을 때 재시도되게 한다.
+    readme: "idle",
+    release: "idle",
+  };
+}
 
-// "idle"일 때만 요청한다. 실패하면 다시 "idle"로 되돌려서 탭을 다시 눌렀을 때 재시도되게 한다.
-const overlay = { readme: "idle", release: "idle" };
+const REPO_TABS = {
+  overlay: repoTab("overlay", "TWChatOverlay", "TWHome-Git/TWChatOverlay", /\.zip$/i,
+    { readme: "overlayReadme", download: "overlayDownload", meta: "overlayReleaseMeta", homeDownload: "homeOverlayDownload", homeMeta: "homeOverlayMeta" }),
+  etachecker: repoTab("etachecker", "TWEtaChecker", "TWHome-Git/TWEtaChecker", /\.exe$/i,
+    { readme: "etaCheckerReadme", download: "etaCheckerDownload", meta: "etaCheckerReleaseMeta", homeDownload: "homeEtaCheckerDownload", homeMeta: "homeEtaCheckerMeta" }),
+};
 
-function loadOverlayTab() {
-  if (overlay.readme === "idle") loadOverlayReadme();
-  if (overlay.release === "idle") loadOverlayRelease();
+function loadRepoTab(tab) {
+  if (tab.readme === "idle") loadRepoReadme(tab);
+  if (tab.release === "idle") loadRepoRelease(tab);
 }
 
 // 릴리스 하나를 읽어 버튼에 첨부 파일 링크와 버전 정보를 채운다
-async function fillOverlayRelease(apiUrl, link, metaEl, fallbackHref, fallbackText, { withSize = true } = {}) {
+async function fillRepoRelease(tab, link, metaEl, fallbackHref, fallbackText, { withSize = true } = {}) {
   if (!link || !metaEl) return true;   // 버튼이 없으면 실패로 치지 않는다
 
   try {
-    const response = await fetch(apiUrl, { headers: { Accept: "application/vnd.github+json" } });
+    const response = await fetch(tab.releaseApi, { headers: { Accept: "application/vnd.github+json" } });
     if (!response.ok) throw new Error(`Release ${response.status}`);
     const release = await response.json();
 
     const assets = Array.isArray(release.assets) ? release.assets : [];
-    const asset = assets.find((item) => /\.zip$/i.test(item.name || "")) || assets[0];
+    const asset = assets.find((item) => tab.asset.test(item.name || "")) || assets[0];
 
     // 첨부 파일이 있으면 바로 받아지게, 없으면 릴리스 페이지로 보낸다
     link.href = asset?.browser_download_url || release.html_url || fallbackHref;
@@ -4834,27 +4855,23 @@ async function fillOverlayRelease(apiUrl, link, metaEl, fallbackHref, fallbackTe
 
     return true;
   } catch (error) {
-    console.warn("TWChatOverlay 릴리스 정보를 불러오지 못했습니다.", apiUrl, error);
+    console.warn(`${tab.name} 릴리스 정보를 불러오지 못했습니다.`, tab.releaseApi, error);
     link.href = fallbackHref;
     metaEl.textContent = fallbackText;
     return false;
   }
 }
 
-async function loadOverlayRelease() {
-  if (!els.overlayDownload || !els.overlayReleaseMeta) return;
-  overlay.release = "loading";
+async function loadRepoRelease(tab) {
+  const link = els[tab.ids.download];
+  const metaEl = els[tab.ids.meta];
+  if (!link || !metaEl) return;
+  tab.release = "loading";
 
-  const loaded = await fillOverlayRelease(
-    OVERLAY_RELEASE_API,
-    els.overlayDownload,
-    els.overlayReleaseMeta,
-    `${OVERLAY_REPO_URL}/releases/latest`,
-    "Latest Release"
-  );
+  const loaded = await fillRepoRelease(tab, link, metaEl, `${tab.repoUrl}/releases/latest`, "Latest Release");
 
   // 실패하면 탭을 다시 눌렀을 때 재시도한다
-  overlay.release = loaded ? "loaded" : "idle";
+  tab.release = loaded ? "loaded" : "idle";
 }
 
 // ── 홈 ──
@@ -5020,18 +5037,18 @@ function renderHomeStats() {
   els.homeStats.innerHTML = cards.join("");
 }
 
+// 홈 카드 두 장(오버레이·에타 체커)의 버전 표시
 async function loadHomeRelease() {
-  if (!els.homeOverlayDownload || !els.homeOverlayMeta) return;
   home.release = "loading";
-  const loaded = await fillOverlayRelease(
-    OVERLAY_RELEASE_API,
-    els.homeOverlayDownload,
-    els.homeOverlayMeta,
-    `${OVERLAY_REPO_URL}/releases/latest`,
+  const results = await Promise.all(Object.values(REPO_TABS).map((tab) => fillRepoRelease(
+    tab,
+    els[tab.ids.homeDownload],
+    els[tab.ids.homeMeta],
+    `${tab.repoUrl}/releases/latest`,
     "Latest Release",
     { withSize: false } // 홈에서는 버전과 날짜만. 용량까지 붙이면 너무 길다
-  );
-  home.release = loaded ? "loaded" : "idle";
+  )));
+  home.release = results.every(Boolean) ? "loaded" : "idle";
 }
 
 function formatOverlaySize(bytes) {
@@ -5040,10 +5057,11 @@ function formatOverlaySize(bytes) {
   return mb >= 1 ? `${mb.toFixed(1)}MB` : `${Math.round(bytes / 1024)}KB`;
 }
 
-async function loadOverlayReadme() {
-  if (!els.overlayReadme) return;
-  overlay.readme = "loading";
-  els.overlayReadme.innerHTML = `
+async function loadRepoReadme(tab) {
+  const box = els[tab.ids.readme];
+  if (!box) return;
+  tab.readme = "loading";
+  box.innerHTML = `
     <div class="overlay-loading">
       <div class="loading-spinner" role="status" aria-label="불러오는 중"></div>
       <span>README를 불러오는 중입니다.</span>
@@ -5051,44 +5069,44 @@ async function loadOverlayReadme() {
   `;
 
   try {
-    els.overlayReadme.innerHTML = await fetchOverlayReadme();
-    decorateOverlayReadme();
-    overlay.readme = "loaded";
+    box.innerHTML = await fetchRepoReadme(tab);
+    decorateRepoReadme(tab, box);
+    tab.readme = "loaded";
   } catch (error) {
-    console.warn("TWChatOverlay README를 불러오지 못했습니다.", error);
-    overlay.readme = "idle";
-    els.overlayReadme.innerHTML = `
+    console.warn(`${tab.name} README를 불러오지 못했습니다.`, error);
+    tab.readme = "idle";
+    box.innerHTML = `
       <div class="empty-state overlay-error">
         <strong>README를 불러오지 못했습니다</strong>
         <span>GitHub 응답이 없거나 API 요청 한도에 걸렸을 수 있습니다.</span>
         <div class="overlay-error-actions">
           <button class="sim-btn" type="button" data-overlay-retry>다시 시도</button>
-          <a href="${OVERLAY_REPO_URL}#readme" target="_blank" rel="noopener noreferrer">GitHub에서 바로 보기</a>
+          <a href="${tab.repoUrl}#readme" target="_blank" rel="noopener noreferrer">GitHub에서 바로 보기</a>
         </div>
       </div>
     `;
-    els.overlayReadme.querySelector("[data-overlay-retry]")?.addEventListener("click", loadOverlayReadme);
+    box.querySelector("[data-overlay-retry]")?.addEventListener("click", () => loadRepoReadme(tab));
   }
 }
 
 // 1순위는 GitHub이 직접 렌더링해준 HTML이다. 문법 재현이 정확하고 서버에서 살균까지 끝난 상태다.
 // API 요청 한도(비로그인 시간당 60회)에 걸리면 raw 마크다운을 받아 내장 변환기로 그린다.
-async function fetchOverlayReadme() {
+async function fetchRepoReadme(tab) {
   try {
-    const response = await fetch(OVERLAY_README_API, { headers: { Accept: "application/vnd.github.html" } });
+    const response = await fetch(tab.readmeApi, { headers: { Accept: "application/vnd.github.html" } });
     if (!response.ok) throw new Error(`README ${response.status}`);
     return await response.text();
   } catch (error) {
     console.info("GitHub README API 실패. raw 마크다운으로 대체합니다.", error);
-    const response = await fetch(`${OVERLAY_RAW_BASE}README.md`);
+    const response = await fetch(`${tab.rawBase}README.md`);
     if (!response.ok) throw new Error(`README raw ${response.status}`);
-    return renderOverlayMarkdown(await response.text());
+    return renderOverlayMarkdown(await response.text(), tab.rawBase);
   }
 }
 
 // README는 저장소 루트 기준으로 쓰여 있어서, 상대 경로를 GitHub 절대 주소로 바꿔줘야 한다.
-function decorateOverlayReadme() {
-  els.overlayReadme.querySelectorAll("a[href]").forEach((anchor) => {
+function decorateRepoReadme(tab, box) {
+  box.querySelectorAll("a[href]").forEach((anchor) => {
     const href = anchor.getAttribute("href") || "";
 
     if (href.startsWith("#")) {
@@ -5098,7 +5116,7 @@ function decorateOverlayReadme() {
       return;
     }
 
-    const resolved = resolveOverlayUrl(href, `${OVERLAY_REPO_URL}/blob/HEAD/`);
+    const resolved = resolveOverlayUrl(href, `${tab.repoUrl}/blob/HEAD/`);
     if (!resolved) {
       anchor.removeAttribute("href");
       return;
@@ -5108,8 +5126,8 @@ function decorateOverlayReadme() {
     anchor.rel = "noopener noreferrer";
   });
 
-  els.overlayReadme.querySelectorAll("img[src]").forEach((image) => {
-    const resolved = resolveOverlayUrl(image.getAttribute("src") || "", OVERLAY_RAW_BASE);
+  box.querySelectorAll("img[src]").forEach((image) => {
+    const resolved = resolveOverlayUrl(image.getAttribute("src") || "", tab.rawBase);
     if (resolved) image.src = stabilizeOverlayImageUrl(resolved);
     image.loading = "lazy";
     image.decoding = "async";
@@ -5136,7 +5154,7 @@ function resolveOverlayUrl(value, base) {
 
 // GitHub API가 막혔을 때만 쓰는 최소 마크다운 변환기.
 // 이 README가 실제로 쓰는 문법(제목 / 목록 / 강조 / 링크 / 이미지 / 구분선 / 코드)만 다룬다.
-function renderOverlayMarkdown(source) {
+function renderOverlayMarkdown(source, rawBase) {
   const rawImages = [];
 
   const text = String(source)
@@ -5145,7 +5163,7 @@ function renderOverlayMarkdown(source) {
     // 마크다운에 직접 박아둔 <img> 태그는 허용 속성만 남겨 따로 보관했다가 마지막에 되돌린다
     .replace(/<img\b[^>]*>/gi, (tag) => {
       const src = /\bsrc\s*=\s*["']([^"']+)["']/i.exec(tag)?.[1] || "";
-      if (!resolveOverlayUrl(src, OVERLAY_RAW_BASE)) return "";
+      if (!resolveOverlayUrl(src, rawBase)) return "";
       const alt = /\balt\s*=\s*["']([^"']*)["']/i.exec(tag)?.[1] || "";
       rawImages.push(`<img src="${escapeHtml(src)}" alt="${escapeHtml(alt)}" />`);
       return `@@TWIMG${rawImages.length - 1}@@`;
@@ -11458,8 +11476,8 @@ function boardClose() {
 }
 
 function wireBoard() {
-  if (!boardEls.button || !boardEls.modal) return;
-  boardEls.button.addEventListener("click", boardOpen);
+  if (!boardEls.modal) return;
+  boardEls.button?.addEventListener("click", boardOpen);
   boardEls.modal.addEventListener("click", (event) => {
     if (event.target.closest("[data-board-close]")) boardClose();
   });

@@ -111,10 +111,6 @@
     grid-template-columns: repeat(2, 1fr);
   }
 
-  .board-open-button {
-    grid-column: 1 / -1;
-  }
-
   .search-field {
     grid-column: auto;
   }
@@ -206,6 +202,20 @@
 }
 
 @media (max-width: 720px) {
+  .home-apps {
+    max-height: none;
+  }
+
+  .home-etachecker-card .home-overlay-shot {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .home-etachecker-card .home-overlay-shot img {
+    max-width: 240px;
+    align-self: center;
+  }
+
   .overlay-actions-field {
     justify-items: stretch;
   }

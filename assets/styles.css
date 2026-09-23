@@ -75,8 +75,7 @@ select {
 
 .top-tabs {
   display: grid;
-  /* 마지막 auto는 오른쪽 끝 문의 버튼 자리. 탭은 그대로 7등분한다 */
-  grid-template-columns: repeat(7, 1fr) auto;
+  grid-template-columns: repeat(8, 1fr);
   gap: 4px;
   padding: 5px;
   border-radius: 8px 8px 0 0;
@@ -7762,12 +7761,22 @@ img.dmg-chk-icon {
   justify-items: center;
 }
 
-/* 홈 오른쪽 오버레이 카드 — 버튼 없이 화면 사진을 다 보여준다. 누르면 사용 안내로 간다 */
+/* 홈 오른쪽 — 프로그램 카드 두 장(오버레이·에타 체커)을 위아래로 둔다. 둘이 같이 왼쪽 칸 높이를 채운다 */
+.home-apps {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+  max-height: var(--home-panel-h);
+  min-height: 0;
+}
+
+/* 프로그램 카드 — 버튼 없이 화면 사진을 보여준다. 누르면 사용 안내로 간다 */
 .home-overlay-card {
   display: flex;
   flex-direction: column;
-  height: 100%;
-  max-height: var(--home-panel-h);
+  flex: 1 1 0;
+  min-height: 0;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 14px;
@@ -7819,6 +7828,26 @@ img.dmg-chk-icon {
   height: auto;
   border-radius: 8px;
   object-fit: contain;
+}
+
+/* 에타 체커 카드: 왼쪽에 팝업 사진, 오른쪽에 한 줄 설명 */
+.home-etachecker-card .home-overlay-shot {
+  gap: 14px;
+  justify-content: flex-start;
+  padding: 10px 14px;
+}
+
+.home-etachecker-card .home-overlay-shot img {
+  flex: 0 1 auto;
+  max-width: 46%;
+}
+
+.home-etachecker-desc {
+  flex: 1 1 0;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
 }
 
 /* hidden 속성이 display 지정에 밀리지 않게 한다 (기본 페이지에서 하위 메뉴 줄 감추기) */
