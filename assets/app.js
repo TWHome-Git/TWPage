@@ -23,7 +23,7 @@ const SNAPSHOT_URL = "./data/equipment-snapshot.json";
 const CDN_ROOT = "https://cdn.jsdelivr.net/gh/TWHome-Git/TWPage@";
 const CDN_AVATAR_ROOT = `${CDN_ROOT}v1.0.15/`;
 const CDN_EQUIP_ROOT = `${CDN_ROOT}v2.0.8/`;
-const CDN_ETC_ROOT = `${CDN_ROOT}v3.0.8/`;
+const CDN_ETC_ROOT = `${CDN_ROOT}v3.0.9/`;
 
 const IMAGE_BASE = `${CDN_EQUIP_ROOT}equipment-images/`;
 const CHARACTER_IMAGE_BASE = `${CDN_ETC_ROOT}character-images/`;
@@ -2025,8 +2025,7 @@ function renderPopLapisUse(dates, shown) {
       });
     });
   });
-  const base = IS_LOCAL ? "./images/" : SIM_IMG_BASE;
-  const icon = (file) => `<img class="eta-lapis-icon" src="${base}${encodeURIComponent(file)}" alt="" width="16" height="16" loading="lazy" />`;
+  const icon = (file) => `<img class="eta-lapis-icon" src="${SIM_IMG_BASE}${encodeURIComponent(file)}" alt="" width="16" height="16" loading="lazy" />`;
   box.hidden = false;
   box.title = `${span[0]} ~ ${span[span.length - 1]} 레벨업에 쓴 양`;
   box.innerHTML = `이 기간 소모 ${icon("에오니스_라피스.png")}라피스 <b>${formatNumber(lapis)}개</b>`
@@ -2649,9 +2648,7 @@ function renderEtaLapisUse(rows, prevMap) {
   });
   box.hidden = false;
   box.title = eta.prevDate ? `${eta.prevDate} 대비 레벨업에 쓴 양` : "";
-  // 아직 CDN 태그에 없는 아이콘은 로컬에서 저장소 images/를 바로 읽는다(공개할 때 태그를 올린다)
-  const base = IS_LOCAL ? "./images/" : SIM_IMG_BASE;
-  const icon = (file) => `<img class="eta-lapis-icon" src="${base}${encodeURIComponent(file)}" alt="" width="16" height="16" loading="lazy" />`;
+  const icon = (file) => `<img class="eta-lapis-icon" src="${SIM_IMG_BASE}${encodeURIComponent(file)}" alt="" width="16" height="16" loading="lazy" />`;
   // 기간을 글로도 적는다. 증감 기준을 바꾸면 이 말도 같이 바뀐다.
   // 그만큼 거슬러 올라갈 자료가 없으면 실제로 견준 날짜를 적는다
   const spanText = { 1: "금일", 7: "최근 1주일", 30: "최근 1달" }[eta.compareDays] || `최근 ${eta.compareDays}일`;
