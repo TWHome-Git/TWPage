@@ -4159,7 +4159,7 @@ img.dmg-chk-icon {
 
 .eta-history-body {
   display: grid;
-  gap: 14px;
+  gap: 10px;
 }
 
 .eta-history-controls {
@@ -4184,8 +4184,8 @@ img.dmg-chk-icon {
   font-weight: 400;
 }
 
-.eta-history-svg {
-  height: 220px;
+.pop-svg.eta-history-svg {
+  height: 110px;
 }
 
 .eta-history-zero {

@@ -1809,7 +1809,7 @@ function renderEtaHistory() {
   });
 }
 
-const ETA_HISTORY_VIEW = { w: 900, h: 240, left: 52, right: 16, top: 14, bottom: 26 };
+const ETA_HISTORY_VIEW = { w: 900, h: 130, left: 52, right: 16, top: 10, bottom: 22 };
 const ETA_HISTORY_MAX_LEVEL = 100;   // 에타 만렙
 
 // 값 하나짜리 선·막대 그래프. y축은 레벨처럼 0에서 먼 값은 최소~최대로 잘라 보이고(floor: false),
