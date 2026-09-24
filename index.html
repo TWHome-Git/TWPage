@@ -6,7 +6,7 @@
     <title>TW DB</title>
     <!-- 이미지 CDN. 첫 이미지 요청 전에 DNS+TLS를 미리 끝내둔다 -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
-    <link rel="stylesheet" href="./assets/styles.css?v=20260924-etachecker2" />
+    <link rel="stylesheet" href="./assets/styles.css?v=20260924-etahistory4" />
     <!-- 모바일 전용. media 속성 덕에 넓은 화면에서는 렌더링을 막지 않는다 -->
     <link rel="stylesheet" href="./assets/mobile.css?v=20260924-etachecker2" media="(max-width: 720px)" />
   </head>
@@ -1156,6 +1156,19 @@
       </div>
     </div>
 
+    <!-- 에타 순위표에서 아이디를 누르면 여는 기록 창: 에타 레벨·획득 정수 그래프 -->
+    <div id="etaHistoryModal" class="modal" hidden>
+      <div class="modal-backdrop" data-eta-history-close></div>
+      <div class="modal-panel eta-history-panel" role="dialog" aria-modal="true" aria-labelledby="etaHistoryTitle">
+        <div class="modal-head">
+          <h2 id="etaHistoryTitle"></h2>
+          <button class="modal-close" type="button" data-eta-history-close aria-label="닫기">✕</button>
+        </div>
+        <p id="etaHistoryNote" class="modal-note"></p>
+        <div id="etaHistoryBody" class="modal-body eta-history-body"></div>
+      </div>
+    </div>
+
     <div id="boardModal" class="modal" hidden>
       <div class="modal-backdrop" data-board-close></div>
       <div class="modal-panel board-modal-panel" role="dialog" aria-modal="true" aria-labelledby="boardModalTitle">
@@ -1174,7 +1187,7 @@
       </div>
     </template>
 
-    <script src="./assets/app.js?v=20260924-etachecker2" type="module"></script>
+    <script src="./assets/app.js?v=20260924-etahistory4" type="module"></script>
     <!-- GoatCounter 방문자 분석 (localhost 방문은 count.js가 기본으로 집계 제외)
          자동 집계를 끄고 app.js의 라우터가 탭 단위 경로(/eta/ranking 등)로 직접 보낸다 -->
     <script>window.goatcounter = { no_onload: true };</script>

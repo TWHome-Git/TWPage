@@ -4,6 +4,7 @@
 # 브라우저가 기간만큼 받을 수 없다. 필요한 것만 미리 추려 둔 파일을 여기서 갱신한다.
 #   - eta-population.json: 캐릭터별·레벨 구간별 인원수 (인구 추이)
 #   - eta-moves.json: 날짜별 순위 진입·이탈 아이디 (아이디 기록 검색)
+#   - eta-history/: 아이디별 날짜별 에타 레벨·보유 정수 (순위표에서 아이디를 누르면 보는 그래프)
 #
 # 원본은 매일 오전 10시(KST)경 갱신되므로 그 뒤인 11시(02:00 UTC)에 돈다.
 name: 에타 집계
@@ -38,14 +39,17 @@ jobs:
       - name: 진입·이탈 집계
         run: node scripts/build-eta-moves.mjs
 
+      - name: 아이디별 기록 집계
+        run: node scripts/build-eta-history.mjs
+
       - name: 바뀌었으면 커밋
         run: |
-          if git diff --quiet -- assets/eta-population.json assets/eta-moves.json; then
+          if git diff --quiet -- assets/eta-population.json assets/eta-moves.json assets/eta-history; then
             echo "변경 없음"
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add assets/eta-population.json assets/eta-moves.json
+          git add assets/eta-population.json assets/eta-moves.json assets/eta-history
           git commit -m "에타 집계를 $(date -u -d '+9 hours' +%Y-%m-%d) 기준으로 갱신"
           git push

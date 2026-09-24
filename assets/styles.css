@@ -4143,6 +4143,63 @@ img.dmg-chk-icon {
   font-size: 13px;
 }
 
+/* 행을 누르면 기록 창이 열린다 */
+.eta-row[data-eta-user] {
+  cursor: pointer;
+}
+
+.eta-row[data-eta-user]:hover td {
+  background: rgba(15, 111, 99, 0.06);
+}
+
+/* 아이디별 기록 창 */
+.eta-history-panel {
+  width: min(960px, 94vw);
+}
+
+.eta-history-body {
+  display: grid;
+  gap: 14px;
+}
+
+.eta-history-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+}
+
+.eta-history-summary {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.eta-history-chart h3 {
+  margin: 0 0 6px;
+  font-size: 13px;
+}
+
+.eta-history-chart h3 small {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.eta-history-svg {
+  height: 220px;
+}
+
+.eta-history-zero {
+  stroke: var(--muted);
+}
+
+.eta-history-empty {
+  margin: 0;
+  padding: 24px 0;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+}
+
 .eta-rank {
   font-weight: 700;
   white-space: nowrap;

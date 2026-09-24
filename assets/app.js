@@ -463,6 +463,10 @@ const els = {
   etaSidebar: document.querySelector("#etaSidebar"),
   etaCharacterList: document.querySelector("#etaCharacterList"),
   etaRankingBody: document.querySelector("#etaRankingBody"),
+  etaHistoryModal: document.querySelector("#etaHistoryModal"),
+  etaHistoryTitle: document.querySelector("#etaHistoryTitle"),
+  etaHistoryNote: document.querySelector("#etaHistoryNote"),
+  etaHistoryBody: document.querySelector("#etaHistoryBody"),
   etaNewDateSelect: document.querySelector("#etaNewDateSelect"),
   etaMoveSearch: document.querySelector("#etaMoveSearch"),
   etaMoveResult: document.querySelector("#etaMoveResult"),
@@ -1661,6 +1665,280 @@ function renderEtaNewServerTabs() {
   `).join("");
 }
 
+// ── 아이디별 기록 (에타 레벨·획득 정수 그래프) ──
+// scripts/build-eta-history.mjs가 매일 쌓는 assets/eta-history/를 읽는다. 아이디는 64조각으로 나뉘어 있어
+// 누른 아이디가 든 조각 하나만 받는다 (약 70KB). 조각과 날짜 목록은 한 번 받으면 다시 받지 않는다.
+const ETA_HISTORY_BASE = "./assets/eta-history/";
+const ETA_HISTORY_SHARDS = 64;
+const ETA_HISTORY_RANGES = [
+  { key: "all", label: "전체", days: 0 },
+  { key: "30", label: "최근 30일", days: 30 },
+  { key: "7", label: "최근 7일", days: 7 },
+];
+const etaHistory = {
+  dates: null,          // index.json의 날짜 목록
+  shards: new Map(),    // 조각 번호 → 조각 파일
+  range: "30",
+  current: null,        // 지금 열어 둔 { server, userId, code, entry }
+  seq: 0,               // 빠르게 다른 아이디를 누르면 앞선 요청은 버린다
+};
+
+// 아이디 → 조각 번호. 집계 스크립트(build-eta-history.mjs)와 같은 FNV-1a 해시다
+function etaHistoryShard(userId) {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < userId.length; i += 1) {
+    hash ^= userId.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash % ETA_HISTORY_SHARDS;
+}
+
+async function etaHistoryFetch(name) {
+  const response = await fetch(`${ETA_HISTORY_BASE}${name}`, { cache: "no-cache" });
+  if (!response.ok) throw new Error(`${name} ${response.status}`);
+  return response.json();
+}
+
+async function etaHistoryLoad(userId) {
+  if (!etaHistory.dates) {
+    const index = await etaHistoryFetch("index.json");
+    etaHistory.dates = Array.isArray(index?.dates) ? index.dates : [];
+  }
+  const n = etaHistoryShard(userId);
+  if (!etaHistory.shards.has(n)) {
+    etaHistory.shards.set(n, await etaHistoryFetch(`${String(n).padStart(2, "0")}.json`));
+  }
+  return etaHistory.shards.get(n);
+}
+
+async function openEtaHistory(server, userId, code) {
+  if (!els.etaHistoryModal) return;
+  const seq = ++etaHistory.seq;
+  const name = ETA_CHARACTER_BY_CODE[code] || "";
+  els.etaHistoryTitle.textContent = `${userId} · ${name} · ${server}`;
+  els.etaHistoryNote.textContent = "날짜별 에타 레벨과 하루 획득 정수입니다. 순위에 없던 날은 마지막으로 보인 값을 이어 씁니다. 획득 정수가 음수인 날은 보유 정수가 줄어든 날입니다.";
+  els.etaHistoryBody.innerHTML = `
+    <div class="overlay-loading">
+      <div class="loading-spinner" role="status" aria-label="불러오는 중"></div>
+      <span>기록을 불러오는 중입니다.</span>
+    </div>`;
+  els.etaHistoryModal.hidden = false;
+  etaHistory.current = null;
+
+  try {
+    // 획득 정수는 레벨업에 쓴 양까지 합쳐 세므로 레벨표가 필요하다
+    const [shard] = await Promise.all([etaHistoryLoad(userId), ensureEtaInfo()]);
+    if (seq !== etaHistory.seq) return;
+    const entry = shard?.servers?.[server]?.[userId];
+    if (!entry) {
+      els.etaHistoryBody.innerHTML = `<p class="eta-history-empty">${escapeHtml(userId)} — 쌓인 기록이 없습니다. 집계는 매일 오전에 한 번 갱신됩니다.</p>`;
+      return;
+    }
+    etaHistory.current = { server, userId, code, entry };
+    renderEtaHistory();
+  } catch (error) {
+    if (seq !== etaHistory.seq) return;
+    console.warn("에타 기록을 불러오지 못했습니다.", error);
+    els.etaHistoryBody.innerHTML = `<p class="eta-history-empty">기록을 불러오지 못했습니다. 잠시 뒤 다시 눌러 주세요.</p>`;
+  }
+}
+
+// 순위에 없던 날은 마지막으로 보인 날의 값을 그대로 이어 쓴다. 그래서 빠진 날의 획득은 0이고,
+// 다시 보인 날에 그동안 늘어난 만큼이 한 번에 잡힌다. 처음 보이기 전의 날은 0으로 둔다.
+function etaHistoryFilled(entry) {
+  const levels = [];
+  const essences = [];
+  let level = null;
+  let essence = null;
+  for (let i = 0; i < entry.l.length; i += 1) {
+    if (entry.l[i] != null && entry.e[i] != null) {
+      level = entry.l[i];
+      essence = entry.e[i];
+    }
+    levels.push(level ?? 0);
+    essences.push(essence ?? 0);
+  }
+  return { levels, essences };
+}
+
+// 하루 획득 정수 = (그 레벨까지 든 정수 합 + 보유 정수)의 전날 대비 증가분. 순위표의 획득 정수 열과 같은 규칙이다.
+function etaHistorySeries(entry) {
+  const cum = etaEssenceCumulative();
+  const { levels, essences } = etaHistoryFilled(entry);
+  const total = (i) => (cum?.[levels[i]] || 0) + essences[i];
+  const gains = levels.map((_, i) => (i === 0 ? 0 : total(i) - total(i - 1)));
+  return { levels, gains };
+}
+
+function renderEtaHistory() {
+  const cur = etaHistory.current;
+  if (!cur || !els.etaHistoryBody) return;
+  const allDates = etaHistory.dates || [];
+  const range = ETA_HISTORY_RANGES.find((r) => r.key === etaHistory.range) || ETA_HISTORY_RANGES[0];
+  const from = range.days ? Math.max(0, allDates.length - range.days) : 0;
+  const dates = allDates.slice(from);
+  const { levels, gains } = etaHistorySeries(cur.entry);
+  const shownLevels = levels.slice(from);
+  const shownGains = gains.slice(from);
+
+  const present = dates.filter((_, i) => cur.entry.l[from + i] != null).length;
+  const gainSum = shownGains.reduce((a, b) => a + b, 0);
+  const first = shownLevels[0];
+  const last = shownLevels[shownLevels.length - 1];
+
+  els.etaHistoryBody.innerHTML = `
+    <div class="eta-history-controls">
+      <div class="pop-range-buttons" role="radiogroup" aria-label="기간">
+        ${ETA_HISTORY_RANGES.map((r) => `<button class="pop-range-btn${r.key === etaHistory.range ? " is-active" : ""}" type="button" role="radio" aria-checked="${r.key === etaHistory.range}" data-eta-history-range="${r.key}">${r.label}</button>`).join("")}
+      </div>
+      <span class="eta-history-summary">${dates.length ? `${escapeHtml(dates[0])} ~ ${escapeHtml(dates[dates.length - 1])}` : ""} · 순위에 든 날 ${formatNumber(present)}일 · 획득 정수 합 <b>${formatNumber(gainSum)}</b>${dates.length ? ` · 레벨 ${formatNumber(first)} → <b>${formatNumber(last)}</b>` : ""}</span>
+    </div>
+    <section class="eta-history-chart">
+      <h3>에타 레벨</h3>
+      <div class="pop-chart-wrap" data-eta-history-chart="level">${etaHistorySvg(dates, shownLevels, { kind: "line", color: "#0f6f63", label: "에타 레벨", floor: false })}</div>
+    </section>
+    <section class="eta-history-chart">
+      <h3>획득 정수 <small>(하루)</small></h3>
+      <div class="pop-chart-wrap" data-eta-history-chart="gain">${etaHistorySvg(dates, shownGains, { kind: "bar", color: "#c88a2c", label: "획득 정수", floor: true })}</div>
+    </section>`;
+
+  els.etaHistoryBody.querySelectorAll("[data-eta-history-chart]").forEach((wrap) => {
+    const values = wrap.dataset.etaHistoryChart === "level" ? shownLevels : shownGains;
+    const label = wrap.dataset.etaHistoryChart === "level" ? "에타 레벨" : "획득 정수";
+    wireEtaHistoryHover(wrap, dates, values, label);
+  });
+}
+
+const ETA_HISTORY_VIEW = { w: 900, h: 240, left: 52, right: 16, top: 14, bottom: 26 };
+const ETA_HISTORY_MAX_LEVEL = 100;   // 에타 만렙
+
+// 값 하나짜리 선·막대 그래프. y축은 레벨처럼 0에서 먼 값은 최소~최대로 잘라 보이고(floor: false),
+// 획득 정수처럼 0이 뜻이 있는 값은 0부터 그린다(floor: true). 음수(정수 소모)는 0 아래로 내려간다.
+function etaHistorySvg(dates, values, { kind, color, label, floor }) {
+  const { w, h, left, right, top, bottom } = ETA_HISTORY_VIEW;
+  const plotW = w - left - right;
+  const plotH = h - top - bottom;
+  const n = dates.length;
+  let max = Math.max(...values, floor ? 1 : -Infinity);
+  let min = Math.min(...values, floor ? 0 : Infinity);
+  if (!Number.isFinite(max)) max = 1;
+  if (!Number.isFinite(min)) min = 0;
+  let tickValues;
+  if (floor) {
+    // 획득 정수: 위끝을 1·2·5 단위로 올려 눈금이 100, 200처럼 떨어지게 한다. 정수를 쓴 날은 0 아래로 내려간다
+    max = popNiceMax(max);
+    min = min < 0 ? -popNiceMax(-min) : 0;
+    // 눈금 간격은 1·2·5 단위 중 4~10칸이 나오는 가장 큰 값 (위끝 500이면 100 간격)
+    let step = popNiceMax(Math.max(1, (max - min) / 4));
+    while (step > 1 && (max - min) / step < 4) step = step % 5 === 0 && step / 5 >= 1 && /^[5]0*$/.test(String(step)) ? step * 2 / 5 : step / 2;
+    tickValues = [];
+    for (let v = Math.ceil(min / step) * step; v <= max; v += step) tickValues.push(v);
+    if (!tickValues.includes(0)) tickValues.push(0);
+    if (!tickValues.includes(max)) tickValues.push(max);
+    tickValues.sort((a, b) => a - b);
+  } else {
+    // 레벨: 최소~최대 사이에 위아래 여유를 주고, 눈금은 정수로만 찍어 같은 숫자가 두 번 나오지 않게 한다.
+    // 만렙이 100이라 위끝은 100을 넘기지 않는다
+    const pad = Math.max(1, Math.round((max - min) * 0.15));
+    min = Math.max(0, min - pad);
+    max = Math.min(ETA_HISTORY_MAX_LEVEL, max + pad);
+    if (max <= min) min = Math.max(0, max - 1);
+    const step = Math.max(1, Math.ceil((max - min) / 4));
+    tickValues = [];
+    for (let v = min; v < max; v += step) tickValues.push(v);
+    tickValues.push(max);
+  }
+  if (max === min) max = min + 1;
+  const stepX = n > 1 ? plotW / (n - 1) : 0;
+  const x = (i) => left + (n > 1 ? i * stepX : plotW / 2);
+  const y = (v) => top + plotH - ((v - min) / (max - min)) * plotH;
+
+  const ticks = tickValues.map((value) => {
+    const py = y(value);
+    return `<line class="pop-grid" x1="${left}" y1="${py}" x2="${w - right}" y2="${py}" /><text class="pop-axis-y" x="${left - 8}" y="${py + 4}">${value.toLocaleString("ko-KR")}</text>`;
+  }).join("");
+  const labelStep = Math.max(1, Math.ceil(n / 6));
+  const xLabels = dates.map((date, i) => (i % labelStep !== 0 && i !== n - 1) ? "" : `<text class="pop-axis-x" x="${x(i)}" y="${h - 8}">${date.slice(5)}</text>`).join("");
+
+  let body = "";
+  if (kind === "bar") {
+    const barW = n > 1 ? Math.max(1.5, Math.min(18, stepX * 0.6)) : 18;
+    const zero = y(Math.max(min, 0));
+    body = values.map((v, i) => {
+      const py = y(v);
+      const top1 = Math.min(py, zero);
+      const height = Math.max(0.6, Math.abs(zero - py));
+      return `<rect class="eta-history-bar" x="${(x(i) - barW / 2).toFixed(1)}" y="${top1.toFixed(1)}" width="${barW.toFixed(1)}" height="${height.toFixed(1)}" fill="${v < 0 ? "#b4443c" : color}" />`;
+    }).join("");
+    body += `<line class="pop-grid eta-history-zero" x1="${left}" y1="${zero}" x2="${w - right}" y2="${zero}" />`;
+  } else {
+    const d = values.map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(" ");
+    body = `<path class="pop-line" d="${d}" stroke="${color}" />`;
+    if (n <= 40) body += values.map((v, i) => `<circle class="eta-history-dot" cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="2.5" fill="${color}" />`).join("");
+  }
+
+  return `
+    <svg class="pop-svg eta-history-svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="${label} 추이">
+      ${ticks}
+      ${xLabels}
+      ${body}
+      <line class="pop-cursor" x1="0" y1="${top}" x2="0" y2="${top + plotH}" hidden />
+      <rect class="pop-hit" x="${left}" y="${top}" width="${plotW}" height="${plotH}" fill="transparent" />
+    </svg>
+    <div class="pop-tooltip" hidden></div>`;
+}
+
+function wireEtaHistoryHover(wrap, dates, values, label) {
+  const svg = wrap.querySelector(".pop-svg");
+  const cursor = wrap.querySelector(".pop-cursor");
+  const tooltip = wrap.querySelector(".pop-tooltip");
+  if (!svg || !cursor || !tooltip || !dates.length) return;
+  const { w, left, right } = ETA_HISTORY_VIEW;
+  const plotW = w - left - right;
+  const hide = () => { cursor.hidden = true; tooltip.hidden = true; };
+  const move = (event) => {
+    const box = svg.getBoundingClientRect();
+    const point = event.touches?.[0] || event;
+    const vx = ((point.clientX - box.left) / box.width) * w;
+    const ratio = clamp((vx - left) / plotW, 0, 1);
+    const index = Math.round(ratio * (dates.length - 1));
+    if (!Number.isFinite(index)) return;
+    const px = left + (dates.length > 1 ? (index / (dates.length - 1)) * plotW : plotW / 2);
+    cursor.setAttribute("x1", px);
+    cursor.setAttribute("x2", px);
+    cursor.hidden = false;
+    tooltip.innerHTML = `<strong>${dates[index]}</strong><span class="pop-tip-row">${escapeHtml(label)}<b>${values[index].toLocaleString("ko-KR")}</b></span>`;
+    tooltip.hidden = false;
+    const leftPx = (px / w) * box.width;
+    tooltip.style.left = `${leftPx}px`;
+    tooltip.classList.toggle("is-left", leftPx > box.width * 0.6);
+  };
+  svg.addEventListener("mousemove", move);
+  svg.addEventListener("touchmove", move, { passive: true });
+  svg.addEventListener("touchstart", move, { passive: true });
+  svg.addEventListener("mouseleave", hide);
+  svg.addEventListener("touchend", hide);
+}
+
+function wireEtaHistoryModal() {
+  const modal = els.etaHistoryModal;
+  if (!modal) return;
+  modal.addEventListener("click", (event) => {
+    if (event.target.closest("[data-eta-history-close]")) {
+      modal.hidden = true;
+      return;
+    }
+    const range = event.target.closest("[data-eta-history-range]")?.dataset.etaHistoryRange;
+    if (range && range !== etaHistory.range) {
+      etaHistory.range = range;
+      renderEtaHistory();
+    }
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !modal.hidden) modal.hidden = true;
+  });
+}
+
 // ── 획득 정수 ──
 // 보유 정수만 빼면 레벨업하며 쓴 정수가 빠지므로, "그 레벨까지 올리는 데 든 정수 합 + 보유 정수"를
 // 누적 획득량으로 두고 비교 기준일과의 차이를 본다. 레벨별 필요량은 eta_info.json의 레벨표(water)에서 읽는다.
@@ -2624,7 +2902,7 @@ function etaRowsHtml(rows) {
     }
     const gainHtml = row.gain == null ? "-" : formatNumber(row.gain);
     return `
-      <tr class="eta-row">
+      <tr class="eta-row" data-eta-user="${escapeHtml(row.userId)}" data-eta-code="${row.code}" title="누르면 날짜별 에타 레벨·획득 정수를 봅니다">
         <td class="eta-rank">${row.rank}${deltaHtml}</td>
         <td><span class="eta-char-thumb"><img src="${ETA_CHAR_IMAGE_BASE}${row.code}.png" alt="${escapeHtml(row.characterName)}" title="${escapeHtml(row.characterName)}" loading="lazy" decoding="async" /></span></td>
         <td class="eta-userid">${escapeHtml(row.userId)}${newHtml}</td>
@@ -6743,6 +7021,12 @@ function wireEvents() {
   els.etaRankingBody?.addEventListener("error", (event) => {
     if (event.target instanceof HTMLImageElement) event.target.hidden = true;
   }, true);
+  els.etaRankingBody?.addEventListener("click", (event) => {
+    const row = event.target.closest("tr[data-eta-user]");
+    if (!row) return;
+    openEtaHistory(eta.server, row.dataset.etaUser, Number(row.dataset.etaCode));
+  });
+  wireEtaHistoryModal();
 
   els.equipmentListBody?.addEventListener("click", (event) => {
     const row = event.target.closest("tr[data-index]");
