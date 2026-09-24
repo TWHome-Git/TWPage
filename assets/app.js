@@ -1795,11 +1795,11 @@ function renderEtaHistory() {
     </div>
     <section class="eta-history-chart">
       <h3>에타 레벨</h3>
-      <div class="pop-chart-wrap" data-eta-history-chart="level">${etaHistorySvg(dates, shownLevels, { kind: "line", color: "#0f6f63", label: "에타 레벨", floor: false })}</div>
+      <div class="pop-chart-wrap" data-eta-history-chart="level">${etaHistorySvg(dates, shownLevels, { kind: "line", color: "#0f6f63", label: "에타 레벨", axis: ETA_HISTORY_LEVEL_AXIS })}</div>
     </section>
     <section class="eta-history-chart">
       <h3>획득 정수 <small>(하루)</small></h3>
-      <div class="pop-chart-wrap" data-eta-history-chart="gain">${etaHistorySvg(dates, shownGains, { kind: "bar", color: "#c88a2c", label: "획득 정수", floor: true })}</div>
+      <div class="pop-chart-wrap" data-eta-history-chart="gain">${etaHistorySvg(dates, shownGains, { kind: "bar", color: "#c88a2c", label: "획득 정수", axis: ETA_HISTORY_GAIN_AXIS })}</div>
     </section>`;
 
   els.etaHistoryBody.querySelectorAll("[data-eta-history-chart]").forEach((wrap) => {
@@ -1809,49 +1809,24 @@ function renderEtaHistory() {
   });
 }
 
-const ETA_HISTORY_VIEW = { w: 900, h: 130, left: 52, right: 16, top: 10, bottom: 22 };
-const ETA_HISTORY_MAX_LEVEL = 100;   // 에타 만렙
+const ETA_HISTORY_VIEW = { w: 900, h: 170, left: 52, right: 16, top: 12, bottom: 24 };
+// 축은 아이디마다 다르게 잡지 않고 고정한다. 그래야 다른 아이디끼리 그래프를 견줄 수 있다.
+// 레벨은 0~만렙. 획득 정수는 하루 300을 넘는 날이 0.1%뿐이라 500까지 두고, 넘치면 잘라 그린다
+const ETA_HISTORY_LEVEL_AXIS = { min: 0, max: 100, ticks: [0, 25, 50, 75, 100] };
+const ETA_HISTORY_GAIN_AXIS = { min: 0, max: 500, ticks: [0, 100, 200, 300, 400, 500] };
 
-// 값 하나짜리 선·막대 그래프. y축은 레벨처럼 0에서 먼 값은 최소~최대로 잘라 보이고(floor: false),
-// 획득 정수처럼 0이 뜻이 있는 값은 0부터 그린다(floor: true). 음수(정수 소모)는 0 아래로 내려간다.
-function etaHistorySvg(dates, values, { kind, color, label, floor }) {
+// 값 하나짜리 선·막대 그래프. 축은 axis로 고정한다. 축을 벗어난 값은 끝에 붙여 그리고 잘림 표시를 단다.
+// 획득 정수가 음수인 날(정수 소모)은 0 아래로 내려가지 않고 바닥에 붉은 막대로만 표시한다
+function etaHistorySvg(dates, values, { kind, color, label, axis }) {
   const { w, h, left, right, top, bottom } = ETA_HISTORY_VIEW;
   const plotW = w - left - right;
   const plotH = h - top - bottom;
   const n = dates.length;
-  let max = Math.max(...values, floor ? 1 : -Infinity);
-  let min = Math.min(...values, floor ? 0 : Infinity);
-  if (!Number.isFinite(max)) max = 1;
-  if (!Number.isFinite(min)) min = 0;
-  let tickValues;
-  if (floor) {
-    // 획득 정수: 위끝을 1·2·5 단위로 올려 눈금이 100, 200처럼 떨어지게 한다. 정수를 쓴 날은 0 아래로 내려간다
-    max = popNiceMax(max);
-    min = min < 0 ? -popNiceMax(-min) : 0;
-    // 눈금 간격은 1·2·5 단위 중 4~10칸이 나오는 가장 큰 값 (위끝 500이면 100 간격)
-    let step = popNiceMax(Math.max(1, (max - min) / 4));
-    while (step > 1 && (max - min) / step < 4) step = step % 5 === 0 && step / 5 >= 1 && /^[5]0*$/.test(String(step)) ? step * 2 / 5 : step / 2;
-    tickValues = [];
-    for (let v = Math.ceil(min / step) * step; v <= max; v += step) tickValues.push(v);
-    if (!tickValues.includes(0)) tickValues.push(0);
-    if (!tickValues.includes(max)) tickValues.push(max);
-    tickValues.sort((a, b) => a - b);
-  } else {
-    // 레벨: 최소~최대 사이에 위아래 여유를 주고, 눈금은 정수로만 찍어 같은 숫자가 두 번 나오지 않게 한다.
-    // 만렙이 100이라 위끝은 100을 넘기지 않는다
-    const pad = Math.max(1, Math.round((max - min) * 0.15));
-    min = Math.max(0, min - pad);
-    max = Math.min(ETA_HISTORY_MAX_LEVEL, max + pad);
-    if (max <= min) min = Math.max(0, max - 1);
-    const step = Math.max(1, Math.ceil((max - min) / 4));
-    tickValues = [];
-    for (let v = min; v < max; v += step) tickValues.push(v);
-    tickValues.push(max);
-  }
-  if (max === min) max = min + 1;
+  const { min, max } = axis;
+  const tickValues = axis.ticks;
   const stepX = n > 1 ? plotW / (n - 1) : 0;
   const x = (i) => left + (n > 1 ? i * stepX : plotW / 2);
-  const y = (v) => top + plotH - ((v - min) / (max - min)) * plotH;
+  const y = (v) => top + plotH - ((clamp(v, min, max) - min) / (max - min)) * plotH;
 
   const ticks = tickValues.map((value) => {
     const py = y(value);
@@ -1863,14 +1838,19 @@ function etaHistorySvg(dates, values, { kind, color, label, floor }) {
   let body = "";
   if (kind === "bar") {
     const barW = n > 1 ? Math.max(1.5, Math.min(18, stepX * 0.6)) : 18;
-    const zero = y(Math.max(min, 0));
+    const zero = y(0);
     body = values.map((v, i) => {
+      const bx = (x(i) - barW / 2).toFixed(1);
+      if (v < 0) {
+        // 소모한 날: 바닥에 붉은 짧은 막대. 크기는 값과 무관하다 (실제 값은 마우스를 올리면 보인다)
+        return `<rect class="eta-history-bar is-minus" x="${bx}" y="${(zero - 4).toFixed(1)}" width="${barW.toFixed(1)}" height="4" fill="#b4443c" />`;
+      }
       const py = y(v);
-      const top1 = Math.min(py, zero);
-      const height = Math.max(0.6, Math.abs(zero - py));
-      return `<rect class="eta-history-bar" x="${(x(i) - barW / 2).toFixed(1)}" y="${top1.toFixed(1)}" width="${barW.toFixed(1)}" height="${height.toFixed(1)}" fill="${v < 0 ? "#b4443c" : color}" />`;
+      const height = Math.max(0.6, zero - py);
+      const clipped = v > max;
+      return `<rect class="eta-history-bar" x="${bx}" y="${py.toFixed(1)}" width="${barW.toFixed(1)}" height="${height.toFixed(1)}" fill="${color}" />`
+        + (clipped ? `<rect class="eta-history-clip" x="${bx}" y="${(top + 3).toFixed(1)}" width="${barW.toFixed(1)}" height="2" fill="#fff" />` : "");
     }).join("");
-    body += `<line class="pop-grid eta-history-zero" x1="${left}" y1="${zero}" x2="${w - right}" y2="${zero}" />`;
   } else {
     const d = values.map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(" ");
     body = `<path class="pop-line" d="${d}" stroke="${color}" />`;
