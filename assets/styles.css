@@ -7761,7 +7761,7 @@ img.dmg-chk-icon {
   justify-items: center;
 }
 
-/* 홈 오른쪽 — 프로그램 카드 두 장(오버레이·에타 체커)을 위아래로 둔다. 둘이 같이 왼쪽 칸 높이를 채운다 */
+/* 홈 오른쪽 — 프로그램 카드 두 장(오버레이·에타 알림)을 위아래로 둔다. 둘이 같이 왼쪽 칸 높이를 채운다 */
 .home-apps {
   display: flex;
   flex-direction: column;
@@ -7830,7 +7830,7 @@ img.dmg-chk-icon {
   object-fit: contain;
 }
 
-/* 에타 체커 카드: 왼쪽에 팝업 사진, 오른쪽에 한 줄 설명 */
+/* 에타 알림 카드: 왼쪽에 팝업 사진, 오른쪽에 한 줄 설명 */
 .home-etachecker-card .home-overlay-shot {
   gap: 14px;
   justify-content: flex-start;

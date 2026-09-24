@@ -6,9 +6,9 @@
     <title>TW DB</title>
     <!-- 이미지 CDN. 첫 이미지 요청 전에 DNS+TLS를 미리 끝내둔다 -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
-    <link rel="stylesheet" href="./assets/styles.css?v=20260924-etachecker1" />
+    <link rel="stylesheet" href="./assets/styles.css?v=20260924-etachecker2" />
     <!-- 모바일 전용. media 속성 덕에 넓은 화면에서는 렌더링을 막지 않는다 -->
-    <link rel="stylesheet" href="./assets/mobile.css?v=20260924-etachecker1" media="(max-width: 720px)" />
+    <link rel="stylesheet" href="./assets/mobile.css?v=20260924-etachecker2" media="(max-width: 720px)" />
   </head>
   <body>
     <main class="app-shell">
@@ -20,7 +20,7 @@
         <button class="tab-button" type="button" data-main-tab="calculator" aria-controls="calculatorView">계산기</button>
         <button class="tab-button" type="button" data-main-tab="simulator" aria-controls="simulatorView">시뮬레이터</button>
         <button class="tab-button" type="button" data-main-tab="overlay" aria-controls="overlayView">테일즈 채팅 오버레이</button>
-        <button class="tab-button" type="button" data-main-tab="etachecker" aria-controls="etaCheckerView">테일즈 에타 체커</button>
+        <button class="tab-button" type="button" data-main-tab="etachecker" aria-controls="etaCheckerView">테일즈 에타 알림</button>
       </nav>
 
       <section id="homeView" class="main-panel addon-view home-view" data-main-panel="home" hidden>
@@ -61,11 +61,11 @@
             </a>
             <a class="home-overlay-card home-etachecker-card" href="#/etachecker">
               <span class="home-overlay-head">
-                <strong>테일즈 에타 체커</strong>
+                <strong>테일즈 에타 알림</strong>
                 <small id="homeEtaCheckerMeta" class="home-overlay-meta">Latest Release</small>
               </span>
               <span class="home-overlay-shot">
-                <img src="./images/home/etachecker-popup.png" width="320" height="278" alt="테일즈 에타 체커 1:1 대화 팝업" loading="lazy" decoding="async" />
+                <img src="./images/home/etachecker-popup.png" width="320" height="278" alt="테일즈 에타 알림 1:1 대화 팝업" loading="lazy" decoding="async" />
                 <span class="home-etachecker-desc">1:1 대화 상대의 에타 레벨을 팝업으로 알려 줍니다.<br />랭킹에 없거나 닮은 아이디는 주의 표시가 붙습니다.</span>
               </span>
             </a>
@@ -1082,7 +1082,7 @@
         <div class="addon-titlebar">
           <div class="brand-block">
             <p class="eyebrow">TW DB</p>
-            <h1>테일즈 에타 체커</h1>
+            <h1>테일즈 에타 알림</h1>
           </div>
           <div class="addon-tab-field overlay-actions-field">
             <div class="overlay-actions">
@@ -1174,7 +1174,7 @@
       </div>
     </template>
 
-    <script src="./assets/app.js?v=20260924-etachecker1" type="module"></script>
+    <script src="./assets/app.js?v=20260924-etachecker2" type="module"></script>
     <!-- GoatCounter 방문자 분석 (localhost 방문은 count.js가 기본으로 집계 제외)
          자동 집계를 끄고 app.js의 라우터가 탭 단위 경로(/eta/ranking 등)로 직접 보낸다 -->
     <script>window.goatcounter = { no_onload: true };</script>

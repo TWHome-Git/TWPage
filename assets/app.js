@@ -5037,7 +5037,7 @@ function renderHomeStats() {
   els.homeStats.innerHTML = cards.join("");
 }
 
-// 홈 카드 두 장(오버레이·에타 체커)의 버전 표시
+// 홈 카드 두 장(오버레이·에타 알림)의 버전 표시
 async function loadHomeRelease() {
   home.release = "loading";
   const results = await Promise.all(Object.values(REPO_TABS).map((tab) => fillRepoRelease(
