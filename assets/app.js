@@ -543,6 +543,7 @@ const ACTIVE_SUB = {};
 const route = {
   applying: false, // 주소를 화면에 반영하는 중 — 이때는 주소를 다시 쓰지 않는다
   pending: null,   // 데이터가 아직 안 와서 못 연 항목 { sub, item }
+  ready: false,    // 첫 화면을 다 열기 전에는 이력을 남기지 않는다 (시작하며 기본 탭을 여러 번 켠다)
 };
 
 function routeActiveKey(attr) {
@@ -574,13 +575,45 @@ function routeToHash(r) {
   return "#/" + parts.map(encodeURIComponent).join("/");
 }
 
-// 주소를 지금 화면에 맞춘다. 뒤로가기 이력을 늘리지 않도록 replaceState를 쓴다.
-function routeWrite() {
+// 주소를 지금 화면에 맞춘다. 화면을 옮길 때마다 이력을 한 칸 남겨서 브라우저 뒤로가기로 앞 화면에 돌아갈 수 있다.
+// 검색어처럼 잦은 변경이나 옛 주소 변환처럼 이력이 되면 안 되는 경우는 replace로 덮어쓴다.
+function routeWrite({ replace = false } = {}) {
   if (route.applying) return;
   visitTrack();
   const hash = routeToHash(routeCurrent());
   if (!hash || hash === location.hash) return;
-  history.replaceState(null, "", location.pathname + location.search + hash);
+  const url = location.pathname + location.search + hash;
+  if (replace || !route.ready) history.replaceState(null, "", url);
+  else history.pushState(null, "", url);
+}
+
+// ── 팝업 창과 뒤로가기 ──
+// 팝업을 열 때 이력을 한 칸 넣어 두면 브라우저·휴대폰의 뒤로가기가 팝업을 닫는 동작이 된다.
+// 닫기 버튼으로 닫을 때는 그 칸을 도로 빼서 뒤로가기를 한 번 더 눌러도 앞 화면으로 바로 가게 한다
+const modalNav = { open: null };
+
+function modalShow(el) {
+  if (!el || !el.hidden) return;
+  el.hidden = false;
+  history.pushState({ twModal: true }, "", location.href);
+  modalNav.open = el;
+}
+
+function modalHide(el) {
+  if (!el || el.hidden) return;
+  el.hidden = true;
+  if (modalNav.open === el) {
+    modalNav.open = null;
+    if (history.state?.twModal) history.back();
+  }
+}
+
+// 뒤로가기로 팝업 칸을 벗어나면 팝업을 닫는다. 주소가 바뀌는 뒤로가기는 hashchange가 따로 받는다
+function modalPop() {
+  const el = modalNav.open;
+  if (!el) return;
+  modalNav.open = null;
+  el.hidden = true;
 }
 
 function routeParse() {
@@ -610,11 +643,14 @@ function routeApply(r) {
       sub.open(r.sub);
     }
     route.pending = r.item ? { sub: r.sub, item: r.item } : null;
+    // 항목이 없는 주소로 돌아왔으면(뒤로가기 등) 열어 둔 상세 화면을 목록으로 되돌린다.
+    // 그러지 않으면 화면은 상세인 채로 남고 주소만 목록이 된다
+    if (!r.item && r.main === "equipment") routeCloseItem(r.sub);
     routeResolvePending();
   } finally {
     route.applying = false;
   }
-  routeWrite(); // 옛 주소로 들어왔으면 지금 자리의 주소로 바꿔 둔다
+  routeWrite({ replace: true }); // 옛 주소로 들어왔으면 지금 자리의 주소로 바꿔 둔다 (이력은 늘리지 않는다)
   visitTrack();
 }
 
@@ -664,6 +700,21 @@ function visitTrack() {
 }
 
 // 데이터가 준비된 뒤 미뤄 둔 항목을 연다. 각 DB 로딩이 끝날 때마다 불린다.
+// 뒤로가기로 항목 없는 주소가 되었을 때 그 하위 탭의 상세를 닫는다 (목록으로 가기 버튼과 같은 동작)
+function routeCloseItem(sub) {
+  if (sub === "equipment" && state.view === "detail") {
+    state.view = "list";
+    render();
+  } else if (sub === "avatar" && avatar.view === "detail") {
+    avatar.view = "list";
+    renderAvatar();
+  } else if (sub === "ability" && els.abilitySearchInput && els.abilitySearchInput.value) {
+    els.abilitySearchInput.value = "";
+    ability.query = "";
+    renderAbilityList();
+  }
+}
+
 function routeResolvePending() {
   const p = route.pending;
   if (!p) return;
@@ -710,8 +761,11 @@ function routeResolvePending() {
 function wireRoute() {
   addEventListener("hashchange", () => {
     if (route.applying) return;
+    // 팝업이 열린 채 주소가 바뀌면 (뒤로가기를 빠르게 두 번 등) 팝업부터 닫는다
+    modalPop();
     routeApply(routeParse());
   });
+  addEventListener("popstate", modalPop);
 }
 
 async function boot() {
@@ -732,6 +786,7 @@ async function boot() {
   wireRoute();
   visit.ready = true;
   routeApply(initialRoute);
+  route.ready = true;
   visitTrack();               // 주소 없이 들어와도(홈) 첫 화면을 센다
   initDamageCalculator();
   initSimulators();
@@ -1722,7 +1777,7 @@ async function openEtaHistory(server, userId, code) {
       <div class="loading-spinner" role="status" aria-label="불러오는 중"></div>
       <span>기록을 불러오는 중입니다.</span>
     </div>`;
-  els.etaHistoryModal.hidden = false;
+  modalShow(els.etaHistoryModal);
   etaHistory.current = null;
 
   try {
@@ -1905,7 +1960,7 @@ function wireEtaHistoryModal() {
   if (!modal) return;
   modal.addEventListener("click", (event) => {
     if (event.target.closest("[data-eta-history-close]")) {
-      modal.hidden = true;
+      modalHide(modal);
       return;
     }
     const range = event.target.closest("[data-eta-history-range]")?.dataset.etaHistoryRange;
@@ -1915,7 +1970,7 @@ function wireEtaHistoryModal() {
     }
   });
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && !modal.hidden) modal.hidden = true;
+    if (event.key === "Escape" && !modal.hidden) modalHide(modal);
   });
 }
 
@@ -6702,7 +6757,7 @@ function wireEvents() {
     abilitySearchTimer = setTimeout(() => {
       ability.query = els.abilitySearchInput.value.trim().toLowerCase();
       renderAbilityList();
-      routeWrite();
+      routeWrite({ replace: true });
     }, 200);
   });
 
@@ -10472,7 +10527,7 @@ function openRateModal(title, note, html) {
   simEls.rateModalTitle.textContent = title;
   simEls.rateModalNote.textContent = note;
   simEls.rateModalBody.innerHTML = html;
-  simEls.rateModal.hidden = false;
+  modalShow(simEls.rateModal);
 }
 
 function wirePierceHelp() {
@@ -10487,10 +10542,10 @@ function wirePierceHelp() {
 
 function wireRateModal() {
   simEls.rateModal?.addEventListener("click", (event) => {
-    if (event.target.closest("[data-rate-close]")) simEls.rateModal.hidden = true;
+    if (event.target.closest("[data-rate-close]")) modalHide(simEls.rateModal);
   });
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && simEls.rateModal && !simEls.rateModal.hidden) simEls.rateModal.hidden = true;
+    if (event.key === "Escape" && simEls.rateModal && !simEls.rateModal.hidden) modalHide(simEls.rateModal);
   });
   simEls.relicRateButton?.addEventListener("click", () => openRateModal(
     "렐릭 강화 확률",
@@ -11729,13 +11784,13 @@ function boardSetView(view) {
 }
 
 function boardOpen() {
-  boardEls.modal.hidden = false;
+  modalShow(boardEls.modal);
   boardSetView("list");
   boardLoadList(false);
 }
 
 function boardClose() {
-  boardEls.modal.hidden = true;
+  modalHide(boardEls.modal);
   board.notice = "";
 }
 
@@ -11788,7 +11843,7 @@ function wireBoard() {
   }
   // 홈의 글쓰기 버튼은 창을 열어 글쓰기 화면부터 보여준다
   boardEls.homeWrite?.addEventListener("click", () => {
-    boardEls.modal.hidden = false;
+    modalShow(boardEls.modal);
     boardSetView("write");
   });
 }
