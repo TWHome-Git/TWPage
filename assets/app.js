@@ -5044,7 +5044,7 @@ const hitCalc = (() => {
   }
 
   function wire() {
-    const panel = q('[data-extra-panel="hit"]');
+    const panel = q('[data-calculator-panel="hit"]');
     if (!panel) return;
 
     // 입력값은 상태에 넣고, 바뀐 영역만 다시 그린다. 숫자 칸은 포커스를 잃지 않게 표 전체를 다시 그리지 않는다
