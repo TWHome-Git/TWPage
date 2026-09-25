@@ -1771,7 +1771,7 @@ async function openEtaHistory(server, userId, code) {
   const seq = ++etaHistory.seq;
   const name = ETA_CHARACTER_BY_CODE[code] || "";
   els.etaHistoryTitle.textContent = `${userId} · ${name} · ${server}`;
-  els.etaHistoryNote.textContent = "날짜별 에타 레벨과 하루 획득 정수입니다. 순위에 없던 날은 마지막으로 보인 값을 이어 씁니다. 획득 정수가 음수인 날은 보유 정수가 줄어든 날입니다.";
+  els.etaHistoryNote.textContent = "날짜별 에타 레벨과 그날 하루 획득 정수입니다 (다음 날 아침 집계 기준). 순위에 없던 날은 마지막으로 보인 값을 이어 씁니다. 획득 정수가 음수인 날은 보유 정수가 줄어든 날입니다.";
   els.etaHistoryBody.innerHTML = `
     <div class="overlay-loading">
       <div class="loading-spinner" role="status" aria-label="불러오는 중"></div>
@@ -1825,13 +1825,20 @@ function etaHistorySeries(entry) {
   return { levels, gains };
 }
 
+// 랭킹은 다음 날 아침에 수집되므로, 수집일의 값은 그 전날 하루의 결과다. 화면에는 전날 날짜로 적는다
+function etaHistoryDayBefore(date) {
+  const [y, m, d] = date.split("-").map(Number);
+  const t = new Date(Date.UTC(y, m - 1, d - 1));
+  return `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, "0")}-${String(t.getUTCDate()).padStart(2, "0")}`;
+}
+
 function renderEtaHistory() {
   const cur = etaHistory.current;
   if (!cur || !els.etaHistoryBody) return;
   const allDates = etaHistory.dates || [];
   const range = ETA_HISTORY_RANGES.find((r) => r.key === etaHistory.range) || ETA_HISTORY_RANGES[0];
   const from = range.days ? Math.max(0, allDates.length - range.days) : 0;
-  const dates = allDates.slice(from);
+  const dates = allDates.slice(from).map(etaHistoryDayBefore);
   const { levels, gains } = etaHistorySeries(cur.entry);
   const shownLevels = levels.slice(from);
   const shownGains = gains.slice(from);
