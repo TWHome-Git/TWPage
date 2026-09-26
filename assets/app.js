@@ -239,20 +239,23 @@ function etaCurrentRows() {
 }
 
 // ── 에타 랭킹 로컬 캐시 ──
-// 데이터는 매일 1회, 넥슨 랭킹이 갱신되는 오전 8시대 직후(수집 포함 보통 09시 전) 갱신되므로,
-// 같은 주기의 데이터를 이미 받아뒀다면 페이지를 다시 열어도 네트워크 요청 없이 localStorage 캐시를 사용한다.
-// (2026-09-15 이전에는 10시경 갱신이라 기준이 10시였다)
-const ETA_REFRESH_ANCHOR_HOUR = 9;
-const ETA_LATEST_CACHE_KEY = "tw-eta-latest-cache-v1";
+// 순위표(1MB)는 매일 한 번만 바뀐다. 받아 둔 것을 localStorage에 두고, 열 때마다 원본의 메타 파일(1KB)로
+// 수집일만 확인해서 바뀌었을 때만 새로 받는다. 시각으로 어림잡지 않으므로 몇 시에 들어와도 새 데이터가 있으면 바로 보인다.
+// (2026-09-26 이전에는 "오전 9시 전이면 어제 주기"로 어림잡아, 08시대에 갱신돼도 9시까지 어제 것이 보였다)
+const ETA_LATEST_CACHE_KEY = "tw-eta-latest-cache-v2";
 const ETA_PREV_CACHE_KEY = "tw-eta-prev-cache-v1";
 const ETA_SNAPSHOT_CACHE_KEY = "tw-eta-snapshot-cache-v1";
 
-// 기준 시각(오전 9시) 이후면 오늘, 이전이면 어제가 현재 갱신 주기의 기준일
-function etaCycleDateString(now = new Date()) {
-  const date = new Date(now);
-  if (date.getHours() < ETA_REFRESH_ANCHOR_HOUR) date.setDate(date.getDate() - 1);
-  const pad = (value) => String(value).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+// 원본의 수집일. 메타 파일을 못 읽으면 null
+async function etaFetchCollectDate() {
+  try {
+    const response = await fetch(ETA_META_URL, { cache: "no-store" });
+    if (!response.ok) return null;
+    const meta = await response.json();
+    return clean(meta?.CollectDate || "").slice(0, 10) || null;
+  } catch {
+    return null;
+  }
 }
 
 function etaReadCache(key) {
@@ -275,7 +278,11 @@ function etaWriteCache(key, value) {
 async function fetchEtaPayload(url, cacheSlot) {
   if (cacheSlot === "latest") {
     const cached = etaReadCache(ETA_LATEST_CACHE_KEY);
-    if (cached?.payload && cached.cycleDate === etaCycleDateString()) return cached.payload;
+    if (cached?.payload) {
+      // 수집일이 그대로면 받아 둔 것을 쓴다. 메타를 못 읽은 경우도 받아 둔 것을 먼저 보여 준다
+      const collectDate = await etaFetchCollectDate();
+      if (!collectDate || collectDate === cached.collectDate) return cached.payload;
+    }
   } else if (cacheSlot) {
     const key = cacheSlot === "prev" ? ETA_PREV_CACHE_KEY : ETA_SNAPSHOT_CACHE_KEY;
     const cached = etaReadCache(key);
@@ -287,11 +294,8 @@ async function fetchEtaPayload(url, cacheSlot) {
   const payload = await response.json();
 
   if (cacheSlot === "latest") {
-    // 수집이 아직 안 된 날(CollectDate가 주기와 다름)에는 캐시하지 않아 다음 방문 때 재확인한다
     const collectDate = clean(payload?.CollectDate || payload?.Date || "").slice(0, 10);
-    if (collectDate === etaCycleDateString()) {
-      etaWriteCache(ETA_LATEST_CACHE_KEY, { cycleDate: collectDate, payload });
-    }
+    if (collectDate) etaWriteCache(ETA_LATEST_CACHE_KEY, { collectDate, payload });
   } else if (cacheSlot) {
     const key = cacheSlot === "prev" ? ETA_PREV_CACHE_KEY : ETA_SNAPSHOT_CACHE_KEY;
     etaWriteCache(key, { url, payload });
@@ -784,6 +788,7 @@ async function boot() {
   wireEvents();
   setAvatarViewMode(avatar.viewMode); // 저장된 선택을 버튼에 반영
   wireRoute();
+  wireEtaAutoRefresh();
   visit.ready = true;
   routeApply(initialRoute);
   route.ready = true;
@@ -1215,8 +1220,9 @@ function activateMainTab(key) {
     button.toggleAttribute("aria-current", isActive);
   });
 
-  if (key === "eta" && !eta.loaded && !eta.loading) {
-    loadEtaRankings();
+  if (key === "eta") {
+    if (!eta.loaded && !eta.loading) loadEtaRankings();
+    else etaCheckFresh();   // 탭을 오가는 사이 새 수집분이 올라왔으면 받는다
   }
 
   if (REPO_TABS[key]) {
@@ -1270,6 +1276,33 @@ async function loadEtaRankings(url = ETA_RANKING_URL) {
 }
 
 let etaIndexPromise = null;
+
+// 새 수집분이 올라왔는지 메타 파일로 확인하고, 바뀌었으면 순위표와 날짜 목록을 다시 받는다.
+// "최신"을 보고 있을 때만 한다. 과거 날짜를 보는 중이면 그 화면을 건드리지 않는다
+async function etaCheckFresh() {
+  if (!eta.loaded || eta.loading || eta.date) return;
+  const collectDate = await etaFetchCollectDate();
+  if (!collectDate || collectDate === eta.collectDate) return;
+  eta.index = null;
+  etaIndexPromise = null;
+  loadEtaRankings();
+}
+
+// 랭킹은 매일 08시대(KST)에 갱신된다. 순위 탭을 열어 둔 채라면 08~10시(KST) 사이에 5분마다 확인해
+// 올라오는 순간 따라간다. 그 시간대 밖에서는 확인하지 않는다 (메타 파일은 1KB라 부담은 없다)
+const ETA_FRESH_WINDOW = { from: 8, to: 10 };
+function etaKstHour(now = new Date()) {
+  return (now.getUTCHours() + 9) % 24;
+}
+function wireEtaAutoRefresh() {
+  setInterval(() => {
+    const hour = etaKstHour();
+    if (hour < ETA_FRESH_WINDOW.from || hour >= ETA_FRESH_WINDOW.to) return;
+    if (document.hidden) return;
+    if (!document.querySelector('[data-main-tab="eta"].is-active')) return;
+    etaCheckFresh();
+  }, 5 * 60 * 1000);
+}
 
 function loadEtaIndex() {
   if (eta.index) return Promise.resolve();
