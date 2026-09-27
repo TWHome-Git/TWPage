@@ -11416,7 +11416,8 @@ const BOARD_LIMITS = { title: 100, author: 20, content: 2000 };
 
 const board = {
   view: "list",       // "list" | "detail" | "write"
-  posts: [],
+  posts: [],          // 원글만 (댓글은 comments에 따로 모은다)
+  comments: new Map(),// 원글 번호 → 댓글 목록 (번호 오름차순)
   post: null,         // 본문까지 받아온 글
   category: "all",
   loaded: false,
@@ -11424,6 +11425,7 @@ const board = {
   error: "",
   notice: "",
   draft: { category: "", title: "", author: "", content: "" },
+  reply: { author: "", content: "" },   // 댓글 입력칸. 다시 그려도 쓰던 내용이 남는다
 };
 
 const boardEls = {
@@ -11506,10 +11508,27 @@ function boardParseCsv(text) {
       content: at(row, "내용", 5),
       answer: at(row, "답변", 6),
       answeredAt: boardParseDate(at(row, "답변일", 7)),
+      parentId: Number(at(row, "부모글", 8)) || 0,
     });
   }
   return posts.sort((a, b) => b.id - a.id);
 }
+
+// 한 시트에 원글과 댓글이 섞여 있다. 부모글 번호가 있으면 댓글이다
+function boardSplit(rows) {
+  const comments = new Map();
+  rows.forEach((row) => {
+    if (!row.parentId) return;
+    const list = comments.get(row.parentId) || [];
+    list.push(row);
+    comments.set(row.parentId, list);
+  });
+  comments.forEach((list) => list.sort((a, b) => a.id - b.id));
+  board.comments = comments;
+  return rows.filter((row) => !row.parentId);
+}
+
+const boardCommentsOf = (id) => board.comments.get(Number(id)) || [];
 
 function boardReadJson(key) {
   try {
@@ -11551,6 +11570,13 @@ function boardRememberPending(post) {
   boardWriteJson(BOARD_PENDING_KEY, pending);
 }
 
+// 지금 화면이 들고 있는 줄 전부 (원글 + 댓글). 다시 나눌 때 쓴다
+function boardAllRows() {
+  const rows = [...board.posts];
+  board.comments.forEach((list) => rows.push(...list));
+  return rows;
+}
+
 async function boardFetch(url, options) {
   const res = await fetch(url, options);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -11567,7 +11593,7 @@ async function boardLoadList(force) {
   if (!board.loaded) {
     const cached = boardReadCache();
     if (cached) {
-      board.posts = boardMergePending(cached);
+      board.posts = boardSplit(boardMergePending(cached));
       board.loaded = true;
     }
   }
@@ -11579,7 +11605,7 @@ async function boardLoadList(force) {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const posts = boardParseCsv(await res.text());
     boardWriteJson(BOARD_CACHE_KEY, { savedAt: Date.now(), posts });
-    board.posts = boardMergePending(posts);
+    board.posts = boardSplit(boardMergePending(posts));
     board.loaded = true;
     // 글을 보고 있는 중이면 답변이 달렸을 수 있으니 같은 글로 바꿔 끼운다
     if (board.view === "detail" && board.post) {
@@ -11601,7 +11627,7 @@ async function boardLoadListViaApi() {
   boardRender();
   try {
     const data = await boardFetch(boardApi({ action: "list" }));
-    board.posts = data.posts || [];
+    board.posts = boardSplit(data.posts || []);
     board.loaded = true;
   } catch (error) {
     board.error = "글 목록을 불러오지 못했습니다.";
@@ -11674,7 +11700,7 @@ async function boardSubmit(form) {
         answer: "",
         answeredAt: "",
       });
-      board.posts = boardMergePending(board.posts.filter((p) => !p.pending));
+      board.posts = boardSplit(boardMergePending(boardAllRows().filter((p) => !p.pending)));
     }
     board.draft = { category: "", title: "", author: "", content: "" };
     board.notice = "등록했습니다. 답변은 게시판에서 확인하실 수 있습니다.";
@@ -11708,6 +11734,7 @@ function boardListHtml() {
             <span class="board-cat" data-cat="${escapeHtml(p.category)}">${escapeHtml(p.category)}</span>
             <span class="board-item-title">${escapeHtml(p.title)}</span>
             ${p.answer ? '<span class="board-answered">답변 완료</span>' : ""}
+            ${boardCommentsOf(p.id).length ? `<span class="board-comment-count">댓글 ${formatNumber(boardCommentsOf(p.id).length)}</span>` : ""}
             <span class="board-item-meta">${escapeHtml(p.author)} · ${boardDate(p.createdAt)}</span>
           </button>
         </li>
@@ -11741,8 +11768,80 @@ function boardDetailHtml() {
           <div class="board-content">${boardText(p.answer)}</div>
         </div>
       ` : '<p class="board-pending">아직 답변이 등록되지 않았습니다.</p>'}
+      ${boardCommentsHtml(p)}
     </article>
   `;
+}
+
+// 답변 아래로 이어 다는 댓글. 운영자 답변 뒤에 더 물어볼 때 쓴다
+function boardCommentsHtml(post) {
+  const list = boardCommentsOf(post.id);
+  const items = list.map((c) => `
+    <li class="board-comment${c.pending ? " is-pending" : ""}">
+      <span class="board-item-meta">${escapeHtml(c.author)} · ${c.pending ? "등록 중…" : boardDate(c.createdAt)}</span>
+      <div class="board-content">${boardText(c.content)}</div>
+    </li>`).join("");
+  const r = board.reply;
+  return `
+    <section class="board-comments">
+      <h4>댓글 <span>${formatNumber(list.length)}</span></h4>
+      ${list.length ? `<ul class="board-comment-list">${items}</ul>` : ""}
+      <form class="board-reply-form" id="boardReplyForm" data-board-parent="${post.id}">
+        <div class="board-reply-head">
+          <input name="author" type="text" maxlength="${BOARD_LIMITS.author}" placeholder="익명" value="${escapeHtml(r.author)}" aria-label="이름" />
+          <button type="submit" class="board-submit"${board.busy ? " disabled" : ""}>${board.busy ? "등록 중…" : "댓글 등록"}</button>
+        </div>
+        <textarea name="content" rows="3" maxlength="${BOARD_LIMITS.content}" placeholder="답변에 이어서 더 물어보실 내용을 적어 주세요." required aria-label="댓글 내용">${escapeHtml(r.content)}</textarea>
+        <input class="board-honeypot" name="website" type="text" tabindex="-1" autocomplete="off" aria-hidden="true" />
+      </form>
+    </section>
+  `;
+}
+
+async function boardSubmitReply(form) {
+  const parentId = Number(form.dataset.boardParent) || 0;
+  const draft = {
+    parentId,
+    author: form.author.value.trim(),
+    content: form.content.value.trim(),
+    website: form.website.value,
+  };
+  board.reply = { author: draft.author, content: draft.content };
+  if (!parentId) return boardFail("글을 찾지 못했습니다.");
+  if (!draft.content) return boardFail("내용을 입력해 주세요.");
+
+  board.busy = true;
+  board.error = "";
+  boardRender();
+  try {
+    const data = await boardFetch(BOARD_API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(draft),
+    });
+    // 게시 CSV는 몇 분 늦다. 방금 단 댓글은 바로 보이게 끼워 넣는다
+    if (BOARD_CSV_URL && data.id) {
+      boardRememberPending({
+        id: Number(data.id),
+        createdAt: new Date().toISOString(),
+        category: "",
+        title: "",
+        author: draft.author || "익명",
+        content: draft.content,
+        answer: "",
+        answeredAt: "",
+        parentId,
+      });
+      board.posts = boardSplit(boardMergePending(boardAllRows().filter((p) => !p.pending)));
+    }
+    board.reply = { author: draft.author, content: "" };
+    board.busy = false;
+    boardRender();
+    await boardLoadList(true);
+  } catch (error) {
+    board.busy = false;
+    boardFail(error.message || "등록하지 못했습니다.");
+  }
 }
 
 function boardWriteHtml() {
@@ -11837,6 +11936,10 @@ function wireBoard() {
   });
 
   boardEls.body.addEventListener("submit", (event) => {
+    if (event.target.id === "boardReplyForm") {
+      event.preventDefault();
+      return boardSubmitReply(event.target);
+    }
     if (event.target.id !== "boardForm") return;
     event.preventDefault();
     boardSubmit(event.target);
@@ -11856,6 +11959,10 @@ function wireBoard() {
       if (item) boardOpenPost(item.dataset.boardPost);
     });
     boardEls.homeBody.addEventListener("submit", (event) => {
+      if (event.target.id === "boardReplyForm") {
+        event.preventDefault();
+        return boardSubmitReply(event.target);
+      }
       if (event.target.id !== "boardForm") return;
       event.preventDefault();
       boardSubmit(event.target);

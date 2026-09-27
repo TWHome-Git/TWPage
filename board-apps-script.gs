@@ -22,13 +22,19 @@
  * 시트에서 해당 줄의 G열(답변)에 내용을 적으면 끝이다. 답변일은 자동으로 찍힌다.
  * (onEdit 트리거가 처리하므로 H열은 건드리지 않아도 된다)
  *
+ * ── 댓글 ──
+ * 댓글도 같은 시트에 한 줄씩 쌓인다. I열(부모글)에 원글 번호가 적혀 있으면 댓글이고,
+ * 비어 있으면(0) 원글이다. 댓글 줄은 분류·제목이 비어 있고 내용만 있다.
+ * 시트에 I열이 없으면 setupSheet()를 한 번 실행하거나, 머리글에 '부모글'을 직접 적으면 된다.
+ * 운영자가 댓글로 답하려면 그냥 사이트에서 이름을 적고 달면 된다.
+ *
  * ── 스크립트를 고친 뒤에는 ──
  * 배포 → 배포 관리 → 연필 → 버전 "새 버전" → 배포. 새로 배포하지 말 것.
  * 새로 배포하면 URL이 바뀌어서 사이트 쪽 상수도 함께 고쳐야 한다.
  */
 
 var SHEET_NAME = '문의게시판';
-var HEADERS = ['번호', '작성일', '분류', '제목', '작성자', '내용', '답변', '답변일'];
+var HEADERS = ['번호', '작성일', '분류', '제목', '작성자', '내용', '답변', '답변일', '부모글'];
 var CATEGORIES = ['버그', '건의', '문의'];
 
 // 같은 사람이 연달아 도배하지 못하게 막는 최소 간격
@@ -46,6 +52,11 @@ function sheet_() {
     sh.appendRow(HEADERS);
     sh.setFrozenRows(1);
     sh.getRange(1, 1, 1, HEADERS.length).setFontWeight('bold');
+  } else if (sh.getLastColumn() < HEADERS.length) {
+    // 댓글을 넣으며 늘어난 칸. 이미 쓰던 시트에 머리글만 채운다
+    sh.getRange(1, sh.getLastColumn() + 1, 1, HEADERS.length - sh.getLastColumn())
+      .setValues([HEADERS.slice(sh.getLastColumn())])
+      .setFontWeight('bold');
   }
   return sh;
 }
@@ -81,6 +92,7 @@ function toPost_(row, full) {
     author: str_(row[4]),
     answer: str_(row[6]),
     answeredAt: iso_(row[7]),
+    parentId: Number(row[8]) || 0,
   };
   if (full) post.content = str_(row[5]);
   return post;
@@ -110,10 +122,10 @@ function doGet(e) {
       return json_({ ok: false, error: '없는 글입니다.' });
     }
 
-    // 최신 글이 위로 오게
+    // 최신 글이 위로 오게. 댓글은 본문이 곧 내용이라 같이 실어 보낸다
     var posts = values
       .filter(function (r) { return Number(r[0]) > 0; })
-      .map(function (r) { return toPost_(r, false); })
+      .map(function (r) { return toPost_(r, Number(r[8]) > 0); })
       .reverse();
 
     return json_({ ok: true, posts: posts, categories: CATEGORIES });
@@ -137,13 +149,15 @@ function doPost(e) {
     // 봇이 채우는 미끼 칸. 사람이 쓴 글이면 항상 비어 있다
     if (str_(body.website)) return json_({ ok: false, error: '잘못된 요청입니다.' });
 
-    var category = str_(body.category);
-    var title = str_(body.title);
+    // 부모글 번호가 있으면 댓글이다. 분류·제목 없이 내용만 받는다
+    var parentId = Number(body.parentId) || 0;
+    var category = parentId ? '' : str_(body.category);
+    var title = parentId ? '' : str_(body.title);
     var author = str_(body.author) || '익명';
     var content = str_(body.content);
 
-    if (CATEGORIES.indexOf(category) < 0) return json_({ ok: false, error: '분류를 선택해 주세요.' });
-    if (!title) return json_({ ok: false, error: '제목을 입력해 주세요.' });
+    if (!parentId && CATEGORIES.indexOf(category) < 0) return json_({ ok: false, error: '분류를 선택해 주세요.' });
+    if (!parentId && !title) return json_({ ok: false, error: '제목을 입력해 주세요.' });
     if (!content) return json_({ ok: false, error: '내용을 입력해 주세요.' });
     if (title.length > LIMITS.title) return json_({ ok: false, error: '제목이 너무 깁니다.' });
     if (author.length > LIMITS.author) return json_({ ok: false, error: '이름이 너무 깁니다.' });
@@ -164,7 +178,7 @@ function doPost(e) {
       }
     }
 
-    sh.appendRow([nextId, new Date(), category, title, author, content, '', '']);
+    sh.appendRow([nextId, new Date(), category, title, author, content, '', '', parentId || '']);
     return json_({ ok: true, id: nextId });
   } catch (err) {
     return json_({ ok: false, error: String(err) });

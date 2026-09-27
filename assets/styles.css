@@ -8394,3 +8394,84 @@ img.dmg-chk-icon {
   color: var(--ink);
   font-weight: 700;
 }
+
+/* ── 문의·건의: 답변 아래 댓글 ─────────────────────────────── */
+.board-comments {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.board-comments h4 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.board-comments h4 span {
+  color: var(--accent);
+}
+
+.board-comment-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.board-comment {
+  display: grid;
+  gap: 3px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-strong);
+}
+
+.board-comment.is-pending {
+  opacity: 0.65;
+}
+
+.board-reply-form {
+  display: grid;
+  gap: 6px;
+}
+
+.board-reply-head {
+  display: flex;
+  gap: 6px;
+}
+
+.board-reply-head input {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.board-reply-head .board-submit {
+  flex: 0 0 auto;
+}
+
+.board-reply-form textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 13px;
+  resize: vertical;
+}
+
+/* 목록에서 댓글이 달린 글 */
+.board-comment-count {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
