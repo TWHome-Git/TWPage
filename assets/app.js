@@ -11727,14 +11727,22 @@ function boardListHtml() {
     .map((key) => `<button type="button" class="board-filter${board.category === key ? " is-active" : ""}" data-board-filter="${key}">${key === "all" ? "전체" : key}</button>`)
     .join("");
 
+  const badges = (p) => {
+    const list = [
+      p.answer ? '<span class="board-answered">답변 완료</span>' : "",
+      boardCommentsOf(p.id).length ? `<span class="board-comment-count">댓글 ${formatNumber(boardCommentsOf(p.id).length)}</span>` : "",
+    ].filter(Boolean);
+    // 배지가 없으면 칸 자체를 만들지 않는다 (빈 칸이 생기면 줄 배치가 흐트러진다)
+    return list.length ? `<span class="board-item-badges">${list.join("")}</span>` : "";
+  };
+
   const items = rows.length
     ? rows.map((p) => `
         <li>
           <button type="button" class="board-item" data-board-post="${p.id}">
             <span class="board-cat" data-cat="${escapeHtml(p.category)}">${escapeHtml(p.category)}</span>
             <span class="board-item-title">${escapeHtml(p.title)}</span>
-            ${p.answer ? '<span class="board-answered">답변 완료</span>' : ""}
-            ${boardCommentsOf(p.id).length ? `<span class="board-comment-count">댓글 ${formatNumber(boardCommentsOf(p.id).length)}</span>` : ""}
+            ${badges(p)}
             <span class="board-item-meta">${escapeHtml(p.author)} · ${boardDate(p.createdAt)}</span>
           </button>
         </li>

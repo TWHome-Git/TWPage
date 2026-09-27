@@ -5202,6 +5202,13 @@ img.dmg-chk-icon {
   cursor: pointer;
 }
 
+/* 답변 완료·댓글 수는 한 칸에 모은다. 배지가 늘어도 줄 배치가 흐트러지지 않는다 */
+.board-item-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .board-item:hover {
   border-color: var(--accent);
 }
@@ -8471,7 +8478,11 @@ img.dmg-chk-icon {
 
 /* 목록에서 댓글이 달린 글 */
 .board-comment-count {
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
   color: var(--muted);
   font-size: 11px;
   font-weight: 700;
+  white-space: nowrap;
 }
