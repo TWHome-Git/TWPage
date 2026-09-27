@@ -11743,7 +11743,6 @@ function boardListHtml() {
             <span class="board-cat" data-cat="${escapeHtml(p.category)}">${escapeHtml(p.category)}</span>
             <span class="board-item-title">${escapeHtml(p.title)}</span>
             ${badges(p)}
-            <span class="board-item-meta">${escapeHtml(p.author)} · ${boardDate(p.createdAt)}</span>
           </button>
         </li>
       `).join("")

@@ -5188,7 +5188,7 @@ img.dmg-chk-icon {
 /* 제목은 남는 폭을 다 쓰고, 분류/답변/작성정보는 제 너비만 쓴다 */
 .board-item {
   display: grid;
-  grid-template-columns: auto 1fr auto auto;
+  grid-template-columns: auto 1fr auto;
   gap: 10px;
   align-items: center;
   width: 100%;
