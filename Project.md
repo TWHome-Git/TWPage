@@ -117,6 +117,12 @@ curl -s "https://twhome-git.github.io/TWPage/index.html" | grep -o 'app.js?v=[^"
 - Google Sheets CSV 로딩이 실패하면 로컬 스냅샷 fallback도 실패해서 페이지가 완전히 비게 됩니다.
 - 안정성을 높이려면 `data/equipment-snapshot.json` 생성 스크립트를 추가하는 것이 좋습니다.
 
+### 에타 자료 백업 (구글 드라이브)
+
+- 깃헙이 막히거나 저장소를 옮겨도 남도록, 에타 자료를 구글 계정에 따로 쌓습니다. 소스는 `eta-backup-apps-script.gs`이고, 구글 시트에 붙여 넣어 하루 한 번(트리거) `backupNow`를 돌립니다.
+- 인구·소모는 시트 두 장(`인구`, `소모`)에 날짜별로 덧붙고, 이미 있는 날짜는 건너뜁니다. 개인 기록(`assets/eta-history/`의 64조각 + index)은 양이 많아 드라이브 폴더 `TWPage 백업/eta-history`에 파일째 덮어쓰고, 매달 1일에 그달 폴더로 한 벌을 남깁니다.
+- 자료는 저장소가 아니라 사이트 주소(`https://talesdb.xyz/assets/...`)에서 받습니다. 저장소를 옮겨도 그대로 돌고, 도메인이 바뀌면 스크립트 맨 위 `SOURCE_URL`·`SITE_BASE`만 고치면 됩니다.
+
 ### 문의·건의 게시판
 
 - 글은 같은 스프레드시트의 `문의게시판` 시트에 쌓입니다. **읽기**는 그 시트를 웹에 게시한 CSV(`BOARD_CSV_URL`)로 받고, **쓰기**만 Apps Script 웹앱(`BOARD_API_URL`, 소스는 `board-apps-script.gs`)을 거칩니다. 읽기까지 Apps Script로 가면 호출마다 2~3초라 목록·글 열기가 너무 느렸습니다(2026-09-14 변경).
