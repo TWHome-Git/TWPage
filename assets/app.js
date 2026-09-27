@@ -376,8 +376,6 @@ const els = {
   infoTabButtons: document.querySelectorAll("[data-info-tab]"),
   infoTitle: document.querySelector("#infoTitle"),
   infoPanels: document.querySelectorAll("[data-info-panel]"),
-  buffTabButtons: document.querySelectorAll("[data-buff-tab]"),
-  buffPanels: document.querySelectorAll("[data-buff-panel]"),
   seedBody: document.getElementById("seedBody"),
   okGroundRow: document.querySelector("#okGroundRow"),
   okModeRow: document.querySelector("#okModeRow"),
@@ -629,8 +627,14 @@ function routeParse() {
   const moved = ROUTE_MOVED[`${parts[0]}/${parts[1] || ""}`] || ROUTE_MOVED[parts[0]];
   const main = moved ? moved.main : (parts[0] || "");
   if (!document.querySelector(`[data-main-tab="${CSS.escape(main)}"]`)) return null;
-  const sub = moved ? (moved.sub || parts[1] || "") : parts[1];
-  return { main, sub: sub || ROUTE_DEFAULT_SUB[main] || "", item: parts.slice(2).join("/") };
+  let sub = moved ? (moved.sub || parts[1] || "") : parts[1];
+  let item = parts.slice(2).join("/");
+  // 옛 주소: 버프 아이템 탭(#/info/buff/rare, #/extra/buff/rare)은 경험치·레어 버프 하위 탭으로 나뉘었다
+  if (main === "info" && sub === "buff") {
+    sub = item === "rare" ? "rare" : "exp";
+    item = "";
+  }
+  return { main, sub: sub || ROUTE_DEFAULT_SUB[main] || "", item };
 }
 
 // 주소 → 화면. 항목은 데이터가 와야 열 수 있으므로 못 찾으면 미뤄 둔다.
@@ -722,13 +726,6 @@ function routeCloseItem(sub) {
 function routeResolvePending() {
   const p = route.pending;
   if (!p) return;
-
-  // 버프 아이템은 데이터 없이도 바로 열 수 있다: #/extra/buff/rare 처럼 세 번째 칸으로 하위 탭을 고른다
-  if (p.sub === "buff") {
-    route.pending = null;
-    if (document.querySelector(`[data-buff-tab="${CSS.escape(p.item)}"]`)) activateBuffTab(p.item);
-    return;
-  }
 
   if (p.sub === "equipment") {
     const key = routeNameKey(p.item);
@@ -3628,7 +3625,7 @@ function activateSimulatorTab(key) {
   routeWrite();
 }
 
-const INFO_TITLES = { seed: "주간 시드 한도", buff: "버프 아이템" };
+const INFO_TITLES = { seed: "주간 시드 한도", exp: "경험치 버프", rare: "레어 버프" };
 
 function activateInfoTab(key) {
   ACTIVE_SUB.info = key;
@@ -3641,8 +3638,8 @@ function activateInfoTab(key) {
     panel.hidden = !isActive;
     panel.classList.toggle("is-active", isActive);
   });
-  // 버프 탭은 처음 열릴 때 기본 하위 탭(경험치)을 그린다
-  if (key === "buff") expBuff.load();
+  if (key === "exp") expBuff.load();
+  if (key === "rare") rareBuff.load();
   if (key === "seed") seedCalc.load();
 
   routeWrite();
@@ -3652,17 +3649,6 @@ function activateInfoTab(key) {
 //  버프 아이템 탭 — 경험치 버프 / 레어 버프
 // ══════════════════════════════════════════════════════════════
 const BUFF_ICON_BASE = `${CDN_ETC_ROOT}images/`;
-
-function activateBuffTab(key) {
-  els.buffTabButtons.forEach((button) => {
-    button.classList.toggle("is-active", button.dataset.buffTab === key);
-  });
-  els.buffPanels.forEach((panel) => {
-    panel.hidden = panel.dataset.buffPanel !== key;
-  });
-  if (key === "exp") expBuff.load();
-  if (key === "rare") rareBuff.load();
-}
 
 // 아이콘이 아직 없는 항목은 빈 자리를 남겨 나중에 채워 넣을 수 있게 한다.
 // "buff/이름.png"처럼 하위 폴더를 적어도 되도록 세그먼트별로 인코딩한다.
@@ -6894,12 +6880,6 @@ function wireEvents() {
   els.infoTabButtons.forEach((button) => {
     button.addEventListener("click", () => {
       activateInfoTab(button.dataset.infoTab);
-    });
-  });
-
-  els.buffTabButtons.forEach((button) => {
-    button.addEventListener("click", () => {
-      activateBuffTab(button.dataset.buffTab);
     });
   });
 

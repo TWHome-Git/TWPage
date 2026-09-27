@@ -2416,29 +2416,6 @@ img.dmg-chk-icon {
 /* 준비중 플레이스홀더 (추가 메뉴) */
 /* ── 버프 아이템 (경험치 / 레어) ────────────────────── */
 
-.buff-subtabs {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: 1fr;
-  gap: 8px;
-  padding: 16px 16px 0;
-}
-
-.buff-tab {
-  min-height: 38px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  color: var(--muted);
-  background: #fff;
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.buff-tab.is-active {
-  color: #fff;
-  border-color: var(--accent);
-  background: var(--accent);
-}
 
 .buff-panel[hidden] {
   display: none;

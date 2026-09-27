@@ -6,7 +6,7 @@
     <title>TW DB</title>
     <!-- 이미지 CDN. 첫 이미지 요청 전에 DNS+TLS를 미리 끝내둔다 -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
-    <link rel="stylesheet" href="./assets/styles.css?v=20260924-etahistory7" />
+    <link rel="stylesheet" href="./assets/styles.css?v=20260927-bufftabs" />
     <!-- 모바일 전용. media 속성 덕에 넓은 화면에서는 렌더링을 막지 않는다 -->
     <link rel="stylesheet" href="./assets/mobile.css?v=20260924-etachecker2" media="(max-width: 720px)" />
   </head>
@@ -1106,7 +1106,8 @@
         <!-- 에타·DB와 같은 구성: 위에 하위 메뉴 알약 버튼, 그 아래 제목 줄 -->
         <nav class="db-subtabs" aria-label="정보 메뉴">
           <button class="db-subtab is-active" type="button" data-info-tab="seed">주간 시드 한도</button>
-          <button class="db-subtab" type="button" data-info-tab="buff">버프 아이템</button>
+          <button class="db-subtab" type="button" data-info-tab="exp">경험치 버프</button>
+          <button class="db-subtab" type="button" data-info-tab="rare">레어 버프</button>
         </nav>
 
         <section class="toolbar" aria-label="정보">
@@ -1119,23 +1120,15 @@
           <section class="addon-content is-active" data-info-panel="seed">
             <div id="seedBody" class="seed-body"></div>
           </section>
-          <section class="addon-content" data-info-panel="buff" hidden>
-            <nav class="buff-subtabs" aria-label="버프 종류">
-              <button class="buff-tab is-active" type="button" data-buff-tab="exp">경험치 버프</button>
-              <button class="buff-tab" type="button" data-buff-tab="rare">레어 버프</button>
-            </nav>
-
-            <section class="buff-panel" data-buff-panel="exp">
-              <div id="expBaseBox" class="buff-base"></div>
-              <div id="expResultBox" class="buff-result"></div>
-              <div id="expBuffBody" class="buff-body"></div>
-            </section>
-
-            <section class="buff-panel" data-buff-panel="rare" hidden>
-              <div id="rareBaseBox" class="buff-base" hidden></div>
-              <div id="rareResultBox" class="buff-result"></div>
-              <div id="rareBuffBody" class="buff-body"></div>
-            </section>
+          <section class="addon-content buff-panel" data-info-panel="exp" hidden>
+            <div id="expBaseBox" class="buff-base"></div>
+            <div id="expResultBox" class="buff-result"></div>
+            <div id="expBuffBody" class="buff-body"></div>
+          </section>
+          <section class="addon-content buff-panel" data-info-panel="rare" hidden>
+            <div id="rareBaseBox" class="buff-base" hidden></div>
+            <div id="rareResultBox" class="buff-result"></div>
+            <div id="rareBuffBody" class="buff-body"></div>
           </section>
         </div>
       </section>
@@ -1187,7 +1180,7 @@
       </div>
     </template>
 
-    <script src="./assets/app.js?v=20260926-etafresh" type="module"></script>
+    <script src="./assets/app.js?v=20260927-bufftabs" type="module"></script>
     <!-- GoatCounter 방문자 분석 (localhost 방문은 count.js가 기본으로 집계 제외)
          자동 집계를 끄고 app.js의 라우터가 탭 단위 경로(/eta/ranking 등)로 직접 보낸다 -->
     <script>window.goatcounter = { no_onload: true };</script>
