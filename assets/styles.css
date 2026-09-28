@@ -6014,6 +6014,11 @@ img.dmg-chk-icon {
   vector-effect: non-scaling-stroke;
 }
 
+.pop-grid.is-zero {
+  stroke: var(--muted);
+  stroke-dasharray: 4 3;
+}
+
 .pop-axis-y,
 .pop-axis-x {
   fill: var(--muted);
@@ -6082,6 +6087,14 @@ img.dmg-chk-icon {
 .pop-tip-row b {
   margin-left: auto;
   font-variant-numeric: tabular-nums;
+}
+
+/* 증감 보기일 때 괄호 없이 옆에 붙이는 원래 인원 */
+.pop-tip-row b em {
+  margin-left: 5px;
+  font-style: normal;
+  font-weight: 400;
+  color: var(--muted);
 }
 
 .pop-legend-head {

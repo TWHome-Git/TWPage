@@ -451,6 +451,7 @@ const els = {
   etaRankingHead: document.querySelector("#etaRankingHead"),
   popRangeButtons: document.querySelector("#popRangeButtons"),
   popBandButtons: document.querySelector("#popBandButtons"),
+  popModeButtons: document.querySelector("#popModeButtons"),
   popFromDate: document.querySelector("#popFromDate"),
   popToDate: document.querySelector("#popToDate"),
   popServerTabs: document.querySelector("#popServerTabs"),
@@ -2088,7 +2089,15 @@ const etaPop = {
   to: "",
   bands: new Set(POP_BAND_TOPS.map((_, index) => index)), // 켜 둔 레벨 구간. 처음엔 전부 켜 둔다
   hidden: new Set(), // 숨긴 캐릭터 코드
+  mode: "count",     // 세로 기준. count = 인원 그대로, delta = 첫날 대비 증감
 };
+
+// 인원으로 그리면 1,000명짜리 줄은 하루 몇십 명이 움직여도 평평하게 눕는다.
+// 그럴 땐 첫날 대비 ±명으로 바꿔 움직임만 본다.
+const POP_MODES = [
+  { key: "count", label: "인원" },
+  { key: "delta", label: "증감" },
+];
 
 const ETA_INFO_URL = "./assets/eta_info.json";
 const etaInfo = { data: null, loading: false };
@@ -2121,6 +2130,13 @@ function wireEtaPopulation() {
     etaPop.range = key;
     etaPop.from = "";
     etaPop.to = "";
+    renderEtaPopulation();
+  });
+
+  els.popModeButtons?.addEventListener("click", (event) => {
+    const key = event.target.closest("[data-pop-mode]")?.dataset.popMode;
+    if (!key || key === etaPop.mode) return;
+    etaPop.mode = key;
     renderEtaPopulation();
   });
 
@@ -2314,6 +2330,7 @@ function renderEtaPopulation() {
 
   renderPopRangeButtons();
   renderPopBandButtons();
+  renderPopModeButtons();
   renderPopServerTabs();
 
   const dates = popVisibleDates();
@@ -2345,8 +2362,9 @@ function renderEtaPopulation() {
     + (clipped ? " · 서버가 모두 수집된 날부터" : "");
 
   renderPopLapisUse(dates, shown);
-  els.popChart.innerHTML = popChartSvg(dates, shown);
-  wirePopChartHover(dates, shown);
+  const plotted = popPlotSeries(shown);
+  els.popChart.innerHTML = popChartSvg(dates, plotted);
+  wirePopChartHover(dates, plotted);
 }
 
 // 날짜별 소모량은 파일을 만들 때 사람마다 어제·오늘 레벨을 견줘 세어 둔 값이다.
@@ -2406,6 +2424,13 @@ function renderPopBandButtons() {
     const on = etaPop.bands.has(index);
     return `<button class="pop-range-btn${on ? " is-active" : ""}" type="button" data-pop-band="${index}" aria-pressed="${on}">${label}</button>`;
   }).join("");
+}
+
+function renderPopModeButtons() {
+  if (!els.popModeButtons) return;
+  els.popModeButtons.innerHTML = POP_MODES.map((mode) => `
+    <button class="pop-range-btn${mode.key === etaPop.mode ? " is-active" : ""}" type="button" role="radio" aria-checked="${mode.key === etaPop.mode}" data-pop-mode="${mode.key}">${mode.label}</button>
+  `).join("");
 }
 
 function renderPopServerTabs() {
@@ -2468,23 +2493,78 @@ function popNiceMax(value) {
   return step * base;
 }
 
+// 증감 보기는 0을 품고 위아래로 뻗어야 해서 눈금 간격부터 고른다.
+// 사람 수는 정수라 2.5 같은 간격은 쓰지 않는다.
+function popNiceStep(rough) {
+  if (!(rough > 1)) return 1;
+  const exponent = Math.floor(Math.log10(rough));
+  const base = 10 ** exponent;
+  const step = [1, 2, 5, 10].find((multiple) => rough <= multiple * base) || 10;
+  return step * base;
+}
+
+// 세로 기준이 "증감"이면 각 줄을 기간 첫 값 대비 ±명으로 바꿔 그린다.
+// 인원 규모가 달라도 움직인 폭을 한 화면에서 견줄 수 있다.
+// 툴팁에 원래 인원도 같이 보이도록 raw를 들고 다닌다.
+function popPlotSeries(series) {
+  if (etaPop.mode !== "delta") return series;
+  return series.map((item) => {
+    const base = popFirstValue(item);
+    return {
+      ...item,
+      raw: item.values,
+      values: item.values.map((value) => (value === null ? null : value - base)),
+    };
+  });
+}
+
+function popValueText(value) {
+  const text = value.toLocaleString("ko-KR");
+  return etaPop.mode === "delta" && value > 0 ? `+${text}` : text;
+}
+
+// 그릴 값들을 보고 y축의 위아래 끝과 눈금 자리를 정한다
+function popAxis(values) {
+  if (etaPop.mode !== "delta") {
+    const max = popNiceMax(Math.max(...values, 1));
+    // 위끝이 10이면 1/4 눈금이 2.5라 반올림한 숫자가 어그러진다. 그때는 눈금을 셋만 둔다.
+    const ratios = max <= POP_MIN_AXIS ? [0, 0.5, 1] : [0, 0.25, 0.5, 0.75, 1];
+    return { min: 0, max, ticks: ratios.map((ratio) => Math.round(max * ratio)) };
+  }
+
+  // 0은 반드시 품고, 위아래로는 눈금 간격의 배수까지만 넓힌다.
+  // 간격이 넓으면 몇 명 안 되는 골짜기 때문에 아래쪽이 통째로 비므로
+  // 눈금이 여섯을 넘지 않는 선에서 가장 촘촘한 간격을 고른다.
+  const lo = Math.min(0, ...values);
+  const hi = Math.max(0, ...values);
+  let step = popNiceStep((hi - lo) / 6);
+  while (Math.ceil(hi / step) - Math.floor(lo / step) > 6) step = popNiceStep(step * 1.5);
+  let min = Math.floor(lo / step) * step;
+  let max = Math.ceil(hi / step) * step;
+  if (min === max) {
+    min -= step;
+    max += step;
+  }
+  const count = Math.round((max - min) / step);
+  return { min, max, ticks: Array.from({ length: count + 1 }, (_, index) => min + index * step) };
+}
+
 function popChartSvg(dates, series) {
   const { w, h, left, right, top, bottom } = POP_VIEW;
   const plotW = w - left - right;
   const plotH = h - top - bottom;
-  const maxValue = popNiceMax(Math.max(...series.flatMap((item) => item.values.filter((value) => value !== null)), 1));
+  const axis = popAxis(series.flatMap((item) => item.values.filter((value) => value !== null)));
   const stepX = dates.length > 1 ? plotW / (dates.length - 1) : 0;
   const x = (index) => left + (dates.length > 1 ? index * stepX : plotW / 2);
-  const y = (value) => top + plotH - (value / maxValue) * plotH;
+  const y = (value) => top + plotH - ((value - axis.min) / (axis.max - axis.min)) * plotH;
 
-  // 위끝이 10이면 1/4 눈금이 2.5라 반올림한 숫자가 어그러진다. 그때는 눈금을 셋만 둔다.
-  const ratios = maxValue <= POP_MIN_AXIS ? [0, 0.5, 1] : [0, 0.25, 0.5, 0.75, 1];
-  const ticks = ratios.map((ratio) => {
-    const value = Math.round(maxValue * ratio);
+  const ticks = axis.ticks.map((value) => {
     const py = y(value);
+    // 증감 보기의 0선은 늘던 줄과 줄던 줄을 가르는 기준이라 따로 눈에 띄게 한다
+    const zero = etaPop.mode === "delta" && value === 0;
     return `
-      <line class="pop-grid" x1="${left}" y1="${py}" x2="${w - right}" y2="${py}" />
-      <text class="pop-axis-y" x="${left - 8}" y="${py + 4}">${value.toLocaleString("ko-KR")}</text>
+      <line class="pop-grid${zero ? " is-zero" : ""}" x1="${left}" y1="${py}" x2="${w - right}" y2="${py}" />
+      <text class="pop-axis-y" x="${left - 8}" y="${py + 4}">${popValueText(value)}</text>
     `;
   }).join("");
 
@@ -2551,15 +2631,15 @@ function wirePopChartHover(dates, series) {
     cursor.hidden = false;
 
     const rows = series
-      .map((item) => ({ name: item.name, color: item.color, value: item.values[index] }))
-      .sort((a, b) => (b.value ?? -1) - (a.value ?? -1))
+      .map((item) => ({ name: item.name, color: item.color, value: item.values[index], raw: item.raw?.[index] ?? null }))
+      .sort((a, b) => (b.value === null ? -Infinity : b.value) - (a.value === null ? -Infinity : a.value))
       .slice(0, 12);
     tooltip.innerHTML = `
       <strong>${dates[index]}</strong>
       ${rows.map((row) => `
         <span class="pop-tip-row">
           <i style="background:${row.color}"></i>${escapeHtml(row.name)}
-          <b>${row.value === null ? "-" : row.value.toLocaleString("ko-KR")}</b>
+          <b>${row.value === null ? "-" : popValueText(row.value)}${row.value !== null && row.raw !== null ? `<em>${row.raw.toLocaleString("ko-KR")}</em>` : ""}</b>
         </span>
       `).join("")}
     `;
