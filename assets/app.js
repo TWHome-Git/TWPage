@@ -5913,6 +5913,9 @@ function buildEquipmentCandidates(slot, type, characterName) {
 }
 
 // 장비 선택 → 행 스탯 반영 (ApplyEquipmentToRow)
+const isWristList = (record) =>
+  String(record.type || "").includes("리스트") || String(record.name || "").includes("리스트");
+
 function statByType(record, type) {
   const S = (key) => record.stats[key] || { min: 0, max: 0, limit: 0 };
   const stab = S("찌르기");
@@ -5930,8 +5933,11 @@ function statByType(record, type) {
       return { pMax: mr.max, sMax: int.max, pLimit: mr.limit, sLimit: int.limit };
     case CALC.PHYSICAL_HYBRID:
       return { pMax: stab.max, sMax: hack.max, pLimit: stab.limit, sLimit: hack.limit };
-    case CALC.MAGIC_HACK:
-      return { pMax: hack.max, sMax: int.max, pLimit: hack.limit, sLimit: int.limit };
+    case CALC.MAGIC_HACK: {
+      // 손목 리스트에는 마법공격 수치가 없다. 마법베기에서는 그 자리에 찌르기를 쓴다
+      const sub = int.max || int.limit || !isWristList(record) ? int : stab;
+      return { pMax: hack.max, sMax: sub.max, pLimit: hack.limit, sLimit: sub.limit };
+    }
     default:
       return { pMax: stab.max, sMax: hack.max, pLimit: stab.limit, sLimit: hack.limit };
   }
