@@ -6350,7 +6350,8 @@ const calcPresetFixed = (n) => n >= 4;
 function calcFixedPayload(preset, characterName, type) {
   const group = CALC_FIXED && CALC_FIXED.presets ? CALC_FIXED.presets[String(preset)] : null;
   if (!group) return null;
-  const base = group._default;
+  // 타입별 공용값(_defaultMAGIC_DEFENSE 등)이 있으면 그것을 먼저 쓴다
+  const base = group[`_default${type}`] || group._default;
   const own = group[`${characterName}::${type}`];
   if (!own) return base || null;
   if (!base) return own;
