@@ -6152,7 +6152,7 @@ function resetCurrentTypeData() {
   if (!calc.active || !calc.characterName || !calc.type) return;
 
   const typeName = CALC_TYPE_DISPLAY[calc.type] || calc.type;
-  const ok = window.confirm(`${calc.characterName} · ${typeName} · 프리셋 ${calc.preset} 데이터를 초기화할까요?`);
+  const ok = window.confirm(`${calc.characterName} · ${typeName} · ${calcPresetName(calc.preset)} 데이터를 초기화할까요?`);
   if (!ok) return;
 
   // 대기 중인 자동 저장 취소 (초기화 직후 되살아나지 않도록)
@@ -6267,7 +6267,11 @@ function slotBaseKey() {
   return `${calc.characterName}::${calc.type}`;
 }
 
-// 프리셋 1은 기존 키 그대로(하위 호환), 2·3은 ::p2 / ::p3 접미사
+// 프리셋 이름. 1~3은 번호 그대로, 4·5는 콘텐츠 이름을 붙여 둔다
+const CALC_PRESET_NAMES = { 4: "아페테리아(어려움)", 5: "환희와 슬픔(일반)" };
+const calcPresetName = (n) => CALC_PRESET_NAMES[n] || `프리셋 ${n}`;
+
+// 프리셋 1은 기존 키 그대로(하위 호환), 2 이상은 ::p2 … 접미사
 function slotSaveKey() {
   return calc.preset > 1 ? `${slotBaseKey()}::p${calc.preset}` : slotBaseKey();
 }

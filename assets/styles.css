@@ -1171,6 +1171,13 @@ select {
   transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
 }
 
+/* 이름이 붙은 프리셋(콘텐츠별)은 글자만큼 넓어진다 */
+.preset-button.is-named {
+  width: auto;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
 .preset-button:hover {
   border-color: var(--accent);
   color: var(--accent);
