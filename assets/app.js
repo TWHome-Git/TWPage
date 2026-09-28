@@ -6156,8 +6156,10 @@ function applyFixedPreset() {
   calc.fixed = fixed;
   if (!fixed) return;
 
+  // 자료를 받아오는 사이 캐릭터·타입·프리셋이 바뀔 수 있다. 그때 온 값은 버린다
+  const want = `${calc.preset}|${calc.characterName}|${calc.type}`;
   loadCalcPresets().then(() => {
-    if (!calcPresetFixed(calc.preset)) return;
+    if (want !== `${calc.preset}|${calc.characterName}|${calc.type}`) return;
     const payload = calcFixedPayload(calc.preset, calc.characterName, calc.type);
     if (payload) calcApplyFixed(payload);
   });
@@ -6343,12 +6345,23 @@ let CALC_FIXED = null;       // { "4": { "캐릭터::타입": {coefficient, dama
 
 const calcPresetFixed = (n) => n >= 4;
 
-// 캐릭터·타입에 맞춘 값이 있으면 그것을, 없으면 공통값(_default)을 쓴다.
-// 공통값에는 무기·갑옷·손목·아티팩트가 비어 있어 각자 채워 보게 된다
+// 공통값(_default) 위에 "캐릭터::타입" 항목을 덮어쓴다.
+// 그 항목에는 달라지는 부위만 적혀 있다 (무기·손목처럼 캐릭터마다 다른 것)
 function calcFixedPayload(preset, characterName, type) {
   const group = CALC_FIXED && CALC_FIXED.presets ? CALC_FIXED.presets[String(preset)] : null;
   if (!group) return null;
-  return group[`${characterName}::${type}`] || group._default || null;
+  const base = group._default;
+  const own = group[`${characterName}::${type}`];
+  if (!own) return base || null;
+  if (!base) return own;
+  return {
+    coefficient: {
+      ...base.coefficient,
+      ...own.coefficient,
+      data: { ...(base.coefficient?.data || {}), ...(own.coefficient?.data || {}) },
+    },
+    damage: own.damage || base.damage,
+  };
 }
 
 async function loadCalcPresets() {
