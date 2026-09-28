@@ -8502,3 +8502,11 @@ img.dmg-chk-icon {
 .db-subtab.is-shortcut:hover {
   color: var(--accent);
 }
+
+/* 스탯·덱스 표 아래 안내: 캐릭터 창에서 버프까지 들어간 값을 그대로 옮겨 적는다 */
+.stat-note {
+  margin: 4px 0 8px;
+  color: #ff6b6b;
+  font-size: 12px;
+  font-weight: 700;
+}
