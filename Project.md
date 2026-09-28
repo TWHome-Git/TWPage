@@ -117,6 +117,12 @@ curl -s "https://twhome-git.github.io/TWPage/index.html" | grep -o 'app.js?v=[^"
 - Google Sheets CSV 로딩이 실패하면 로컬 스냅샷 fallback도 실패해서 페이지가 완전히 비게 됩니다.
 - 안정성을 높이려면 `data/equipment-snapshot.json` 생성 스크립트를 추가하는 것이 좋습니다.
 
+### 계수 계산기 고정 프리셋 (아페·환슬)
+
+- 프리셋 4·5는 콘텐츠별로 맞춰 둔 값입니다. 값은 `assets/calc-presets.json`에 `presets["4"]["캐릭터::타입"] = { coefficient, damage }` 모양으로 넣습니다(계산기의 ↓ 저장 파일과 같은 형식).
+- 그 프리셋을 열 때마다 파일 값을 얹습니다. 화면에서 고쳐 볼 수는 있지만 저장하지 않으므로(`calc.fixed`), 다시 열면 준비된 값으로 돌아옵니다. 1~3번은 예전처럼 각자 값이 브라우저에 남습니다.
+- 값을 바꾸려면 계산기에서 맞춘 뒤 ↓ 저장으로 받은 파일 내용을 이 JSON에 옮기면 됩니다.
+
 ### 에타 자료 백업 (구글 드라이브)
 
 - 깃헙이 막히거나 저장소를 옮겨도 남도록, 에타 자료를 구글 계정에 따로 쌓습니다. 소스는 `eta-backup-apps-script.gs`이고, 구글 시트에 붙여 넣어 하루 한 번(트리거) `backupNow`를 돌립니다.

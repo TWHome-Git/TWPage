@@ -330,7 +330,8 @@ const calc = {
   characterName: "",
   types: [],
   type: null,
-  preset: 1, // 캐릭터·타입별 프리셋 (1~3)
+  preset: 1, // 캐릭터·타입별 프리셋 (1~3은 내 값, 4~5는 미리 맞춰 둔 값)
+  fixed: false, // 고정 프리셋을 보고 있는 중인지 (이때는 저장하지 않는다)
   mainRows: [],
   accRows: [],
   dex: 0,
@@ -6103,6 +6104,7 @@ function showCoefficientDetail(characterName) {
   calc.accRows = ACCESSORY_SLOTS.map(makeSlotRow);
 
   refreshAllRows();
+  applyFixedPreset();
 
   els.coefficientSelectView.hidden = true;
   els.coefficientDetailView.hidden = false;
@@ -6145,6 +6147,66 @@ function switchPreset(n) {
 
   updatePresetButtons();
   refreshAllRows();
+  applyFixedPreset();
+}
+
+// 고정 프리셋이면 준비된 값을 얹는다. 고쳐 볼 수는 있지만 저장되지 않는다
+function applyFixedPreset() {
+  const fixed = calcPresetFixed(calc.preset);
+  calc.fixed = fixed;
+  if (!fixed) return;
+
+  loadCalcPresets().then(() => {
+    if (!calcPresetFixed(calc.preset)) return;
+    const payload = calcFixedPayload(calc.preset, calc.characterName, calc.type);
+    if (payload) calcApplyFixed(payload);
+  });
+}
+
+// 저장 파일을 읽을 때와 같은 방식으로 값만 채운다 (자동 저장은 하지 않는다)
+function calcApplyFixed(payload) {
+  const state = payload.coefficient;
+  if (!state) return;
+  const snap = state.data || {};
+  const apply = (row, isMain) => {
+    const saved = snap[row.slotName];
+    if (!saved) return;
+    if (isMain) {
+      if (saved.at && ABILITY_OPTIONS.includes(saved.at)) row.abilityType = saved.at;
+      if (saved.equip && row.candidates.includes(saved.equip)) {
+        row.selectedEquipment = saved.equip;
+        applyEquipmentToRow(row);
+      }
+      if (row.selectedEquipment === "수동 입력" || row.isAbility) {
+        row.attackValue = saved.a || 0;
+        row.defenseValue = saved.d || 0;
+        row.hitValue = saved.hit || 0;
+      }
+    } else {
+      row.attackValue = saved.a || 0;
+      row.defenseValue = saved.d || 0;
+      row.hitValue = saved.hit || 0;
+    }
+    row.attackEnchant = saved.ae || 0;
+    row.defenseEnchant = saved.de || 0;
+    row.primaryStatValue = saved.p || 0;
+    row.secondaryStatValue = saved.s || 0;
+    recalcRow(row, calc.type);
+  };
+  for (const row of calc.mainRows) apply(row, true);
+  for (const row of calc.accRows) apply(row, false);
+
+  calc.dex = Number(state.dex) || 0;
+  if (els.avatarMainEnhance) els.avatarMainEnhance.checked = !!state.avatarMain;
+  if (els.avatarSubEnhance) els.avatarSubEnhance.checked = !!state.avatarSub;
+  renderCalculator();
+
+  if (payload.damage) {
+    dmg.userEdited = true;
+    dmgRefresh();
+    dmgApplyFields(payload.damage);
+    dmgRefresh();
+  }
 }
 
 // 선택된 캐릭터 + 계산 타입의 데이터만 초기화
@@ -6152,6 +6214,12 @@ function resetCurrentTypeData() {
   if (!calc.active || !calc.characterName || !calc.type) return;
 
   const typeName = CALC_TYPE_DISPLAY[calc.type] || calc.type;
+  if (calc.fixed) {
+    // 고정 프리셋은 지울 내 데이터가 없다. 고쳐 본 값을 준비된 값으로 되돌린다
+    refreshAllRows();
+    applyFixedPreset();
+    return;
+  }
   const ok = window.confirm(`${calc.characterName} · ${typeName} · ${calcPresetName(calc.preset)} 데이터를 초기화할까요?`);
   if (!ok) return;
 
@@ -6267,6 +6335,32 @@ function slotBaseKey() {
   return `${calc.characterName}::${calc.type}`;
 }
 
+// ── 고정 프리셋 (아페·환슬) ──
+// 콘텐츠별로 맞춰 둔 값을 assets/calc-presets.json에 담아 둔다.
+// 화면에서 고쳐 볼 수는 있지만 저장하지 않는다. 다시 들어오면 늘 준비된 값으로 돌아온다.
+const CALC_PRESET_URL = "./assets/calc-presets.json";
+let CALC_FIXED = null;       // { "4": { "캐릭터::타입": {coefficient, damage} }, ... }
+
+const calcPresetFixed = (n) => n >= 4;
+
+function calcFixedPayload(preset, characterName, type) {
+  const group = CALC_FIXED && CALC_FIXED.presets ? CALC_FIXED.presets[String(preset)] : null;
+  return (group && group[`${characterName}::${type}`]) || null;
+}
+
+async function loadCalcPresets() {
+  if (CALC_FIXED) return CALC_FIXED;
+  try {
+    const res = await fetch(CALC_PRESET_URL, { cache: "no-cache" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    CALC_FIXED = await res.json();
+  } catch (error) {
+    CALC_FIXED = { presets: {} };
+    console.info("고정 프리셋(calc-presets.json)을 불러오지 못했습니다.", error);
+  }
+  return CALC_FIXED;
+}
+
 // 프리셋 이름. 1~3은 번호 그대로, 4·5는 콘텐츠 이름을 붙여 둔다
 const CALC_PRESET_NAMES = { 4: "아페테리아(어려움)", 5: "환희와 슬픔(일반)" };
 const calcPresetName = (n) => CALC_PRESET_NAMES[n] || `프리셋 ${n}`;
@@ -6304,6 +6398,7 @@ function flushSave() {
 
 function saveCalcState() {
   if (!calc.characterName || !calc.type) return;
+  if (calc.fixed) return;   // 고정 프리셋에서 고친 값은 남기지 않는다
 
   const charEntry = calc.save.characters[calc.characterName] || { lastType: calc.type, slots: {} };
   charEntry.lastType = calc.type;
@@ -6908,8 +7003,10 @@ function wireEvents() {
     calc.type = els.coefficientTypeSelect.value;
     // 바뀐 타입에서 마지막으로 쓰던 프리셋 복원
     calc.preset = savedPresetFor(calc.characterName, calc.type);
+    calc.fixed = calcPresetFixed(calc.preset);
     updatePresetButtons();
     refreshAllRows();
+    applyFixedPreset();
   });
 
   document.querySelector("#coefficientPresetGroup")?.addEventListener("click", (event) => {

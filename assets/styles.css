@@ -577,6 +577,8 @@ select {
 .coefficient-table {
   table-layout: fixed;
   width: 100%;
+  /* 부위 104 + 숫자 84×5 + 계수 78 + 아이템 최소 140. 이보다 좁아지면 카드가 가로로 스크롤된다 */
+  min-width: 742px;
 }
 
 .coefficient-table thead th {
@@ -594,9 +596,12 @@ select {
   width: 104px;
 }
 
+/* 아이템 칸이 남는 폭을 맡는다. 좁아지면 이 칸만 줄고 숫자 칸은 그대로 남는다.
+   (table-layout: fixed에서는 auto 칸이 남은 폭을 가져간다) */
 .coefficient-table th:nth-child(2),
 .coefficient-table td:nth-child(2) {
-  width: var(--item-col-width, 200px);
+  width: auto;
+  max-width: var(--item-col-width, 200px);
   padding-left: 10px;
   padding-right: 10px;
 }
@@ -611,19 +616,9 @@ select {
 .coefficient-table td:nth-child(6),
 .coefficient-table th:nth-child(7),
 .coefficient-table td:nth-child(7) {
-  width: auto;
-  min-width: 64px;
+  width: 84px;
   padding-left: 4px;
   padding-right: 4px;
-}
-
-/* 강화 열은 "강화 마법방어"처럼 제목이 길어 줄바꿈이 났다.
-   남는 폭은 계수 열에서 가져온다 */
-.coefficient-table th:nth-child(4),
-.coefficient-table td:nth-child(4),
-.coefficient-table th:nth-child(6),
-.coefficient-table td:nth-child(6) {
-  width: 84px;
 }
 
 .coefficient-table th:nth-child(8),

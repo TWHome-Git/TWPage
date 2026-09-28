@@ -678,6 +678,7 @@
   .coefficient-table {
     display: block;
     width: 100%;
+    min-width: 0;   /* 폰에서는 카드로 펴므로 가로 스크롤이 필요 없다 */
   }
 
   .coefficient-table thead {
