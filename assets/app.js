@@ -6969,6 +6969,13 @@ function wireEvents() {
     });
   });
 
+  // 메뉴 줄의 바로가기. 다른 탭에 있는 계산기로 주소만 바꿔 넘어간다
+  document.querySelectorAll("[data-goto]").forEach((button) => {
+    button.addEventListener("click", () => {
+      location.hash = `#/${button.dataset.goto}`;
+    });
+  });
+
   els.simulatorTabButtons.forEach((button) => {
     button.addEventListener("click", () => {
       activateSimulatorTab(button.dataset.simulatorTab);

@@ -8488,3 +8488,17 @@ img.dmg-chk-icon {
   font-weight: 700;
   white-space: nowrap;
 }
+
+/* 메뉴 줄의 바로가기 버튼: 다른 탭으로 넘어간다는 것을 화살표로 알린다 */
+.db-subtab.is-shortcut {
+  color: var(--muted);
+}
+
+.db-subtab.is-shortcut span {
+  margin-left: 4px;
+  font-size: 11px;
+}
+
+.db-subtab.is-shortcut:hover {
+  color: var(--accent);
+}

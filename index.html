@@ -6,7 +6,7 @@
     <title>TW DB</title>
     <!-- 이미지 CDN. 첫 이미지 요청 전에 DNS+TLS를 미리 끝내둔다 -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
-    <link rel="stylesheet" href="./assets/styles.css?v=20260928-col2" />
+    <link rel="stylesheet" href="./assets/styles.css?v=20260928-goto" />
     <!-- 모바일 전용. media 속성 덕에 넓은 화면에서는 렌더링을 막지 않는다 -->
     <link rel="stylesheet" href="./assets/mobile.css?v=20260928-col2" media="(max-width: 720px)" />
   </head>
@@ -487,6 +487,9 @@
           <button class="db-subtab" type="button" data-calculator-tab="damage">계수 · 대미지</button>
           <button class="db-subtab" type="button" data-calculator-tab="onekill">사냥터 1킬</button>
           <button class="db-subtab" type="button" data-calculator-tab="hit">명중</button>
+          <!-- 다른 탭에 있는 계산기로 건너뛰는 바로가기 (패널을 새로 만들지 않는다) -->
+          <button class="db-subtab is-shortcut" type="button" data-goto="info/exp">경험치 버프<span aria-hidden="true">↗</span></button>
+          <button class="db-subtab is-shortcut" type="button" data-goto="eta/calc">에타 계산기<span aria-hidden="true">↗</span></button>
         </nav>
 
         <section class="toolbar" aria-label="계산기">
@@ -1182,7 +1185,7 @@
       </div>
     </template>
 
-    <script src="./assets/app.js?v=20260928-preset-all" type="module"></script>
+    <script src="./assets/app.js?v=20260928-goto" type="module"></script>
     <!-- GoatCounter 방문자 분석 (localhost 방문은 count.js가 기본으로 집계 제외)
          자동 집계를 끄고 app.js의 라우터가 탭 단위 경로(/eta/ranking 등)로 직접 보낸다 -->
     <script>window.goatcounter = { no_onload: true };</script>
