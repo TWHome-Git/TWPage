@@ -6343,9 +6343,12 @@ let CALC_FIXED = null;       // { "4": { "캐릭터::타입": {coefficient, dama
 
 const calcPresetFixed = (n) => n >= 4;
 
+// 캐릭터·타입에 맞춘 값이 있으면 그것을, 없으면 공통값(_default)을 쓴다.
+// 공통값에는 무기·갑옷·손목·아티팩트가 비어 있어 각자 채워 보게 된다
 function calcFixedPayload(preset, characterName, type) {
   const group = CALC_FIXED && CALC_FIXED.presets ? CALC_FIXED.presets[String(preset)] : null;
-  return (group && group[`${characterName}::${type}`]) || null;
+  if (!group) return null;
+  return group[`${characterName}::${type}`] || group._default || null;
 }
 
 async function loadCalcPresets() {
