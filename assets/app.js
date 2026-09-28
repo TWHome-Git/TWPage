@@ -6204,9 +6204,12 @@ function calcApplyFixed(payload) {
   renderCalculator();
 
   if (payload.damage) {
+    // 저장 파일에는 계산 타입도 들어 있다. 고정 프리셋은 지금 고른 타입 그대로 써야 하므로 뺀다
+    // (그대로 넣으면 표는 찌르기인데 타입 칸만 마법공격으로 바뀐다)
+    const { coefficientTypeSelect, ...fields } = payload.damage.fields || {};
     dmg.userEdited = true;
     dmgRefresh();
-    dmgApplyFields(payload.damage);
+    dmgApplyFields({ ...payload.damage, fields });
     dmgRefresh();
   }
 }
