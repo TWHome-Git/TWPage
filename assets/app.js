@@ -3008,7 +3008,7 @@ function renderEtaLapisUse(rows, prevMap) {
   const icon = (file) => `<img class="eta-lapis-icon" src="${SIM_IMG_BASE}${encodeURIComponent(file)}" alt="" width="16" height="16" loading="lazy" />`;
   // 기간을 글로도 적는다. 증감 기준을 바꾸면 이 말도 같이 바뀐다.
   // 그만큼 거슬러 올라갈 자료가 없으면 실제로 견준 날짜를 적는다
-  const spanText = { 1: "금일", 7: "최근 1주일", 30: "최근 1달" }[eta.compareDays] || `최근 ${eta.compareDays}일`;
+  const spanText = { 1: "최근 하루", 7: "최근 1주일", 30: "최근 1달" }[eta.compareDays] || `최근 ${eta.compareDays}일`;
   const label = eta.prevShort ? `${eta.prevDate} 이후` : spanText;
   box.innerHTML = `${label} 소모 ${icon("에오니스_라피스.png")}라피스 <b>${formatNumber(lapis)}개</b>`
     + ` · ${icon("설계자의_반지.png")}설계자의 반지 <b>${formatNumber(ring)}개</b>`;
