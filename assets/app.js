@@ -5232,9 +5232,9 @@ const ENCRYPT_OPT_SAVE_KEY = "tw-encrypt-opt-save-v1";
 const encryptOptCalc = (() => {
   const opt = {
     loaded: false,
-    current: 240,
-    limit: 570,
-    stage: 16,         // 지금 인크립트. 한 장 바를 때마다 하나씩 오른다
+    current: 0,
+    limit: 0,
+    stage: 0,          // 지금 인크립트. 한 장 바를 때마다 하나씩 오른다
     type: "vianu",     // 비아누 / 에타
     // 한 번 시도할 때 드는 시드 (만원). 값이 워낙 달라 따로 들고 있다가 골라 쓴다
     fee: { vianu: "666", eta: "29668" },
@@ -5256,10 +5256,11 @@ const encryptOptCalc = (() => {
   // 억으로 받은 값을 조·억으로 끊어 읽는다
   function money(eok) {
     if (!Number.isFinite(eok)) return "-";
-    const cut = (n) => n.toLocaleString("ko-KR", { maximumFractionDigits: 1 });
+    // 1,000억을 넘으면 소수점 아래는 읽는 데 방해만 된다
+    const cut = (n) => n.toLocaleString("ko-KR", { maximumFractionDigits: n >= 1000 ? 0 : 1 });
     if (eok < 10000) return `${cut(eok)}억`;
     const jo = Math.floor(eok / 10000);
-    const rest = eok - jo * 10000;
+    const rest = Math.round(eok - jo * 10000);
     return rest ? `${cut(jo)}조 ${cut(rest)}억` : `${cut(jo)}조`;
   }
 
@@ -5364,6 +5365,10 @@ const encryptOptCalc = (() => {
     const need = Math.max(0, Math.round(num(opt.limit) - num(opt.current)));
     const scrolls = usableScrolls();
 
+    if (Math.round(num(opt.limit)) <= 0) {
+      els.result.innerHTML = `<p class="encrypt-opt-empty">인챈트 한계치를 넣어주세요.</p>`;
+      return;
+    }
     if (need <= 0) {
       els.result.innerHTML = `<p class="encrypt-opt-empty">이미 한계치입니다. 더 바를 곳이 없습니다.</p>`;
       return;
@@ -5411,6 +5416,7 @@ const encryptOptCalc = (() => {
           <div><span>도달</span><b>+${formatNumber(limit)}</b>${best.over ? `<em>${best.over} 버림</em>` : ""}</div>
         </div>
       </div>
+      <div class="encrypt-opt-compare-wrap">
       <table class="encrypt-opt-compare">
         <thead>
           <tr><th>루트 비교</th><th>장수</th><th class="is-detail">주문서</th><th class="is-detail">인크립트</th><th>합계</th><th>차이</th></tr>
@@ -5428,6 +5434,7 @@ const encryptOptCalc = (() => {
           `).join("")}
         </tbody>
       </table>
+      </div>
     `;
   }
 

@@ -5933,8 +5933,8 @@ img.dmg-chk-icon {
 /* 넣는 값 · 주문서 · 결과를 세 기둥으로 세워 한 화면에 담는다 */
 .encrypt-opt-layout {
   display: grid;
-  grid-template-columns: 252px 300px minmax(0, 1fr);
-  gap: 20px 32px;
+  grid-template-columns: 236px 288px minmax(0, 1fr);
+  gap: 20px 24px;
   align-items: start;
 }
 
@@ -6025,9 +6025,9 @@ img.dmg-chk-icon {
 }
 
 /* 셋을 나란히 두기엔 좁은 폭에서는 결과를 아래로 내린다 */
-@media (max-width: 1180px) {
+@media (max-width: 1359px) {
   .encrypt-opt-layout {
-    grid-template-columns: 252px minmax(0, 1fr);
+    grid-template-columns: 236px minmax(0, 1fr);
   }
 
   .encrypt-opt-layout .ok-result {
@@ -6093,9 +6093,16 @@ img.dmg-chk-icon {
   font-size: 13px;
 }
 
+/* 숫자가 "2조 1,047.3 / 억"처럼 갈라지면 읽기 나쁘다. 줄을 끊지 않고,
+   그래도 넘치면 표만 옆으로 밀어 본다 */
+.encrypt-opt-compare-wrap {
+  overflow-x: auto;
+}
+
 .encrypt-opt-compare th,
 .encrypt-opt-compare td {
-  padding: 6px 8px;
+  white-space: nowrap;
+  padding: 6px;
   border-bottom: 1px solid var(--line);
   text-align: right;
   font-variant-numeric: tabular-nums;
