@@ -6,9 +6,9 @@
     <title>TW DB</title>
     <!-- 이미지 CDN. 첫 이미지 요청 전에 DNS+TLS를 미리 끝내둔다 -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
-    <link rel="stylesheet" href="./assets/styles.css?v=20260929-encrypt17" />
+    <link rel="stylesheet" href="./assets/styles.css?v=20260929-weapon13" />
     <!-- 모바일 전용. media 속성 덕에 넓은 화면에서는 렌더링을 막지 않는다 -->
-    <link rel="stylesheet" href="./assets/mobile.css?v=20260929-encrypt17" media="(max-width: 720px)" />
+    <link rel="stylesheet" href="./assets/mobile.css?v=20260929-weapon13" media="(max-width: 720px)" />
   </head>
   <body>
     <main class="app-shell">
@@ -493,6 +493,7 @@
           <button class="db-subtab" type="button" data-calculator-tab="onekill">사냥터 1킬</button>
           <button class="db-subtab" type="button" data-calculator-tab="hit">명중</button>
           <button class="db-subtab" type="button" data-calculator-tab="encrypt">인크립트 최적화</button>
+          <button class="db-subtab" type="button" data-calculator-tab="weapon" data-local-only hidden>무기 강화 대미지</button>
           <!-- 다른 탭에 있는 계산기로 건너뛰는 바로가기 (패널을 새로 만들지 않는다) -->
           <button class="db-subtab is-shortcut" type="button" data-goto="info/exp">경험치<span aria-hidden="true">↗</span></button>
           <button class="db-subtab is-shortcut" type="button" data-goto="eta/calc">에타<span aria-hidden="true">↗</span></button>
@@ -910,6 +911,45 @@
             <p class="ok-note" hidden>비아누 인크립트 비용 : 효과 666만원 / 이클립스 2,046만원 / 세크리드 2,946만원<br />에타 인크립트 비용 : 세크리드 29,668만원</p>
           </div>
         </section>
+
+        <section class="addon-content" data-calculator-panel="weapon" hidden>
+          <div class="ok-body weapon-dmg-body">
+            <div class="weapon-dmg-layout">
+              <div class="weapon-dmg-side">
+                <section>
+                  <p class="buff-section-title">무기</p>
+                  <div class="weapon-dmg-fields">
+                    <label class="field ok-field">
+                      <span>종류</span>
+                      <select id="weaponDmgType"></select>
+                    </label>
+                    <label class="field ok-field">
+                      <span>강화</span>
+                      <select id="weaponDmgLevel"></select>
+                    </label>
+                  </div>
+                </section>
+
+                <section>
+                  <p class="buff-section-title">무기 스탯 <em>(어빌리티 제외)</em></p>
+                  <div id="weaponDmgStats" class="weapon-dmg-fields"></div>
+                </section>
+
+                <section>
+                  <p class="buff-section-title">내 추가 대미지</p>
+                  <div class="weapon-dmg-fields">
+                    <label class="field ok-field">
+                      <span>넣으면 등급을 알려줍니다</span>
+                      <input id="weaponDmgValue" class="weapon-dmg-input" type="text" inputmode="numeric" autocomplete="off" placeholder="예: 1227800" />
+                    </label>
+                  </div>
+                </section>
+              </div>
+
+              <div id="weaponDmgResult" class="ok-result" aria-live="polite"></div>
+            </div>
+          </div>
+        </section>
       </section>
 
       <section id="simulatorView" class="main-panel" data-main-panel="simulator" hidden>
@@ -1247,7 +1287,7 @@
       </div>
     </template>
 
-    <script src="./assets/app.js?v=20260929-encrypt17" type="module"></script>
+    <script src="./assets/app.js?v=20260929-weapon13" type="module"></script>
     <!-- GoatCounter 방문자 분석 (localhost 방문은 count.js가 기본으로 집계 제외)
          자동 집계를 끄고 app.js의 라우터가 탭 단위 경로(/eta/ranking 등)로 직접 보낸다 -->
     <script>window.goatcounter = { no_onload: true };</script>

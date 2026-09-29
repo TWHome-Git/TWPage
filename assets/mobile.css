@@ -1077,3 +1077,11 @@
     width: 92px;
   }
 }
+
+/* 무기 강화 대미지: 좁은 화면에서는 입력과 결과를 한 열로 */
+@media (max-width: 720px) {
+  .weapon-dmg-layout {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}

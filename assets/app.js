@@ -3638,7 +3638,7 @@ function renderAbilityList() {
 }
 
 // 계산기 탭 — 하위 메뉴 알약으로 도구를 바꾼다 (에타·DB와 같은 구성)
-const CALCULATOR_TITLES = { equipment: "장비 재료", inherit: "상속서", damage: "계수 · 대미지", onekill: "사냥터 1킬", hit: "명중", encrypt: "인크립트 최적화" };
+const CALCULATOR_TITLES = { equipment: "장비 재료", inherit: "상속서", damage: "계수 · 대미지", onekill: "사냥터 1킬", hit: "명중", encrypt: "인크립트 최적화", weapon: "무기 강화 대미지" };
 
 // 계수 → 대미지는 이어지는 두 단계다. 계수 값을 넣어야 대미지가 계산되므로 한 화면 안에서 오간다.
 function activateDamageStep(step) {
@@ -3680,6 +3680,7 @@ function activateCalculatorTab(key) {
   if (key === "onekill") oneKillCalc.load();
   if (key === "hit") hitCalc.load();
   if (key === "encrypt") encryptOptCalc.load();
+  if (key === "weapon") weaponDmgCalc.load();
 
   routeWrite();
 }
@@ -5551,6 +5552,193 @@ const encryptOptCalc = (() => {
       const on = event.target.dataset?.optOn;
       if (on === undefined) return;
       opt.scrolls[Number(on)].on = event.target.checked;
+      refresh();
+    });
+  }
+
+  return { load, wire };
+})();
+
+// ══════════════════════════════════════════════════════════════
+//  무기 강화 대미지 — +12~+15 강화로 붙는 추가 대미지
+// ══════════════════════════════════════════════════════════════
+// 추가 대미지 = 강화 상수 x (무기 수치 두 개에 무리별 배수를 먹인 합) / 5.
+// 강화 상수는 강화할 때 구간별 확률로 한 번 정해지고 그 뒤로 바뀌지 않는다.
+const WEAPON_DMG_SAVE_KEY = "tw-weapon-dmg-save-v1";
+
+// 무리마다 보는 수치와 배수가 다르다. 배수는 공식 그대로 두고 나눌 때 5로 나눈다.
+const WEAPON_DMG_GROUPS = [
+  { label: "찌르기 무기", types: ["세검", "단검", "창", "스몰소드", "물리총", "클로", "핸드런처"], stats: [["찌르기", 6.67], ["베기", 1.00]] },
+  { label: "찌르기·베기 무기", types: ["장검", "태도", "메이스", "단도", "봉", "플레일"], stats: [["찌르기", 4.55], ["베기", 4.55]] },
+  { label: "베기 무기", types: ["평도", "도끼", "채찍", "카라", "물리검", "사이드", "아밍소드"], stats: [["베기", 6.67], ["찌르기", 1.00]] },
+  { label: "마법공격 무기", types: ["스태프", "완드", "마법총", "셉터", "토템"], stats: [["마법공격", 6.95], ["마법방어", 1.05]] },
+  { label: "대검", types: ["대검"], stats: [["마법공격", 4.55], ["베기", 3.85]] },
+  { label: "마법방어 무기", types: ["로드", "핸드벨", "마법검", "해머"], stats: [["마법방어", 7.70], ["마법공격", 0.70]] },
+];
+
+// 강화 단계별 상수 구간과 그 구간이 나올 확률
+const WEAPON_DMG_BANDS = {
+  12: [["최상", 1365, 1400, 2], ["상", 1190, 1364, 10], ["중", 910, 1189, 45], ["하", 770, 909, 38], ["최하", 700, 769, 5]],
+  13: [["최상", 2260, 2300, 2], ["상", 2060, 2259, 10], ["중", 1740, 2059, 45], ["하", 1580, 1739, 38], ["최하", 1500, 1579, 5]],
+  14: [["최상", 3255, 3300, 2], ["상", 3030, 3254, 10], ["중", 2670, 3029, 45], ["하", 2490, 2669, 38], ["최하", 2400, 2489, 5]],
+  15: [["최상", 4350, 4400, 2], ["상", 4100, 4349, 10], ["중", 3700, 4099, 45], ["하", 3500, 3699, 38], ["최하", 3400, 3499, 5]],
+};
+
+const weaponDmgCalc = (() => {
+  const wp = {
+    loaded: false,
+    type: "핸드벨",
+    level: 12,
+    stats: {},      // 수치 이름 → 값. 무리를 바꿔도 같은 이름은 그대로 남는다
+    damage: "",     // 내 추가 대미지. 넣으면 어느 등급 몇 등인지 짚어 준다
+  };
+  const els = {};
+  const num = (v) => Number(String(v ?? "").replace(/[,\s]/g, "")) || 0;
+  const groupOf = (type) => WEAPON_DMG_GROUPS.find((g) => g.types.includes(type)) || WEAPON_DMG_GROUPS[0];
+  const bands = () => WEAPON_DMG_BANDS[wp.level] || WEAPON_DMG_BANDS[12];
+
+  // 무리별 배수를 먹인 합. 배수가 소수라 합도 소수로 떨어지는데, 게임은 여기서
+  // 소수점을 버린다 (555x7.70 + 160x0.70 = 4,385.5 -> 4,385).
+  // 추가 대미지는 여기에 강화 상수를 곱해 5로 나눈 값이다.
+  const rawWeighted = () => groupOf(wp.type).stats.reduce((sum, [name, mult]) => sum + num(wp.stats[name]) * mult, 0);
+  const weighted = () => Math.floor(rawWeighted() + 1e-9);
+
+  // 상수가 어느 등급이고, 그 등급 안에서 위에서부터 몇 %쯤인지.
+  // 구간 안에서는 고르게 나온다고 본다.
+  function rankOf(constant) {
+    for (const [name, lo, hi] of bands()) {
+      if (constant >= lo && constant <= hi) {
+        return { name, inside: hi > lo ? ((hi - constant) / (hi - lo)) * 100 : 0 };
+      }
+    }
+    return null;
+  }
+
+  // 같은 등급 안에서도 위아래 차이가 커서 다시 다섯으로 나눈다.
+  // 등급 이름을 또 쓰면 "최상 그중 최상"처럼 겹쳐 보여서 별로 적는다.
+  function insideStars(pct) {
+    const filled = 5 - Math.min(4, Math.floor(pct / 20));
+    return "★".repeat(filled) + "☆".repeat(5 - filled);
+  }
+
+  function renderFields() {
+    const group = groupOf(wp.type);
+    els.stats.innerHTML = group.stats.map(([name]) => `
+      <label class="field ok-field">
+        <span>${escapeHtml(name)}</span>
+        <input class="weapon-dmg-input" type="text" inputmode="numeric" autocomplete="off"
+          data-weapon-stat="${escapeHtml(name)}" value="${escapeHtml(String(wp.stats[name] ?? ""))}" placeholder="0" />
+      </label>
+    `).join("");
+  }
+
+  function renderResult() {
+    if (!els.result) return;
+    const group = groupOf(wp.type);
+    const sum = weighted();
+
+    if (sum <= 0) {
+      els.result.innerHTML = `<p class="weapon-dmg-empty">무기 스탯을 넣어주세요.</p>`;
+      return;
+    }
+
+    // 내 추가 대미지를 넣었으면 상수를 거꾸로 구해 등급과 등수를 짚어 준다
+    const mine = num(wp.damage);
+    const rank = mine > 0 ? rankOf((mine * 5) / sum) : null;
+
+    const rows = bands().map(([name, lo, hi, pct]) => {
+      const on = rank && rank.name === name;
+      return `
+        <tr${on ? ' class="is-mine"' : ""}>
+          <td>${name}${on ? " <em>내 무기</em>" : ""}</td>
+          <td>${pct}%</td>
+          <td>${formatNumber(Math.floor((lo * sum) / 5))} ~ ${formatNumber(Math.floor((hi * sum) / 5))}</td>
+        </tr>
+      `;
+    }).join("");
+
+    els.result.innerHTML = `
+      <div class="weapon-dmg-plan">
+        <p class="weapon-dmg-plan-title">${escapeHtml(wp.type)} +${wp.level} · ${escapeHtml(group.label)}</p>
+        <div class="weapon-dmg-plan-stats">
+          ${mine > 0 ? `<div><span>내 무기</span><b>${rank ? rank.name : "구간 밖"}</b>${rank ? `<em class="weapon-dmg-stars" title="같은 등급 안에서의 자리">${insideStars(rank.inside)}</em>` : ""}</div>` : ""}
+        </div>
+      </div>
+      <table class="weapon-dmg-table">
+        <thead><tr><th>등급</th><th>나올 확률</th><th>추가 대미지</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    `;
+  }
+
+  function refresh() {
+    renderResult();
+    save();
+  }
+
+  function save() {
+    try {
+      localStorage.setItem(WEAPON_DMG_SAVE_KEY, JSON.stringify({
+        type: wp.type, level: wp.level, stats: wp.stats, damage: wp.damage,
+      }));
+    } catch { /* 저장은 편의일 뿐 */ }
+  }
+
+  function restore() {
+    let saved = null;
+    try {
+      saved = JSON.parse(localStorage.getItem(WEAPON_DMG_SAVE_KEY) || "null");
+    } catch { /* 저장된 값이 깨졌으면 기본값으로 연다 */ }
+    if (!saved) return;
+    if (WEAPON_DMG_GROUPS.some((g) => g.types.includes(saved.type))) wp.type = saved.type;
+    if (WEAPON_DMG_BANDS[saved.level]) wp.level = Number(saved.level);
+    if (typeof saved.damage === "string") wp.damage = saved.damage;
+    if (saved.stats && typeof saved.stats === "object") {
+      Object.entries(saved.stats).forEach(([key, value]) => { wp.stats[key] = String(value ?? ""); });
+    }
+  }
+
+  function load() {
+    if (wp.loaded) return;
+    wp.loaded = true;
+    restore();
+    els.type.innerHTML = WEAPON_DMG_GROUPS.map((group) => `
+      <optgroup label="${escapeHtml(group.label)}">
+        ${group.types.map((type) => `<option value="${escapeHtml(type)}"${type === wp.type ? " selected" : ""}>${escapeHtml(type)}</option>`).join("")}
+      </optgroup>
+    `).join("");
+    els.level.innerHTML = Object.keys(WEAPON_DMG_BANDS)
+      .map((lv) => `<option value="${lv}"${Number(lv) === wp.level ? " selected" : ""}>+${lv}</option>`).join("");
+    if (els.damage) els.damage.value = wp.damage;
+    renderFields();
+    refresh();
+  }
+
+  function wire() {
+    els.type = document.querySelector("#weaponDmgType");
+    els.level = document.querySelector("#weaponDmgLevel");
+    els.stats = document.querySelector("#weaponDmgStats");
+    els.damage = document.querySelector("#weaponDmgValue");
+    els.result = document.querySelector("#weaponDmgResult");
+    if (!els.type || !els.stats || !els.result) return;
+
+    els.type.addEventListener("change", () => {
+      wp.type = els.type.value;
+      renderFields();   // 무리가 바뀌면 보는 수치도 바뀐다
+      refresh();
+    });
+    els.level.addEventListener("change", () => {
+      wp.level = Number(els.level.value) || 12;
+      refresh();
+    });
+    els.stats.addEventListener("input", (event) => {
+      const name = event.target.dataset?.weaponStat;
+      if (!name) return;
+      wp.stats[name] = event.target.value;
+      refresh();
+    });
+    els.damage?.addEventListener("input", () => {
+      wp.damage = els.damage.value;
       refresh();
     });
   }
@@ -7439,6 +7627,7 @@ function wireEvents() {
   oneKillCalc.wire();
   hitCalc.wire();
   encryptOptCalc.wire();
+  weaponDmgCalc.wire();
   rareBuff.wire();
 
   els.characterGrid?.addEventListener("click", (event) => {

@@ -6128,6 +6128,164 @@ img.dmg-chk-icon {
   font-weight: 700;
 }
 
+/* ── 무기 강화 대미지 ───────────────────────────────────────── */
+/* 어빌리티는 빼고 넣어야 한다는 단서를 제목 옆에 작게 붙인다 */
+.weapon-dmg-side .buff-section-title em {
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+}
+.weapon-dmg-layout {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 20px 28px;
+  align-items: start;
+}
+
+.weapon-dmg-layout .ok-result {
+  margin-top: 0;
+}
+
+.weapon-dmg-side {
+  display: grid;
+  gap: 16px;
+}
+
+.weapon-dmg-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+}
+
+.weapon-dmg-input {
+  width: 100%;
+  min-width: 0;
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--ink);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.weapon-dmg-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.weapon-dmg-plan {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: var(--card);
+}
+
+.weapon-dmg-plan-title {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.weapon-dmg-plan-main {
+  margin: 0 0 10px;
+  font-size: 14px;
+}
+
+.weapon-dmg-plan-main b {
+  color: var(--accent);
+}
+
+.weapon-dmg-plan-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  font-size: 13px;
+}
+
+.weapon-dmg-plan-stats > div {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.weapon-dmg-plan-stats span {
+  color: var(--muted);
+}
+
+.weapon-dmg-plan-stats b {
+  font-variant-numeric: tabular-nums;
+}
+
+/* 같은 등급 안에서의 자리. 별이 많을수록 위쪽이다 */
+.weapon-dmg-stars {
+  letter-spacing: 1px;
+  color: var(--gold);
+  font-size: 13px;
+}
+
+.weapon-dmg-plan-stats em,
+.weapon-dmg-table em {
+  font-style: normal;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.weapon-dmg-table {
+  width: 100%;
+  margin-top: 10px;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+}
+
+.weapon-dmg-table th,
+.weapon-dmg-table td {
+  white-space: nowrap;
+  padding: 6px;
+  border-bottom: 1px solid var(--line);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.weapon-dmg-table th:first-child,
+.weapon-dmg-table td:first-child {
+  text-align: left;
+  font-variant-numeric: normal;
+}
+
+.weapon-dmg-table th {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.weapon-dmg-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+/* 내 무기가 든 줄은 칸을 통째로 칠해 한눈에 잡히게 한다 */
+.weapon-dmg-table tbody tr.is-mine td {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+  border-bottom-color: var(--accent);
+}
+
+.weapon-dmg-table tbody tr.is-mine em {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.weapon-dmg-table tbody tr.is-mine td:first-child {
+  border-radius: 7px 0 0 7px;
+}
+
+.weapon-dmg-table tbody tr.is-mine td:last-child {
+  border-radius: 0 7px 7px 0;
+}
+
 /* ── 에타 인구 추이 ─────────────────────────────────────────── */
 .pop-range-field {
   display: flex;
