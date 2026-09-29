@@ -6,9 +6,9 @@
     <title>TW DB</title>
     <!-- 이미지 CDN. 첫 이미지 요청 전에 DNS+TLS를 미리 끝내둔다 -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
-    <link rel="stylesheet" href="./assets/styles.css?v=20260928-pop-delta" />
+    <link rel="stylesheet" href="./assets/styles.css?v=20260929-encrypt14" />
     <!-- 모바일 전용. media 속성 덕에 넓은 화면에서는 렌더링을 막지 않는다 -->
-    <link rel="stylesheet" href="./assets/mobile.css?v=20260928-col2" media="(max-width: 720px)" />
+    <link rel="stylesheet" href="./assets/mobile.css?v=20260929-encrypt14" media="(max-width: 720px)" />
   </head>
   <body>
     <main class="app-shell">
@@ -492,6 +492,7 @@
           <button class="db-subtab" type="button" data-calculator-tab="damage">계수 · 대미지</button>
           <button class="db-subtab" type="button" data-calculator-tab="onekill">사냥터 1킬</button>
           <button class="db-subtab" type="button" data-calculator-tab="hit">명중</button>
+          <button class="db-subtab" type="button" data-calculator-tab="encrypt">인크립트 최적화</button>
           <!-- 다른 탭에 있는 계산기로 건너뛰는 바로가기 (패널을 새로 만들지 않는다) -->
           <button class="db-subtab is-shortcut" type="button" data-goto="info/exp">경험치<span aria-hidden="true">↗</span></button>
           <button class="db-subtab is-shortcut" type="button" data-goto="eta/calc">에타<span aria-hidden="true">↗</span></button>
@@ -854,6 +855,61 @@
             </div>
           </div>
         </section>
+
+        <section class="addon-content" data-calculator-panel="encrypt" hidden>
+          <div class="ok-body encrypt-opt-body">
+            <div class="encrypt-opt-layout">
+            <div class="encrypt-opt-top">
+              <section class="encrypt-opt-group">
+                <p class="buff-section-title">아이템</p>
+                <div class="encrypt-opt-fields">
+                  <label class="field ok-field">
+                    <span>현재 인챈트</span>
+                    <input id="encryptOptCurrent" type="number" min="0" step="1" inputmode="numeric" value="240" />
+                  </label>
+                  <label class="field ok-field">
+                    <span>인챈트 한계치</span>
+                    <input id="encryptOptLimit" type="number" min="0" step="1" inputmode="numeric" value="570" />
+                  </label>
+                </div>
+              </section>
+
+              <section class="encrypt-opt-group">
+                <p class="buff-section-title">인크립트</p>
+                <div class="sim-row encrypt-opt-picks">
+                  <label class="sim-radio"><input type="radio" name="encryptOptType" value="vianu" checked /><span>비아누</span></label>
+                  <label class="sim-radio"><input type="radio" name="encryptOptType" value="eta" /><span>에타</span></label>
+                  <label class="sim-check"><input id="encryptOptDiscount" type="checkbox" /><span>20% 할인</span></label>
+                </div>
+                <div class="encrypt-opt-fields">
+                  <label class="field ok-field">
+                    <span>현재 인크립트</span>
+                    <input id="encryptOptStage" type="number" min="0" step="1" inputmode="numeric" value="16" />
+                  </label>
+                  <label class="field ok-field">
+                    <span>1회 비용 (만원)</span>
+                    <input id="encryptOptFee" type="text" inputmode="numeric" autocomplete="off" value="666" placeholder="예: 666" />
+                  </label>
+                </div>
+                <p id="encryptOptFeeNote" class="encrypt-opt-note"></p>
+              </section>
+            </div>
+
+            <section class="encrypt-opt-group">
+              <p class="buff-section-title">주문서</p>
+              <div class="encrypt-opt-scrolls">
+                <div class="encrypt-opt-head" aria-hidden="true">
+                  <span>사용</span><span>수치</span><span>가격 (억)</span>
+                </div>
+                <div id="encryptOptRows"></div>
+              </div>
+            </section>
+
+            <div id="encryptOptResult" class="ok-result" aria-live="polite"></div>
+            </div>
+            <p class="ok-note" hidden>비아누 인크립트 비용 : 효과 666만원 / 이클립스 2,046만원 / 세크리드 2,946만원<br />에타 인크립트 비용 : 세크리드 29,668만원</p>
+          </div>
+        </section>
       </section>
 
       <section id="simulatorView" class="main-panel" data-main-panel="simulator" hidden>
@@ -1191,7 +1247,7 @@
       </div>
     </template>
 
-    <script src="./assets/app.js?v=20260928-pop-delta" type="module"></script>
+    <script src="./assets/app.js?v=20260929-encrypt14" type="module"></script>
     <!-- GoatCounter 방문자 분석 (localhost 방문은 count.js가 기본으로 집계 제외)
          자동 집계를 끄고 app.js의 라우터가 탭 단위 경로(/eta/ranking 등)로 직접 보낸다 -->
     <script>window.goatcounter = { no_onload: true };</script>

@@ -1051,3 +1051,29 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* 인크립트 최적화: 좁은 화면에서는 세 기둥을 한 열로 내린다 */
+@media (max-width: 720px) {
+  .encrypt-opt-layout {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}
+
+/* 좁은 폰에서는 주문서·인크립트 갈라 보기를 접고 합계만 남긴다 */
+@media (max-width: 560px) {
+  .encrypt-opt-compare .is-detail {
+    display: none;
+  }
+
+  .encrypt-opt-head,
+  .encrypt-opt-row {
+    grid-template-columns: 34px 92px 92px;
+    gap: 6px;
+  }
+
+  .encrypt-opt-body .ok-field input,
+  .encrypt-opt-input {
+    width: 92px;
+  }
+}

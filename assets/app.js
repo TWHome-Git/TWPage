@@ -3638,7 +3638,7 @@ function renderAbilityList() {
 }
 
 // 계산기 탭 — 하위 메뉴 알약으로 도구를 바꾼다 (에타·DB와 같은 구성)
-const CALCULATOR_TITLES = { equipment: "장비 재료", inherit: "상속서", damage: "계수 · 대미지", onekill: "사냥터 1킬", hit: "명중" };
+const CALCULATOR_TITLES = { equipment: "장비 재료", inherit: "상속서", damage: "계수 · 대미지", onekill: "사냥터 1킬", hit: "명중", encrypt: "인크립트 최적화" };
 
 // 계수 → 대미지는 이어지는 두 단계다. 계수 값을 넣어야 대미지가 계산되므로 한 화면 안에서 오간다.
 function activateDamageStep(step) {
@@ -3679,6 +3679,7 @@ function activateCalculatorTab(key) {
   }
   if (key === "onekill") oneKillCalc.load();
   if (key === "hit") hitCalc.load();
+  if (key === "encrypt") encryptOptCalc.load();
 
   routeWrite();
 }
@@ -5217,6 +5218,337 @@ const hitCalc = (() => {
   }
 
   return { load, wire, refreshEquipment };
+})();
+
+// ══════════════════════════════════════════════════════════════
+//  인크립트 최적화 — 한계치까지 가장 싸게 가는 주문서 조합
+// ══════════════════════════════════════════════════════════════
+// 주문서 하나는 제 수치만큼 인챈트를 올린다. 한계치를 넘겨도 바를 수 있고
+// 넘은 만큼은 버려지므로 "남은 수치 이상을 가장 싸게 덮기" 문제가 된다.
+// 다만 한 장을 바르려면 인크립트를 성공해야 하고, 그 값이 주문서 값보다 크다.
+// 그래서 "몇 장을 바르느냐"까지 값에 들어가고, 장수마다 최선을 따로 구해 견준다.
+const ENCRYPT_OPT_SAVE_KEY = "tw-encrypt-opt-save-v1";
+
+const encryptOptCalc = (() => {
+  const opt = {
+    loaded: false,
+    current: 240,
+    limit: 570,
+    stage: 16,         // 지금 인크립트. 한 장 바를 때마다 하나씩 오른다
+    type: "vianu",     // 비아누 / 에타
+    // 한 번 시도할 때 드는 시드 (만원). 값이 워낙 달라 따로 들고 있다가 골라 쓴다
+    fee: { vianu: "666", eta: "29668" },
+    discount: false,   // 인크립트 시뮬과 같은 20% 할인
+    // 수치와 가격만 다르고 하는 일은 같다. 처음엔 흔히 쓰는 네 등급을 깔아 둔다
+    scrolls: [12, 14, 15, 16].map((value) => ({ on: true, value, price: "" })),
+  };
+  const els = {};
+  const num = (v) => Number(v) || 0;
+
+  // "1,200억"처럼 적어도 읽는다
+  function parseAmount(raw) {
+    const text = String(raw ?? "").replace(/[,\s억만원]/g, "");
+    if (!text) return null;
+    const n = Number(text);
+    return Number.isFinite(n) && n >= 0 ? n : null;
+  }
+
+  // 억으로 받은 값을 조·억으로 끊어 읽는다
+  function money(eok) {
+    if (!Number.isFinite(eok)) return "-";
+    const cut = (n) => n.toLocaleString("ko-KR", { maximumFractionDigits: 1 });
+    if (eok < 10000) return `${cut(eok)}억`;
+    const jo = Math.floor(eok / 10000);
+    const rest = eok - jo * 10000;
+    return rest ? `${cut(jo)}조 ${cut(rest)}억` : `${cut(jo)}조`;
+  }
+
+  // 인크립트 시뮬과 같은 식. 비아누는 인크가 오를수록 낮아져 0.01%에서 멈추고,
+  // 에타는 단계와 상관없이 1%로 고정이다.
+  const chanceAt = (stage) => (opt.type === "eta"
+    ? 0.01
+    : Math.max(0.0001, 0.0007 - Math.max(0, stage) * 0.00005));
+
+  // 한 번 시도에 드는 시드를 억으로 (1억 = 10,000만원)
+  const feeEok = () => ((parseAmount(opt.fee[opt.type]) ?? 0) * (opt.discount ? 0.8 : 1)) / 10000;
+
+  // 지금 인크에서 한 장 더 바르는 데 드는 인크립트 값 (성공할 때까지의 기대값)
+  const feePerSheet = (index) => feeEok() / chanceAt(Math.round(num(opt.stage)) + index);
+
+  // n장을 바르는 동안 드는 인크립트 값. 뒤로 갈수록 한 장이 비싸진다
+  function feeFor(n) {
+    let sum = 0;
+    for (let k = 0; k < n; k += 1) sum += feePerSheet(k);
+    return sum;
+  }
+
+  const usableScrolls = () => opt.scrolls
+    .map((scroll, index) => ({ index, value: Math.round(num(scroll.value)), price: parseAmount(scroll.price) }))
+    .filter((scroll) => opt.scrolls[scroll.index].on && scroll.value > 0 && scroll.price !== null);
+
+  // 남은 수치 need를 덮는 가장 싼 조합. exact면 한계치를 넘기지 않고 딱 맞춘다.
+  // 인크립트 값이 장수에 딸려 오므로 "몇 장으로 덮느냐"를 나눠 두고 마지막에 견준다.
+  function solve(need, scrolls, exact) {
+    const minValue = Math.min(...scrolls.map((scroll) => scroll.value));
+    const maxSheets = Math.min(400, Math.ceil(need / minValue));
+    // cost[n][rest] = 딱 n장으로 rest를 덮을 때 주문서 값의 최솟값
+    const cost = [new Array(need + 1).fill(Infinity)];
+    const pick = [new Array(need + 1).fill(-1)];
+    cost[0][0] = 0;
+
+    for (let n = 1; n <= maxSheets; n += 1) {
+      cost[n] = new Array(need + 1).fill(Infinity);
+      pick[n] = new Array(need + 1).fill(-1);
+      for (let rest = 1; rest <= need; rest += 1) {
+        scrolls.forEach((scroll, index) => {
+          const left = rest - scroll.value;
+          if (left < 0 && exact) return;   // 딱 맞추기에서는 넘기지 못한다
+          const before = cost[n - 1][Math.max(0, left)];
+          if (!Number.isFinite(before)) return;
+          const total = before + scroll.price;
+          if (total < cost[n][rest] - 1e-9) {
+            cost[n][rest] = total;
+            pick[n][rest] = index;
+          }
+        });
+      }
+    }
+
+    let best = -1;
+    let bestTotal = Infinity;
+    for (let n = 1; n <= maxSheets; n += 1) {
+      if (!Number.isFinite(cost[n][need])) continue;
+      const total = cost[n][need] + feeFor(n);
+      if (total < bestTotal - 1e-9) {
+        bestTotal = total;
+        best = n;
+      }
+    }
+    if (best < 0) return null;
+
+    const counts = new Map();
+    let rest = need;
+    let over = 0;
+    for (let n = best; n > 0; n -= 1) {
+      const scroll = scrolls[pick[n][rest]];
+      counts.set(scroll.value, (counts.get(scroll.value) || 0) + 1);
+      const left = rest - scroll.value;
+      if (left < 0) over = -left;      // 마지막 한 장이 한계치를 넘긴 만큼
+      rest = Math.max(0, left);
+    }
+    return { scrolls: cost[best][need], fee: feeFor(best), cost: bestTotal, sheets: best, counts, over };
+  }
+
+  const planText = (counts) => [...counts.entries()]
+    .sort((a, b) => b[0] - a[0])
+    .map(([value, count]) => `<b>${value}주문서</b> ${formatNumber(count)}장`)
+    .join(" + ");
+
+  function renderFeeNote() {
+    if (!els.feeNote) return;
+    const stage = Math.round(num(opt.stage));
+    const chance = chanceAt(stage);
+    const pct = (value) => `${(value * 100).toFixed(3)}%`;
+    if (opt.type === "eta") {
+      els.feeNote.innerHTML = `성공 확률 <b>${pct(chance)}</b><br />단계와 상관없이 같음`;
+      return;
+    }
+    els.feeNote.innerHTML = `인크립트 <b>${formatNumber(stage)}</b>단계 성공 확률 <b>${pct(chance)}</b>`
+      + (chance > 0.0001
+        ? "<br />인크립트 1단계마다 0.005%p 하락"
+        : "<br />여기서 더 내려가지 않음");
+  }
+
+  function renderResult() {
+    if (!els.result) return;
+    const need = Math.max(0, Math.round(num(opt.limit) - num(opt.current)));
+    const scrolls = usableScrolls();
+
+    if (need <= 0) {
+      els.result.innerHTML = `<p class="encrypt-opt-empty">이미 한계치입니다. 더 바를 곳이 없습니다.</p>`;
+      return;
+    }
+    if (!scrolls.length) {
+      els.result.innerHTML = `<p class="encrypt-opt-empty">남은 수치는 <b>${formatNumber(need)}</b>입니다. 쓸 주문서를 켜고 가격을 넣어주세요.</p>`;
+      return;
+    }
+
+    const best = solve(need, scrolls, false);
+    const exact = solve(need, scrolls, true);
+    const limit = Math.round(num(opt.limit));
+    const stage = Math.round(num(opt.stage));
+
+    // 견줄 거리: 한 등급만 쭉 바르는 길과, 넘기지 않고 딱 맞추는 길
+    const rows = scrolls.map((scroll) => {
+      const sheets = Math.ceil(need / scroll.value);
+      const scrollCost = sheets * scroll.price;
+      const fee = feeFor(sheets);
+      return {
+        name: `${scroll.value}주문서만`,
+        sheets,
+        scrolls: scrollCost,
+        fee,
+        cost: scrollCost + fee,
+        over: sheets * scroll.value - need,
+      };
+    });
+    if (exact && exact.over === 0 && exact.cost > best.cost + 1e-9) {
+      rows.push({ name: "넘기지 않고 딱 맞추기", sheets: exact.sheets, scrolls: exact.scrolls, fee: exact.fee, cost: exact.cost, over: 0 });
+    }
+    rows.sort((a, b) => a.cost - b.cost);
+
+    const gapText = (cost) => (cost - best.cost <= 1e-9 ? "-" : `+${money(cost - best.cost)}`);
+
+    els.result.innerHTML = `
+      <div class="encrypt-opt-plan">
+        <p class="encrypt-opt-plan-title">가장 저렴한 루트 · 남은 수치 ${formatNumber(need)}</p>
+        <p class="encrypt-opt-plan-main">${planText(best.counts)}</p>
+        <div class="encrypt-opt-plan-stats">
+          <div><span>총 비용</span><b>${money(best.cost)}</b></div>
+          <div><span>주문서</span><b>${money(best.scrolls)}</b></div>
+          <div><span>인크립트</span><b>${money(best.fee)}</b></div>
+          <div><span>인크립트</span><b>${formatNumber(stage)} → ${formatNumber(stage + best.sheets)}</b></div>
+          <div><span>도달</span><b>+${formatNumber(limit)}</b>${best.over ? `<em>${best.over} 버림</em>` : ""}</div>
+        </div>
+      </div>
+      <table class="encrypt-opt-compare">
+        <thead>
+          <tr><th>루트 비교</th><th>장수</th><th class="is-detail">주문서</th><th class="is-detail">인크립트</th><th>합계</th><th>차이</th></tr>
+        </thead>
+        <tbody>
+          ${rows.map((row) => `
+            <tr${row.cost <= best.cost + 1e-9 ? ' class="is-best"' : ""}>
+              <td>${escapeHtml(row.name)}${row.over ? ` <em>${row.over} 버림</em>` : ""}</td>
+              <td>${formatNumber(row.sheets)}장</td>
+              <td class="is-detail">${money(row.scrolls)}</td>
+              <td class="is-detail">${money(row.fee)}</td>
+              <td>${money(row.cost)}</td>
+              <td>${gapText(row.cost)}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    `;
+  }
+
+  function refresh() {
+    renderFeeNote();
+    renderResult();
+    save();
+  }
+
+  function save() {
+    try {
+      localStorage.setItem(ENCRYPT_OPT_SAVE_KEY, JSON.stringify({
+        current: opt.current, limit: opt.limit,
+        stage: opt.stage, type: opt.type, fee: opt.fee, discount: opt.discount, scrolls: opt.scrolls,
+      }));
+    } catch { /* 저장은 편의일 뿐 */ }
+  }
+
+  function restore() {
+    let saved = null;
+    try {
+      saved = JSON.parse(localStorage.getItem(ENCRYPT_OPT_SAVE_KEY) || "null");
+    } catch { /* 저장된 값이 깨졌으면 기본값으로 연다 */ }
+    if (!saved) return;
+    ["current", "limit", "stage"].forEach((key) => {
+      if (Number.isFinite(Number(saved[key]))) opt[key] = Number(saved[key]);
+    });
+    if (saved.type === "eta" || saved.type === "vianu") opt.type = saved.type;
+    if (saved.fee && typeof saved.fee === "object") {
+      ["vianu", "eta"].forEach((key) => {
+        if (typeof saved.fee[key] === "string") opt.fee[key] = saved.fee[key];
+      });
+    }
+    opt.discount = saved.discount === true;
+    if (Array.isArray(saved.scrolls) && saved.scrolls.length) {
+      opt.scrolls = saved.scrolls.slice(0, 8).map((scroll) => ({
+        on: scroll?.on !== false,
+        value: Math.max(1, Math.round(Number(scroll?.value) || 1)),
+        price: String(scroll?.price ?? ""),
+      }));
+    }
+  }
+
+  function buildRows() {
+    els.rows.innerHTML = opt.scrolls.map((scroll, index) => `
+      <div class="encrypt-opt-row">
+        <label class="sim-check"><input type="checkbox" data-opt-on="${index}"${scroll.on ? " checked" : ""} /><span class="sr-only">사용</span></label>
+        <input class="encrypt-opt-input" type="number" min="1" step="1" inputmode="numeric" data-opt-value="${index}" value="${scroll.value}" aria-label="주문서 수치" />
+        <input class="encrypt-opt-input" type="text" inputmode="decimal" autocomplete="off" data-opt-price="${index}" value="${escapeHtml(String(scroll.price))}" placeholder="예: 10" aria-label="주문서 가격 (억)" />
+      </div>
+    `).join("");
+  }
+
+  function load() {
+    if (opt.loaded) return;
+    opt.loaded = true;
+    restore();
+    if (els.current) els.current.value = String(opt.current);
+    if (els.limit) els.limit.value = String(opt.limit);
+    if (els.stage) els.stage.value = String(opt.stage);
+    if (els.fee) els.fee.value = opt.fee[opt.type];
+    if (els.discount) els.discount.checked = opt.discount;
+    const typeInput = document.querySelector(`input[name="encryptOptType"][value="${opt.type}"]`);
+    if (typeInput) typeInput.checked = true;
+    buildRows();
+    refresh();
+  }
+
+  function wire() {
+    els.current = document.querySelector("#encryptOptCurrent");
+    els.limit = document.querySelector("#encryptOptLimit");
+    els.stage = document.querySelector("#encryptOptStage");
+    els.fee = document.querySelector("#encryptOptFee");
+    els.discount = document.querySelector("#encryptOptDiscount");
+    els.feeNote = document.querySelector("#encryptOptFeeNote");
+    els.rows = document.querySelector("#encryptOptRows");
+    els.result = document.querySelector("#encryptOptResult");
+    if (!els.rows || !els.result) return;
+
+    [["current", els.current], ["limit", els.limit], ["stage", els.stage]].forEach(([key, input]) => {
+      input?.addEventListener("input", () => {
+        opt[key] = num(input.value);
+        refresh();
+      });
+    });
+    els.fee?.addEventListener("input", () => {
+      opt.fee[opt.type] = els.fee.value;
+      refresh();
+    });
+    // 비아누와 에타는 값 차이가 커서, 고른 쪽에 넣어 둔 값을 되살린다
+    document.querySelectorAll('input[name="encryptOptType"]').forEach((input) => {
+      input.addEventListener("change", () => {
+        if (!input.checked) return;
+        opt.type = input.value;
+        if (els.fee) els.fee.value = opt.fee[opt.type];
+        refresh();
+      });
+    });
+    els.discount?.addEventListener("change", () => {
+      opt.discount = els.discount.checked;
+      refresh();
+    });
+
+    els.rows.addEventListener("input", (event) => {
+      const value = event.target.dataset?.optValue;
+      const price = event.target.dataset?.optPrice;
+      if (value !== undefined) opt.scrolls[Number(value)].value = num(event.target.value);
+      else if (price !== undefined) opt.scrolls[Number(price)].price = event.target.value;
+      else return;
+      refresh();
+    });
+
+    els.rows.addEventListener("change", (event) => {
+      const on = event.target.dataset?.optOn;
+      if (on === undefined) return;
+      opt.scrolls[Number(on)].on = event.target.checked;
+      refresh();
+    });
+  }
+
+  return { load, wire };
 })();
 
 // ══════════════════════════════════════════════════════════════
@@ -7099,6 +7431,7 @@ function wireEvents() {
   seedCalc.wire();
   oneKillCalc.wire();
   hitCalc.wire();
+  encryptOptCalc.wire();
   rareBuff.wire();
 
   els.characterGrid?.addEventListener("click", (event) => {
