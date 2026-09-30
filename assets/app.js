@@ -2537,7 +2537,8 @@ function renderPopLapisDetail() {
       return { ...group, people, lapis: people.reduce((sum, q) => sum + q.lapis, 0), ring: people.reduce((sum, q) => sum + q.ring, 0) };
     })
     .filter((group) => group.people.length)
-    .sort((x, y) => y.people.length - x.people.length || y.lapis - x.lapis || x.code - y.code);
+    // 위 캐릭터 버튼과 같은 순서(캐릭터 번호순)로 늘어놓는다
+    .sort((x, y) => x.code - y.code);
 
   // 구간 버튼의 인원: 캐릭터 필터만 적용한 상태에서 그 구간을 넘은 사람 수
   const byCode = all.filter((group) => code === "all" || group.code === Number(code));
