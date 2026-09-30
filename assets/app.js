@@ -2417,7 +2417,7 @@ function renderPopLapisUse(dates, shown) {
 // ── 인구 통계 "자세히": 이 기간에 레벨 구간을 넘어 라피스를 쓴 사람 목록 ──
 // 위 요약과 같은 조건으로 뽑는다. 진입·이탈은 넣지 않고, 어제보다 레벨이 올라 구간을 넘은 사람만이다.
 const ETA_LAPIS_IDS_URL = "./assets/eta-lapis-ids.json";
-const popLapis = { ids: null, promise: null };
+const popLapis = { ids: null, promise: null, groups: null, level: "all", code: "all" };
 
 function loadPopLapisIds() {
   if (popLapis.ids) return Promise.resolve(popLapis.ids);
@@ -2496,26 +2496,76 @@ async function openPopLapisDetail() {
       <span>목록을 불러오는 중입니다.</span>
     </div>`;
   modalShow(els.popLapisModal);
+  // 창을 열 때마다 필터는 전체로 되돌린다
+  popLapis.level = "all";
+  popLapis.code = "all";
 
-  let groups;
   try {
-    groups = popLapisCollect(await loadPopLapisIds());
+    popLapis.groups = popLapisCollect(await loadPopLapisIds());
   } catch (error) {
     console.warn("라피스 소모 아이디 목록을 불러오지 못했습니다.", error);
     els.popLapisBody.innerHTML = `<p class="eta-history-empty">목록을 불러오지 못했습니다. 잠시 뒤 다시 눌러 주세요.</p>`;
     return;
   }
-  if (!groups.length) {
+  renderPopLapisDetail();
+}
+
+// 필터: 넘은 구간(21·41·61·81·91 된 사람)과 캐릭터. 둘 다 "전체"가 기본이고 겹쳐서 쓸 수 있다
+function renderPopLapisDetail() {
+  const all = popLapis.groups || [];
+  if (!all.length) {
     els.popLapisBody.innerHTML = `<p class="eta-history-empty">이 조건에서 구간을 넘은 사람이 없습니다.</p>`;
     return;
   }
+  const level = popLapis.level;   // "all" | 구간 상한 (20·40·60·80·90)
+  const code = popLapis.code;     // "all" | 캐릭터 코드
 
-  const showServer = servers.length > 1;
-  const total = groups.reduce((sum, g) => sum + g.people.length, 0);
+  // 구간 필터를 적용한 목록. 사람마다 그 구간의 기록만 남기고 라피스도 그만큼만 센다
+  const filtered = all
+    .filter((group) => code === "all" || group.code === Number(code))
+    .map((group) => {
+      const people = group.people
+        .map((person) => {
+          const steps = level === "all" ? person.steps : person.steps.filter((step) => step.level === Number(level));
+          if (!steps.length) return null;
+          const lapis = steps.reduce((sum, step) => sum + POP_COST_ITEMS[POP_BAND_TOPS.indexOf(step.level)].lapis, 0);
+          const ring = steps.reduce((sum, step) => sum + (POP_COST_ITEMS[POP_BAND_TOPS.indexOf(step.level)].ring || 0), 0);
+          return { ...person, steps, lapis, ring };
+        })
+        .filter(Boolean)
+        .sort((x, y) => y.lapis - x.lapis || x.userId.localeCompare(y.userId, "ko"));
+      return { ...group, people, lapis: people.reduce((sum, q) => sum + q.lapis, 0), ring: people.reduce((sum, q) => sum + q.ring, 0) };
+    })
+    .filter((group) => group.people.length)
+    .sort((x, y) => y.people.length - x.people.length || y.lapis - x.lapis || x.code - y.code);
+
+  // 구간 버튼의 인원: 캐릭터 필터만 적용한 상태에서 그 구간을 넘은 사람 수
+  const byCode = all.filter((group) => code === "all" || group.code === Number(code));
+  const levelCount = (top) => byCode.reduce((sum, group) => sum + group.people.filter((person) => person.steps.some((step) => step.level === top)).length, 0);
+  const levelButtons = [["all", "전체", byCode.reduce((sum, group) => sum + group.people.length, 0)]]
+    .concat(POP_COST_ITEMS.map((_, index) => [String(POP_BAND_TOPS[index]), `${POP_BAND_TOPS[index] + 1} 된 사람`, levelCount(POP_BAND_TOPS[index])]))
+    .map(([key, label, count]) => `<button class="pop-range-btn${key === level ? " is-active" : ""}" type="button" data-pop-lapis-level="${key}"${count ? "" : " disabled"}>${label} <small>${formatNumber(count)}</small></button>`)
+    .join("");
+
+  // 캐릭터 버튼의 인원: 구간 필터만 적용한 상태
+  const codeCount = (group) => group.people.filter((person) => level === "all" || person.steps.some((step) => step.level === Number(level))).length;
+  const codeButtons = [`<button class="pop-range-btn${code === "all" ? " is-active" : ""}" type="button" data-pop-lapis-code="all">전체</button>`]
+    .concat(all.slice().sort((x, y) => x.code - y.code).map((group) => {
+      const count = codeCount(group);
+      return `<button class="pop-range-btn pop-lapis-char${String(group.code) === String(code) ? " is-active" : ""}" type="button" data-pop-lapis-code="${group.code}"${count ? "" : " disabled"}><img src="${ETA_CHAR_IMAGE_BASE}${group.code}.png" alt="" loading="lazy" decoding="async" />${escapeHtml(group.name)} <small>${formatNumber(count)}</small></button>`;
+    }))
+    .join("");
+
+  const showServer = popActiveServers().length > 1;
+  const total = filtered.reduce((sum, group) => sum + group.people.length, 0);
   const icon = (file) => `<img class="eta-lapis-icon" src="${SIM_IMG_BASE}${encodeURIComponent(file)}" alt="" width="14" height="14" loading="lazy" />`;
   els.popLapisBody.innerHTML = `
-    <p class="pop-lapis-summary">캐릭터 ${formatNumber(groups.length)}종 · <b>${formatNumber(total)}명</b> · ${icon("에오니스_라피스.png")}라피스 <b>${formatNumber(groups.reduce((s, g) => s + g.lapis, 0))}개</b> · ${icon("설계자의_반지.png")}설계자의 반지 <b>${formatNumber(groups.reduce((s, g) => s + g.ring, 0))}개</b></p>
-    ${groups.map((group) => `
+    <div class="pop-lapis-filters">
+      <div class="pop-lapis-filter-row"><span>구간</span><div class="pop-range-buttons">${levelButtons}</div></div>
+      <div class="pop-lapis-filter-row"><span>캐릭터</span><div class="pop-range-buttons pop-lapis-chars">${codeButtons}</div></div>
+    </div>
+    <p class="pop-lapis-summary">캐릭터 ${formatNumber(filtered.length)}종 · <b>${formatNumber(total)}명</b> · ${icon("에오니스_라피스.png")}라피스 <b>${formatNumber(filtered.reduce((sum, g) => sum + g.lapis, 0))}개</b> · ${icon("설계자의_반지.png")}설계자의 반지 <b>${formatNumber(filtered.reduce((sum, g) => sum + g.ring, 0))}개</b></p>
+    ${filtered.length ? filtered.map((group) => `
       <details class="pop-lapis-group" open>
         <summary>
           <span class="eta-char-thumb"><img src="${ETA_CHAR_IMAGE_BASE}${group.code}.png" alt="" loading="lazy" decoding="async" /></span>
@@ -2523,14 +2573,14 @@ async function openPopLapisDetail() {
           <span class="pop-lapis-group-meta">${formatNumber(group.people.length)}명 · 라피스 ${formatNumber(group.lapis)}개${group.ring ? ` · 반지 ${formatNumber(group.ring)}개` : ""}</span>
         </summary>
         <ul class="pop-lapis-list">
-          ${group.people.map((p) => `
+          ${group.people.map((person) => `
             <li>
-              <span class="pop-lapis-id">${escapeHtml(p.userId)}${showServer ? `<small>${escapeHtml(p.server)}</small>` : ""}</span>
-              <span class="pop-lapis-steps">${p.steps.map((s) => `<span class="pop-lapis-step" title="${s.date}">${s.level}→${s.level + 1}<small>${s.date.slice(5)}</small></span>`).join("")}</span>
-              <span class="pop-lapis-cost">${formatNumber(p.lapis)}개${p.ring ? ` · 반지 ${formatNumber(p.ring)}` : ""}</span>
+              <span class="pop-lapis-id">${escapeHtml(person.userId)}${showServer ? `<small>${escapeHtml(person.server)}</small>` : ""}</span>
+              <span class="pop-lapis-steps">${person.steps.map((step) => `<span class="pop-lapis-step" title="${step.date}">${step.level}→${step.level + 1}<small>${step.date.slice(5)}</small></span>`).join("")}</span>
+              <span class="pop-lapis-cost">${formatNumber(person.lapis)}개${person.ring ? ` · 반지 ${formatNumber(person.ring)}` : ""}</span>
             </li>`).join("")}
         </ul>
-      </details>`).join("")}`;
+      </details>`).join("") : `<p class="eta-history-empty">이 조건에 맞는 사람이 없습니다.</p>`}`;
 }
 
 function wirePopLapisDetail() {
@@ -2540,7 +2590,21 @@ function wirePopLapisDetail() {
   const modal = els.popLapisModal;
   if (!modal) return;
   modal.addEventListener("click", (event) => {
-    if (event.target.closest("[data-pop-lapis-close]")) modalHide(modal);
+    if (event.target.closest("[data-pop-lapis-close]")) {
+      modalHide(modal);
+      return;
+    }
+    const levelBtn = event.target.closest("[data-pop-lapis-level]");
+    if (levelBtn) {
+      popLapis.level = levelBtn.dataset.popLapisLevel;
+      renderPopLapisDetail();
+      return;
+    }
+    const codeBtn = event.target.closest("[data-pop-lapis-code]");
+    if (codeBtn) {
+      popLapis.code = codeBtn.dataset.popLapisCode;
+      renderPopLapisDetail();
+    }
   });
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && !modal.hidden) modalHide(modal);

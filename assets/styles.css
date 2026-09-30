@@ -8789,6 +8789,55 @@ img.dmg-chk-icon {
   gap: 10px;
 }
 
+/* 자세히 창의 필터: 구간(21·41·61·81·91 된 사람)과 캐릭터 */
+.pop-lapis-filters {
+  display: grid;
+  gap: 6px;
+}
+
+.pop-lapis-filter-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.pop-lapis-filter-row > span {
+  flex: 0 0 44px;
+  padding-top: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.pop-lapis-filter-row .pop-range-buttons {
+  flex-wrap: wrap;
+  border-radius: 12px;
+}
+
+.pop-lapis-filter-row .pop-range-btn small {
+  margin-left: 2px;
+  font-weight: 400;
+  opacity: 0.8;
+}
+
+.pop-lapis-filter-row .pop-range-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.pop-lapis-char {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pop-lapis-char img {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
 .pop-lapis-summary {
   margin: 0;
   font-size: 13px;
