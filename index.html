@@ -6,7 +6,7 @@
     <title>TW DB</title>
     <!-- 이미지 CDN. 첫 이미지 요청 전에 DNS+TLS를 미리 끝내둔다 -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
-    <link rel="stylesheet" href="./assets/styles.css?v=20260930-lapistable" />
+    <link rel="stylesheet" href="./assets/styles.css?v=20260930-brkpage" />
     <!-- 모바일 전용. media 속성 덕에 넓은 화면에서는 렌더링을 막지 않는다 -->
     <link rel="stylesheet" href="./assets/mobile.css?v=20260929-weapon14" media="(max-width: 720px)" />
   </head>
@@ -81,6 +81,7 @@
           <button class="db-subtab is-active" type="button" data-eta-tab="ranking">에타 순위</button>
           <button class="db-subtab" type="button" data-eta-tab="newcomers">진입 · 이탈</button>
           <button class="db-subtab" type="button" data-eta-tab="population">인구 통계</button>
+          <button class="db-subtab" type="button" data-eta-tab="breakthrough">에타 돌파</button>
           <button class="db-subtab" type="button" data-eta-tab="info">에타 정보</button>
           <button class="db-subtab" type="button" data-eta-tab="calc">에타 계산기</button>
         </nav>
@@ -244,6 +245,51 @@
             </div>
           </div>
           <div id="popLegend" class="pop-legend"></div>
+        </section>
+        </div>
+
+        <div data-eta-panel="breakthrough" hidden>
+        <section class="toolbar pop-toolbar" aria-label="에타 돌파 조건">
+          <div class="brand-block">
+            <p class="eyebrow">TW DB</p>
+            <h1>에타 돌파</h1>
+          </div>
+
+          <div class="pop-controls">
+            <div class="pop-range-field">
+              <span>기간</span>
+              <div id="brkRangeButtons" class="pop-range-buttons" role="group" aria-label="기간 선택"></div>
+              <div class="pop-custom-range">
+                <input id="brkFromDate" type="date" aria-label="시작 날짜" />
+                <span class="pop-range-dash" aria-hidden="true">~</span>
+                <input id="brkToDate" type="date" aria-label="종료 날짜" />
+              </div>
+            </div>
+
+            <div class="pop-range-field">
+              <span>구간</span>
+              <div id="brkLevelButtons" class="pop-range-buttons" role="group" aria-label="돌파 구간 선택"></div>
+            </div>
+
+            <div class="pop-range-field">
+              <span>캐릭터</span>
+              <div id="brkCodeButtons" class="pop-range-buttons pop-lapis-chars" role="group" aria-label="캐릭터 선택"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="result-band" aria-live="polite">
+          <div class="result-meta">
+            <div id="brkServerTabs" class="eta-server-tabs" role="radiogroup" aria-label="서버 선택"></div>
+            <strong id="brkTotal">0명</strong>
+            <span id="brkRangeLabel">-</span>
+            <span id="brkLapis" class="eta-lapis-use" hidden></span>
+          </div>
+        </section>
+
+        <section class="workspace pop-workspace brk-workspace">
+          <p class="brk-note">어제보다 레벨이 올라 구간(20·40·60·80·90)을 넘은 사람만 셉니다. 접었다 돌아온 사람이나 새로 들어온 사람은 넣지 않습니다. 날짜는 수집일입니다.</p>
+          <div id="brkBody" class="brk-body"></div>
         </section>
         </div>
 
@@ -1256,19 +1302,6 @@
       </div>
     </div>
 
-    <!-- 인구 통계의 "자세히": 이 기간에 레벨 구간을 넘어 라피스를 쓴 사람 목록 -->
-    <div id="popLapisModal" class="modal" hidden>
-      <div class="modal-backdrop" data-pop-lapis-close></div>
-      <div class="modal-panel pop-lapis-panel" role="dialog" aria-modal="true" aria-labelledby="popLapisTitle">
-        <div class="modal-head">
-          <h2 id="popLapisTitle">에타 돌파</h2>
-          <button class="modal-close" type="button" data-pop-lapis-close aria-label="닫기">✕</button>
-        </div>
-        <p id="popLapisNote" class="modal-note"></p>
-        <div id="popLapisBody" class="modal-body pop-lapis-body"></div>
-      </div>
-    </div>
-
     <!-- 에타 순위표에서 아이디를 누르면 여는 기록 창: 에타 레벨·획득 정수 그래프 -->
     <div id="etaHistoryModal" class="modal" hidden>
       <div class="modal-backdrop" data-eta-history-close></div>
@@ -1300,7 +1333,7 @@
       </div>
     </template>
 
-    <script src="./assets/app.js?v=20260930-lapistable" type="module"></script>
+    <script src="./assets/app.js?v=20260930-brkpage" type="module"></script>
     <!-- GoatCounter 방문자 분석 (localhost 방문은 count.js가 기본으로 집계 제외)
          자동 집계를 끄고 app.js의 라우터가 탭 단위 경로(/eta/ranking 등)로 직접 보낸다 -->
     <script>window.goatcounter = { no_onload: true };</script>

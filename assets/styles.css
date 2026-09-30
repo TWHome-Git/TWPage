@@ -8761,73 +8761,14 @@ img.dmg-chk-icon {
   display: none;
 }
 
-/* 인구 통계 "자세히" 버튼과 목록 창 */
-.pop-lapis-detail {
-  margin-left: 6px;
-  padding: 2px 9px;
-  border: 1px solid var(--accent);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--accent-strong);
-  font: inherit;
-  font-size: 11px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.pop-lapis-detail:hover {
-  background: var(--accent);
-  color: #fff;
-}
-
-.pop-lapis-panel {
-  width: min(820px, 94vw);
-  /* 사람이 수백 명이면 내용 높이가 화면을 훌쩍 넘는다. 기본 규칙의 max-height: min(86vh, 100%)는
-     격자 칸 높이(100%)가 내용에 따라 정해져 제한이 풀리므로, 화면 높이로 못 박고 안에서 스크롤시킨다 */
-  max-height: 86vh;
-}
-
-.pop-lapis-body {
-  min-height: 0;
-}
-
-.pop-lapis-body {
-  display: grid;
-  gap: 10px;
-}
-
-/* 에타 돌파 창의 필터: 구간(21·41·61·81·91)과 캐릭터 */
-.pop-lapis-filters {
-  display: grid;
-  gap: 6px;
-}
-
-.pop-lapis-filter-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-}
-
-.pop-lapis-filter-row > span {
-  flex: 0 0 44px;
-  padding-top: 6px;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.pop-lapis-filter-row .pop-range-buttons {
-  flex-wrap: wrap;
-  border-radius: 12px;
-}
-
-.pop-lapis-filter-row .pop-range-btn small {
+/* 에타 돌파 탭의 구간·캐릭터 버튼 */
+.pop-range-btn small {
   margin-left: 2px;
   font-weight: 400;
   opacity: 0.8;
 }
 
-.pop-lapis-filter-row .pop-range-btn:disabled {
+.pop-range-btn:disabled {
   opacity: 0.35;
   cursor: default;
 }
@@ -8845,9 +8786,19 @@ img.dmg-chk-icon {
   object-fit: cover;
 }
 
-.pop-lapis-summary {
+.brk-workspace {
+  display: grid;
+}
+
+.brk-note {
   margin: 0;
-  font-size: 13px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.pop-lapis-chars {
+  flex-wrap: wrap;
+  border-radius: 12px;
 }
 
 /* 에타 돌파 표: 행은 사람, 열은 21·41·61·81·91 구간. 넘은 날짜가 칸에 들어간다 */
