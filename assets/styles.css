@@ -8782,6 +8782,13 @@ img.dmg-chk-icon {
 
 .pop-lapis-panel {
   width: min(820px, 94vw);
+  /* 사람이 수백 명이면 내용 높이가 화면을 훌쩍 넘는다. 기본 규칙의 max-height: min(86vh, 100%)는
+     격자 칸 높이(100%)가 내용에 따라 정해져 제한이 풀리므로, 화면 높이로 못 박고 안에서 스크롤시킨다 */
+  max-height: 86vh;
+}
+
+.pop-lapis-body {
+  min-height: 0;
 }
 
 .pop-lapis-body {
