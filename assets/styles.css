@@ -6532,6 +6532,8 @@ img.dmg-chk-icon {
 /* "에타 인구 추이"는 190px 고정폭에서 두 줄로 접힌다. 이 패널만 제목 너비를 내용에 맞춘다 */
 .pop-toolbar {
   grid-template-columns: auto 1fr;
+  /* 조건이 세 줄이라 제목을 아래에 맞추면 붕 떠 보인다. 제목을 위에 맞춘다 */
+  align-items: start;
 }
 
 /* .empty-state와 .pop-tooltip이 display를 지정해서 hidden 속성만으로는 안 숨는다 */
