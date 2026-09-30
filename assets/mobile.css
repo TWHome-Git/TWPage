@@ -1188,3 +1188,15 @@
     font-size: 11px;
   }
 }
+
+/* 소울 링크: 폰에서는 표를 옆으로 밀어 본다 */
+@media (max-width: 720px) {
+  .soul-body {
+    padding: 14px 12px 20px;
+  }
+
+  .soul-table th,
+  .soul-table td {
+    padding: 6px 7px;
+  }
+}

@@ -3996,7 +3996,7 @@ function activateSimulatorTab(key) {
   routeWrite();
 }
 
-const INFO_TITLES = { seed: "주간 시드 한도", exp: "경험치 버프", rare: "레어 버프" };
+const INFO_TITLES = { seed: "주간 시드 한도", exp: "경험치 버프", rare: "레어 버프", soul: "소울 링크" };
 
 function activateInfoTab(key) {
   ACTIVE_SUB.info = key;
@@ -4012,6 +4012,7 @@ function activateInfoTab(key) {
   if (key === "exp") expBuff.load();
   if (key === "rare") rareBuff.load();
   if (key === "seed") seedCalc.load();
+  if (key === "soul") soulLink.load();
 
   routeWrite();
 }
@@ -6035,6 +6036,127 @@ const weaponDmgCalc = (() => {
 })();
 
 // ══════════════════════════════════════════════════════════════
+//  소울 링크 — 링크 스탯 등급별 조건과 드는 재화
+// ══════════════════════════════════════════════════════════════
+// 표 모양은 열 가지가 모두 같고 숫자와 재료 이름만 바뀐다.
+// 자료는 넥슨 고객센터 FAQ를 옮겨 둔 것이라 파일로 빼 두고 탭을 열 때 받는다.
+const SOUL_LINK_URL = "./assets/soul-link.json";
+
+const soulLink = (() => {
+  const soul = { data: null, loading: false, key: "", showExpected: false };
+  const els = {};
+
+  const statOf = (key) => soul.data?.stats.find((s) => s.key === key) || soul.data?.stats[0] || null;
+  // 확률이 100%가 아니면 한 번에 안 올라서, 실제로는 재료가 더 든다
+  const hasChance = (stat) => stat.rows.some((row) => row[1] < 100);
+
+  function renderTabs() {
+    if (!els.tabs || !soul.data) return;
+    els.tabs.innerHTML = soul.data.stats.map((stat) => `
+      <button class="pop-range-btn${stat.key === soul.key ? " is-active" : ""}" type="button" data-soul-key="${escapeHtml(stat.key)}" title="${escapeHtml(stat.name)}">${escapeHtml(stat.short || stat.name)}</button>
+    `).join("");
+  }
+
+  function renderTable() {
+    if (!els.body) return;
+    const stat = statOf(soul.key);
+    if (!stat) {
+      els.body.innerHTML = `<p class="soul-empty">자료를 불러오지 못했습니다.</p>`;
+      return;
+    }
+
+    const [mat1, mat2] = stat.materials;
+    const chance = hasChance(stat);
+    // 확률이 100%가 아니면 성공할 때까지 거듭 발라야 하니 재료도 그만큼 더 든다.
+    // 1등급은 습득이라 재료가 들지 않는다.
+    const total = [0, 0];
+    stat.rows.forEach(([, pct, , , , a, b]) => {
+      if (pct <= 0) return;
+      total[0] += (a * 100) / pct;
+      total[1] += (b * 100) / pct;
+    });
+
+    const cell = (value) => (value ? formatNumber(value) : "-");
+    const rows = stat.rows.map(([grade, pct, eta, power, effect, a, b]) => `
+      <tr>
+        <td>${grade}</td>
+        <td${pct < 100 ? ' class="is-risky"' : ""}>${pct}%</td>
+        <td>${formatNumber(eta)}</td>
+        <td>${formatNumber(power)}</td>
+        <td class="is-effect">${escapeHtml(effect)}</td>
+        <td>${cell(a)}</td>
+        <td>${cell(b)}</td>
+      </tr>
+    `).join("");
+
+    els.body.innerHTML = `
+      <p class="soul-name">${escapeHtml(stat.name)}</p>
+      <p class="soul-detail">${escapeHtml(stat.detail)}</p>
+      <div class="soul-table-wrap">
+        <table class="soul-table">
+          <thead>
+            <tr>
+              <th>등급</th>
+              <th>강화 확률</th>
+              <th>에타 레벨</th>
+              <th>전투력</th>
+              <th>효과</th>
+              <th>${escapeHtml(mat1)}</th>
+              <th>${escapeHtml(mat2)}</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+          <tfoot>
+            <tr>
+              <th colspan="5">총 필요 재료${chance ? " <em>확률 반영</em>" : ""}</th>
+              <td>${cell(Math.round(total[0]))}</td>
+              <td>${cell(Math.round(total[1]))}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      ${chance ? `<p class="soul-note">강화에 실패하면 재료만 사라지고 등급은 그대로입니다. 총 필요 재료는 성공할 때까지 거듭 시도한다고 보고 낸 값입니다.</p>` : ""}
+      <p class="soul-source">자료: <a href="${escapeHtml(soul.data.source)}" target="_blank" rel="noopener">넥슨 고객센터 FAQ</a> · ${escapeHtml(soul.data.note)}</p>
+    `;
+  }
+
+  function render() {
+    renderTabs();
+    renderTable();
+  }
+
+  async function load() {
+    if (soul.data || soul.loading) return;
+    soul.loading = true;
+    try {
+      const response = await fetch(SOUL_LINK_URL);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      soul.data = await response.json();
+      soul.key = soul.data.stats[0]?.key || "";
+      render();
+    } catch (error) {
+      console.warn("소울 링크 자료를 불러오지 못했습니다.", error);
+      if (els.body) els.body.innerHTML = `<p class="soul-empty">자료를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.</p>`;
+    } finally {
+      soul.loading = false;
+    }
+  }
+
+  function wire() {
+    els.tabs = document.querySelector("#soulTabs");
+    els.body = document.querySelector("#soulBody");
+    els.tabs?.addEventListener("click", (event) => {
+      const key = event.target.closest("[data-soul-key]")?.dataset.soulKey;
+      if (!key || key === soul.key) return;
+      soul.key = key;
+      render();
+    });
+  }
+
+  return { load, wire };
+})();
+
+// ══════════════════════════════════════════════════════════════
 //  프로그램 탭 (TWChatOverlay · TWEtaChecker) — GitHub README + 최신 릴리스 다운로드
 //  저장소만 다르고 화면 구성은 같아서, 저장소별 설정을 두고 같은 코드로 그린다.
 // ══════════════════════════════════════════════════════════════
@@ -7916,6 +8038,7 @@ function wireEvents() {
   hitCalc.wire();
   encryptOptCalc.wire();
   weaponDmgCalc.wire();
+  soulLink.wire();
   rareBuff.wire();
 
   els.characterGrid?.addEventListener("click", (event) => {
