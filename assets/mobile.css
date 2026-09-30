@@ -1085,3 +1085,106 @@
     gap: 16px;
   }
 }
+
+/* ── 인구 통계 · 에타 돌파 ─────────────────────────────────────
+   도구 모음이 "제목 | 조건" 두 열이라 폰에서는 제목이 50px로 눌려 안 보이고,
+   기간 버튼이 한 줄에 못 들어가 글자가 세로로 깨진다. 제목을 위에, 조건을 아래에 놓고
+   버튼 묶음은 줄바꿈시킨다. 표는 칸을 좁혀 폰 폭에 맞춘다. */
+@media (max-width: 720px) {
+  .pop-toolbar {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+    align-items: start;
+  }
+
+  .pop-controls {
+    min-width: 0;
+  }
+
+  .pop-range-field {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+
+  .pop-range-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    border-radius: 12px;
+  }
+
+  .pop-range-btn {
+    white-space: nowrap;
+    padding: 5px 10px;
+  }
+
+  .pop-custom-range {
+    display: flex;
+  }
+
+  .pop-custom-range input {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  [data-eta-panel="population"] .result-meta,
+  [data-eta-panel="breakthrough"] .result-meta {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .pop-lapis-table {
+    font-size: 12px;
+  }
+
+  .pop-lapis-table th,
+  .pop-lapis-table td {
+    padding: 4px 4px;
+  }
+
+  .pop-lapis-table .is-id {
+    white-space: normal;
+    word-break: break-all;
+    min-width: 72px;
+  }
+
+  .pop-lapis-table td.is-id small {
+    display: block;
+    margin-left: 0;
+  }
+
+  .pop-lapis-table .is-level {
+    width: 42px;
+  }
+
+  .pop-lapis-table .is-cost {
+    width: 36px;
+  }
+
+  .pop-lapis-day {
+    padding: 1px 4px;
+    font-size: 11px;
+  }
+
+  .pop-lapis-char-row b {
+    font-size: 13px;
+  }
+
+  .pop-lapis-group-meta {
+    display: block;
+    margin-left: 0;
+  }
+}
+
+/* 인구 통계 범례: 폰에서 한 줄에 하나씩 놓이면 19줄이라 길다. 두 칸으로 나눈다 */
+@media (max-width: 720px) {
+  .pop-legend {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .pop-legend-item {
+    padding: 5px 6px;
+    font-size: 11px;
+  }
+}
