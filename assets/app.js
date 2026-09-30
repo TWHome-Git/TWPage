@@ -2566,22 +2566,33 @@ function renderPopLapisDetail() {
       <div class="pop-lapis-filter-row"><span>캐릭터</span><div class="pop-range-buttons pop-lapis-chars">${codeButtons}</div></div>
     </div>
     <p class="pop-lapis-summary">캐릭터 ${formatNumber(filtered.length)}종 · <b>${formatNumber(total)}명</b> · ${icon("에오니스_라피스.png")}라피스 <b>${formatNumber(filtered.reduce((sum, g) => sum + g.lapis, 0))}개</b> · ${icon("설계자의_반지.png")}설계자의 반지 <b>${formatNumber(filtered.reduce((sum, g) => sum + g.ring, 0))}개</b></p>
-    ${filtered.length ? filtered.map((group) => `
-      <details class="pop-lapis-group" open>
-        <summary>
-          <span class="eta-char-thumb"><img src="${ETA_CHAR_IMAGE_BASE}${group.code}.png" alt="" loading="lazy" decoding="async" /></span>
-          <b>${escapeHtml(group.name)}</b>
-          <span class="pop-lapis-group-meta">${formatNumber(group.people.length)}명 · 라피스 ${formatNumber(group.lapis)}개${group.ring ? ` · 반지 ${formatNumber(group.ring)}개` : ""}</span>
-        </summary>
-        <ul class="pop-lapis-list">
-          ${group.people.map((person) => `
-            <li>
-              <span class="pop-lapis-id">${escapeHtml(person.userId)}${showServer ? `<small>${escapeHtml(person.server)}</small>` : ""}</span>
-              <span class="pop-lapis-steps">${person.steps.map((step) => `<span class="pop-lapis-step" title="${step.date}">${step.level}→${step.level + 1}<small>${step.date.slice(5)}</small></span>`).join("")}</span>
-              <span class="pop-lapis-cost">${formatNumber(person.lapis)}개${person.ring ? ` · 반지 ${formatNumber(person.ring)}` : ""}</span>
-            </li>`).join("")}
-        </ul>
-      </details>`).join("") : `<p class="eta-history-empty">이 조건에 맞는 사람이 없습니다.</p>`}`;
+    ${filtered.length ? `
+      <div class="pop-lapis-table-wrap">
+        <table class="pop-lapis-table">
+          <thead><tr><th class="is-id">아이디</th>${POP_BAND_TOPS.slice(0, POP_COST_ITEMS.length).map((top) => `<th class="is-level${String(top) === level ? " is-picked" : ""}">${top + 1}</th>`).join("")}<th class="is-cost">라피스</th></tr></thead>
+          ${filtered.map((group) => `
+            <tbody>
+              <tr class="pop-lapis-char-row">
+                <th colspan="${POP_COST_ITEMS.length + 2}">
+                  <span class="eta-char-thumb"><img src="${ETA_CHAR_IMAGE_BASE}${group.code}.png" alt="" loading="lazy" decoding="async" /></span>
+                  <b>${escapeHtml(group.name)}</b>
+                  <span class="pop-lapis-group-meta">${formatNumber(group.people.length)}명 · 라피스 ${formatNumber(group.lapis)}개${group.ring ? ` · 반지 ${formatNumber(group.ring)}개` : ""}</span>
+                </th>
+              </tr>
+              ${group.people.map((person) => {
+                const byLevel = new Map(person.steps.map((step) => [step.level, step.date]));
+                return `<tr>
+                  <td class="is-id">${escapeHtml(person.userId)}${showServer ? `<small>${escapeHtml(person.server)}</small>` : ""}</td>
+                  ${POP_BAND_TOPS.slice(0, POP_COST_ITEMS.length).map((top) => {
+                    const date = byLevel.get(top);
+                    return `<td class="is-level${String(top) === level ? " is-picked" : ""}">${date ? `<span class="pop-lapis-day" title="${date}">${date.slice(5)}</span>` : `<span class="pop-lapis-none">·</span>`}</td>`;
+                  }).join("")}
+                  <td class="is-cost">${formatNumber(person.lapis)}${person.ring ? `<small>반지 ${formatNumber(person.ring)}</small>` : ""}</td>
+                </tr>`;
+              }).join("")}
+            </tbody>`).join("")}
+        </table>
+      </div>` : `<p class="eta-history-empty">이 조건에 맞는 사람이 없습니다.</p>`}`;
 }
 
 function wirePopLapisDetail() {

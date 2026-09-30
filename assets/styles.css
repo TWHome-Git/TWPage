@@ -8850,102 +8850,102 @@ img.dmg-chk-icon {
   font-size: 13px;
 }
 
-.pop-lapis-group {
+/* 에타 돌파 표: 행은 사람, 열은 21·41·61·81·91 구간. 넘은 날짜가 칸에 들어간다 */
+.pop-lapis-table-wrap {
+  overflow: auto;
   border: 1px solid var(--line);
   border-radius: 10px;
   background: #fff;
 }
 
-.pop-lapis-group > summary {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  cursor: pointer;
-  list-style: none;
+.pop-lapis-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
 }
 
-.pop-lapis-group > summary::-webkit-details-marker {
-  display: none;
+.pop-lapis-table th,
+.pop-lapis-table td {
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--line);
+  text-align: center;
+  white-space: nowrap;
 }
 
-.pop-lapis-group > summary::before {
-  content: "▸";
-  color: var(--muted);
-  font-size: 11px;
-}
-
-.pop-lapis-group[open] > summary::before {
-  content: "▾";
-}
-
-.pop-lapis-group-meta {
-  margin-left: auto;
+.pop-lapis-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--panel-strong);
   color: var(--muted);
   font-size: 12px;
 }
 
-.pop-lapis-list {
-  margin: 0;
-  padding: 0 12px 8px;
-  list-style: none;
-  border-top: 1px solid var(--line);
-}
-
-.pop-lapis-list li {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 12px;
-  padding: 6px 0;
-  border-bottom: 1px dashed var(--line);
-  font-size: 13px;
-}
-
-.pop-lapis-list li:last-child {
-  border-bottom: 0;
-}
-
-.pop-lapis-id {
-  flex: 0 0 160px;
+.pop-lapis-table .is-id {
+  text-align: left;
   font-weight: 700;
 }
 
-.pop-lapis-id small {
+.pop-lapis-table td.is-id small {
   margin-left: 6px;
   color: var(--muted);
   font-weight: 400;
 }
 
-.pop-lapis-steps {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  flex: 1 1 auto;
+.pop-lapis-table .is-level {
+  width: 64px;
 }
 
-.pop-lapis-step {
+.pop-lapis-table .is-picked {
+  background: rgba(15, 111, 99, 0.07);
+}
+
+.pop-lapis-table .is-cost {
+  width: 64px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.pop-lapis-table td.is-cost small {
+  display: block;
+  font-size: 10px;
+}
+
+.pop-lapis-char-row th {
+  padding: 7px 8px;
+  background: rgba(15, 111, 99, 0.06);
+  text-align: left;
+}
+
+.pop-lapis-char-row th > * {
+  vertical-align: middle;
+}
+
+.pop-lapis-char-row b {
+  margin-left: 6px;
+  font-size: 14px;
+}
+
+.pop-lapis-group-meta {
+  margin-left: 10px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.pop-lapis-day {
+  display: inline-block;
   padding: 1px 7px;
   border-radius: 999px;
-  background: rgba(15, 111, 99, 0.1);
+  background: rgba(15, 111, 99, 0.12);
   color: var(--accent-strong);
   font-size: 12px;
   font-weight: 700;
 }
 
-.pop-lapis-step small {
-  margin-left: 4px;
-  color: var(--muted);
-  font-weight: 400;
+.pop-lapis-none {
+  color: rgba(23, 33, 31, 0.25);
 }
-
-.pop-lapis-cost {
-  margin-left: auto;
-  color: var(--muted);
-  font-size: 12px;
-  white-space: nowrap;
-}
-
 .eta-lapis-icon {
   width: 16px;
   height: 16px;
