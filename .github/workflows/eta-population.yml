@@ -3,6 +3,7 @@
 # 원본(TWHomeDB의 eta_ranking.json)은 날짜별 커밋으로 쌓이고 하루치가 1MB 가까워,
 # 브라우저가 기간만큼 받을 수 없다. 필요한 것만 미리 추려 둔 파일을 여기서 갱신한다.
 #   - eta-population.json: 캐릭터별·레벨 구간별 인원수 (인구 추이)
+#   - eta-lapis-ids.json: 레벨 구간을 넘어 라피스를 쓴 아이디 (인구 통계의 "자세히")
 #   - eta-moves.json: 날짜별 순위 진입·이탈 아이디 (아이디 기록 검색)
 #   - eta-history/: 아이디별 날짜별 에타 레벨·보유 정수 (순위표에서 아이디를 누르면 보는 그래프)
 #
@@ -47,12 +48,12 @@ jobs:
 
       - name: 바뀌었으면 커밋
         run: |
-          if git diff --quiet -- assets/eta-population.json assets/eta-moves.json assets/eta-history; then
+          if git diff --quiet -- assets/eta-population.json assets/eta-lapis-ids.json assets/eta-moves.json assets/eta-history; then
             echo "변경 없음"
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add assets/eta-population.json assets/eta-moves.json assets/eta-history
+          git add assets/eta-population.json assets/eta-lapis-ids.json assets/eta-moves.json assets/eta-history
           git commit -m "에타 집계를 $(date -u -d '+9 hours' +%Y-%m-%d) 기준으로 갱신"
           git push

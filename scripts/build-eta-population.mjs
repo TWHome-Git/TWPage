@@ -12,6 +12,10 @@
 // (같은 날 올라간 사람과 그만둔 사람이 섞이면 한 숫자로 합쳐지고, 높은 레벨로 새로 들어온 사람은
 //  올라간 것처럼 보인다.) 그래서 여기서 사람마다 어제 레벨과 오늘 레벨을 견줘 미리 세어 둔다.
 // 저장 형태:  cost["2026-09-05"]["하이아칸"]["11"] = [20→21 인원, 40→41, 60→61, 80→81, 90→91]
+//
+// 누가 넘었는지도 assets/eta-lapis-ids.json에 따로 남긴다 (인구 통계의 "자세히"가 읽는다).
+// 하루에 몇 명 안 되어 파일이 작다. 인구 파일과 분리해 두어 그래프만 볼 때는 받지 않는다.
+// 저장 형태:  ids["2026-09-05"]["하이아칸"]["11"] = [[20→21 아이디...], [40→41...], [60→61...], [80→81...], [90→91...]]
 
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
@@ -20,6 +24,7 @@ import { fileURLToPath } from "node:url";
 const INDEX_URL = "https://raw.githubusercontent.com/TWHome-Git/TWHomeDB/main/ranking_index.json";
 const snapshotUrl = (sha) => `https://raw.githubusercontent.com/TWHome-Git/TWHomeDB/${sha}/eta_ranking.json`;
 const OUT_PATH = fileURLToPath(new URL("../assets/eta-population.json", import.meta.url));
+const IDS_PATH = fileURLToPath(new URL("../assets/eta-lapis-ids.json", import.meta.url));
 
 // 저장 형식이 바뀌면 올린다. 파일의 version이 다르면 전체를 다시 집계한다.
 const VERSION = 3;
@@ -90,10 +95,11 @@ function levelsByCharacter(rows) {
   return map;
 }
 
-// 어제와 오늘을 견줘 캐릭터별로 넘어간 구간 수를 센다. 어제 없던 사람은 세지 않는다
+// 어제와 오늘을 견줘 캐릭터별로 넘어간 구간 수와 넘은 사람을 모은다. 어제 없던 사람은 세지 않는다
 function countCrossings(prevRows, rows) {
   const prev = levelsByCharacter(prevRows);
   const counts = new Map();
+  const ids = new Map();
   (rows || []).forEach((row) => {
     const userId = String(row?.UserId ?? "").trim();
     if (!userId) return;
@@ -103,40 +109,60 @@ function countCrossings(prevRows, rows) {
     if (before === undefined || now <= before) return;
     COST_LEVELS.forEach((level, index) => {
       if (before <= level && level < now) {
-        if (!counts.has(code)) counts.set(code, new Array(COST_LEVELS.length).fill(0));
+        if (!counts.has(code)) {
+          counts.set(code, new Array(COST_LEVELS.length).fill(0));
+          ids.set(code, COST_LEVELS.map(() => []));
+        }
         counts.get(code)[index] += 1;
+        ids.get(code)[index].push(userId);
       }
     });
   });
-  return Object.fromEntries([...counts.entries()].sort((a, b) => a[0] - b[0]));
+  const sortedCodes = [...counts.keys()].sort((a, b) => a - b);
+  return {
+    counts: Object.fromEntries(sortedCodes.map((code) => [code, counts.get(code)])),
+    ids: Object.fromEntries(sortedCodes.map((code) => [code, ids.get(code)])),
+  };
 }
 
 function crossingsBySnapshot(prevSnapshot, snapshot) {
   const prevServers = new Map(serverEntries(prevSnapshot));
-  const out = {};
+  const counts = {};
+  const ids = {};
   serverEntries(snapshot).forEach(([name, rows]) => {
-    const counts = countCrossings(prevServers.get(name), rows);
-    if (Object.keys(counts).length) out[name] = counts;
+    const found = countCrossings(prevServers.get(name), rows);
+    if (Object.keys(found.counts).length) {
+      counts[name] = found.counts;
+      ids[name] = found.ids;
+    }
   });
-  return out;
+  return { counts, ids };
 }
 
 async function readExisting() {
+  const empty = { days: {}, cost: {}, ids: {} };
   try {
     const payload = JSON.parse(await readFile(OUT_PATH, "utf8"));
     // 형식이 바뀌었으면 기존 값을 버리고 전부 다시 집계한다
-    if (payload?.version !== VERSION) return { days: {}, cost: {} };
-    return { days: payload.days || {}, cost: payload.cost || {} };
+    if (payload?.version !== VERSION) return empty;
+    let ids = {};
+    try {
+      const idsPayload = JSON.parse(await readFile(IDS_PATH, "utf8"));
+      if (idsPayload?.version === VERSION) ids = idsPayload.ids || {};
+    } catch {
+      // 아이디 파일이 없으면 그 날짜들을 다시 집계한다
+    }
+    return { days: payload.days || {}, cost: payload.cost || {}, ids };
   } catch {
-    return { days: {}, cost: {} };
+    return empty;
   }
 }
 
 async function main() {
   const index = await fetchJson(INDEX_URL);
-  const { days, cost } = await readExisting();
+  const { days, cost, ids } = await readExisting();
   const all = Object.keys(index).sort();
-  const missing = all.filter((date, i) => !days[date] || (i > 0 && !cost[date]));
+  const missing = all.filter((date, i) => !days[date] || (i > 0 && (!cost[date] || !ids[date])));
 
   if (!missing.length) {
     console.log(`추가할 날짜 없음 (보유 ${Object.keys(days).length}일)`);
@@ -159,7 +185,11 @@ async function main() {
       days[date] = Object.fromEntries(
         serverEntries(snapshot).map(([name, rows]) => [name, countByCharacter(rows)]),
       );
-      if (prevSnapshot && prevDate === before) cost[date] = crossingsBySnapshot(prevSnapshot, snapshot);
+      if (prevSnapshot && prevDate === before) {
+        const crossings = crossingsBySnapshot(prevSnapshot, snapshot);
+        cost[date] = crossings.counts;
+        ids[date] = crossings.ids;
+      }
       prevSnapshot = snapshot;
       prevDate = date;
     } catch (error) {
@@ -181,6 +211,8 @@ async function main() {
   };
   await mkdir(dirname(OUT_PATH), { recursive: true });
   await writeFile(OUT_PATH, JSON.stringify(payload), "utf8");
+  const sortedIds = Object.fromEntries(Object.keys(ids).sort().map((date) => [date, ids[date]]));
+  await writeFile(IDS_PATH, JSON.stringify({ version: VERSION, generated: payload.generated, costLevels: COST_LEVELS, ids: sortedIds }), "utf8");
 
   const dates = Object.keys(sorted);
   console.log(`새로 받은 날짜: ${missing.length - failed.length}`);

@@ -458,6 +458,10 @@ const els = {
   popTotal: document.querySelector("#popTotal"),
   popRangeLabel: document.querySelector("#popRangeLabel"),
   popLapisUse: document.querySelector("#popLapisUse"),
+  popLapisModal: document.querySelector("#popLapisModal"),
+  popLapisTitle: document.querySelector("#popLapisTitle"),
+  popLapisNote: document.querySelector("#popLapisNote"),
+  popLapisBody: document.querySelector("#popLapisBody"),
   popChart: document.querySelector("#popChart"),
   popEmpty: document.querySelector("#popEmpty"),
   popLegend: document.querySelector("#popLegend"),
@@ -2403,8 +2407,144 @@ function renderPopLapisUse(dates, shown) {
   const icon = (file) => `<img class="eta-lapis-icon" src="${SIM_IMG_BASE}${encodeURIComponent(file)}" alt="" width="16" height="16" loading="lazy" />`;
   box.hidden = false;
   box.title = `${span[0]} ~ ${span[span.length - 1]} 레벨업에 쓴 양`;
+  // "자세히"가 같은 조건(기간·서버·구간·캐릭터)으로 목록을 뽑도록 남겨 둔다
+  etaPop.lapisContext = { span, codes };
   box.innerHTML = `이 기간 소모 ${icon("에오니스_라피스.png")}라피스 <b>${formatNumber(lapis)}개</b>`
-    + ` · ${icon("설계자의_반지.png")}설계자의 반지 <b>${formatNumber(ring)}개</b>`;
+    + ` · ${icon("설계자의_반지.png")}설계자의 반지 <b>${formatNumber(ring)}개</b>`
+    + (lapis ? ` <button class="pop-lapis-detail" type="button" data-pop-lapis-detail>자세히</button>` : "");
+}
+
+// ── 인구 통계 "자세히": 이 기간에 레벨 구간을 넘어 라피스를 쓴 사람 목록 ──
+// 위 요약과 같은 조건으로 뽑는다. 진입·이탈은 넣지 않고, 어제보다 레벨이 올라 구간을 넘은 사람만이다.
+const ETA_LAPIS_IDS_URL = "./assets/eta-lapis-ids.json";
+const popLapis = { ids: null, promise: null };
+
+function loadPopLapisIds() {
+  if (popLapis.ids) return Promise.resolve(popLapis.ids);
+  if (!popLapis.promise) {
+    popLapis.promise = fetch(ETA_LAPIS_IDS_URL, { cache: "no-cache" })
+      .then((response) => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json();
+      })
+      .then((payload) => {
+        popLapis.ids = payload?.ids || {};
+        return popLapis.ids;
+      })
+      .catch((error) => {
+        popLapis.promise = null;   // 다음에 다시 시도
+        throw error;
+      });
+  }
+  return popLapis.promise;
+}
+
+// 기간·서버·구간·캐릭터 조건에 맞는 사람을 캐릭터별로 모은다
+function popLapisCollect(ids) {
+  const ctx = etaPop.lapisContext;
+  if (!ctx) return [];
+  const servers = popActiveServers();
+  const byCode = new Map();   // code → Map(서버|아이디 → { userId, server, lapis, ring, steps: [] })
+  ctx.span.forEach((date) => {
+    servers.forEach((server) => {
+      const perCode = ids[date]?.[server];
+      if (!perCode) return;
+      ctx.codes.forEach((code) => {
+        const lists = perCode[code];
+        if (!lists) return;
+        lists.forEach((people, index) => {
+          if (!people?.length || !etaPop.bands.has(index + 1)) return;
+          const level = POP_BAND_TOPS[index];
+          const item = POP_COST_ITEMS[index];
+          people.forEach((userId) => {
+            if (!byCode.has(code)) byCode.set(code, new Map());
+            const bag = byCode.get(code);
+            const key = `${server}|${userId}`;
+            if (!bag.has(key)) bag.set(key, { userId, server, lapis: 0, ring: 0, steps: [] });
+            const person = bag.get(key);
+            person.lapis += item.lapis;
+            person.ring += item.ring || 0;
+            person.steps.push({ date, level });
+          });
+        });
+      });
+    });
+  });
+  return [...byCode.entries()]
+    .map(([code, bag]) => {
+      const people = [...bag.values()].sort((a, b) => b.lapis - a.lapis || a.userId.localeCompare(b.userId, "ko"));
+      return {
+        code: Number(code),
+        name: ETA_CHARACTER_BY_CODE[code] || `캐릭터 ${code}`,
+        people,
+        lapis: people.reduce((sum, p) => sum + p.lapis, 0),
+        ring: people.reduce((sum, p) => sum + p.ring, 0),
+      };
+    })
+    .sort((a, b) => b.lapis - a.lapis || b.people.length - a.people.length || a.code - b.code);
+}
+
+async function openPopLapisDetail() {
+  if (!els.popLapisModal || !etaPop.lapisContext) return;
+  const { span } = etaPop.lapisContext;
+  const servers = popActiveServers();
+  els.popLapisTitle.textContent = "라피스를 쓴 사람";
+  els.popLapisNote.textContent = `${span[0]} ~ ${span[span.length - 1]} · ${servers.join(" · ")} · 어제보다 레벨이 올라 구간(20·40·60·80·90)을 넘은 사람만입니다. 날짜는 수집일입니다.`;
+  els.popLapisBody.innerHTML = `
+    <div class="overlay-loading">
+      <div class="loading-spinner" role="status" aria-label="불러오는 중"></div>
+      <span>목록을 불러오는 중입니다.</span>
+    </div>`;
+  modalShow(els.popLapisModal);
+
+  let groups;
+  try {
+    groups = popLapisCollect(await loadPopLapisIds());
+  } catch (error) {
+    console.warn("라피스 소모 아이디 목록을 불러오지 못했습니다.", error);
+    els.popLapisBody.innerHTML = `<p class="eta-history-empty">목록을 불러오지 못했습니다. 잠시 뒤 다시 눌러 주세요.</p>`;
+    return;
+  }
+  if (!groups.length) {
+    els.popLapisBody.innerHTML = `<p class="eta-history-empty">이 조건에서 구간을 넘은 사람이 없습니다.</p>`;
+    return;
+  }
+
+  const showServer = servers.length > 1;
+  const total = groups.reduce((sum, g) => sum + g.people.length, 0);
+  const icon = (file) => `<img class="eta-lapis-icon" src="${SIM_IMG_BASE}${encodeURIComponent(file)}" alt="" width="14" height="14" loading="lazy" />`;
+  els.popLapisBody.innerHTML = `
+    <p class="pop-lapis-summary">캐릭터 ${formatNumber(groups.length)}종 · <b>${formatNumber(total)}명</b> · ${icon("에오니스_라피스.png")}라피스 <b>${formatNumber(groups.reduce((s, g) => s + g.lapis, 0))}개</b> · ${icon("설계자의_반지.png")}설계자의 반지 <b>${formatNumber(groups.reduce((s, g) => s + g.ring, 0))}개</b></p>
+    ${groups.map((group) => `
+      <details class="pop-lapis-group" open>
+        <summary>
+          <span class="eta-char-thumb"><img src="${ETA_CHAR_IMAGE_BASE}${group.code}.png" alt="" loading="lazy" decoding="async" /></span>
+          <b>${escapeHtml(group.name)}</b>
+          <span class="pop-lapis-group-meta">${formatNumber(group.people.length)}명 · 라피스 ${formatNumber(group.lapis)}개${group.ring ? ` · 반지 ${formatNumber(group.ring)}개` : ""}</span>
+        </summary>
+        <ul class="pop-lapis-list">
+          ${group.people.map((p) => `
+            <li>
+              <span class="pop-lapis-id">${escapeHtml(p.userId)}${showServer ? `<small>${escapeHtml(p.server)}</small>` : ""}</span>
+              <span class="pop-lapis-steps">${p.steps.map((s) => `<span class="pop-lapis-step" title="${s.date}">${s.level}→${s.level + 1}<small>${s.date.slice(5)}</small></span>`).join("")}</span>
+              <span class="pop-lapis-cost">${formatNumber(p.lapis)}개${p.ring ? ` · 반지 ${formatNumber(p.ring)}` : ""}</span>
+            </li>`).join("")}
+        </ul>
+      </details>`).join("")}`;
+}
+
+function wirePopLapisDetail() {
+  els.popLapisUse?.addEventListener("click", (event) => {
+    if (event.target.closest("[data-pop-lapis-detail]")) openPopLapisDetail();
+  });
+  const modal = els.popLapisModal;
+  if (!modal) return;
+  modal.addEventListener("click", (event) => {
+    if (event.target.closest("[data-pop-lapis-close]")) modalHide(modal);
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !modal.hidden) modalHide(modal);
+  });
 }
 
 function renderPopRangeButtons() {
@@ -7825,6 +7965,7 @@ function wireEvents() {
     openEtaHistory(eta.server, row.dataset.etaUser, Number(row.dataset.etaCode));
   });
   wireEtaHistoryModal();
+  wirePopLapisDetail();
 
   els.equipmentListBody?.addEventListener("click", (event) => {
     const row = event.target.closest("tr[data-index]");

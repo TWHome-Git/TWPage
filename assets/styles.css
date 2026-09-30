@@ -8761,6 +8761,135 @@ img.dmg-chk-icon {
   display: none;
 }
 
+/* 인구 통계 "자세히" 버튼과 목록 창 */
+.pop-lapis-detail {
+  margin-left: 6px;
+  padding: 2px 9px;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--accent-strong);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pop-lapis-detail:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
+.pop-lapis-panel {
+  width: min(820px, 94vw);
+}
+
+.pop-lapis-body {
+  display: grid;
+  gap: 10px;
+}
+
+.pop-lapis-summary {
+  margin: 0;
+  font-size: 13px;
+}
+
+.pop-lapis-group {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.pop-lapis-group > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.pop-lapis-group > summary::-webkit-details-marker {
+  display: none;
+}
+
+.pop-lapis-group > summary::before {
+  content: "▸";
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.pop-lapis-group[open] > summary::before {
+  content: "▾";
+}
+
+.pop-lapis-group-meta {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.pop-lapis-list {
+  margin: 0;
+  padding: 0 12px 8px;
+  list-style: none;
+  border-top: 1px solid var(--line);
+}
+
+.pop-lapis-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  padding: 6px 0;
+  border-bottom: 1px dashed var(--line);
+  font-size: 13px;
+}
+
+.pop-lapis-list li:last-child {
+  border-bottom: 0;
+}
+
+.pop-lapis-id {
+  flex: 0 0 160px;
+  font-weight: 700;
+}
+
+.pop-lapis-id small {
+  margin-left: 6px;
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.pop-lapis-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  flex: 1 1 auto;
+}
+
+.pop-lapis-step {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(15, 111, 99, 0.1);
+  color: var(--accent-strong);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.pop-lapis-step small {
+  margin-left: 4px;
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.pop-lapis-cost {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
 .eta-lapis-icon {
   width: 16px;
   height: 16px;
