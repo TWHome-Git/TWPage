@@ -2427,7 +2427,7 @@ const ETA_LAPIS_IDS_URL = "./assets/eta-lapis-ids.json";
 const etaBreak = {
   ids: null,      // { "yyyy-MM-dd": { 서버: { 캐릭터코드: [[20→21 아이디...], [40→41...], ...] } } }
   loading: false,
-  server: POP_ALL_SERVERS,
+  server: "",       // 처음 열 때 첫 서버(하이아칸)로 맞춘다
   range: "1m",
   from: "",       // 직접 선택. 값이 있으면 range보다 우선한다
   to: "",
@@ -2448,6 +2448,7 @@ async function loadEtaBreak() {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const payload = await response.json();
     etaBreak.ids = payload?.ids || {};
+    if (!etaBreak.server) etaBreak.server = brkServerNames()[0] || POP_ALL_SERVERS;
     renderEtaBreak();
   } catch (error) {
     console.warn("에타 돌파 기록 로딩 실패", error);
@@ -2457,10 +2458,13 @@ async function loadEtaBreak() {
   }
 }
 
+// 서버는 인구 통계와 같은 순서(하이아칸 · 네냐플)로 둔다
+const BRK_SERVER_ORDER = ["하이아칸", "네냐플"];
 function brkServerNames() {
   const names = new Set();
   Object.values(etaBreak.ids || {}).forEach((byServer) => Object.keys(byServer).forEach((name) => names.add(name)));
-  return [...names].sort((a, b) => a.localeCompare(b, "ko"));
+  const rank = (name) => { const i = BRK_SERVER_ORDER.indexOf(name); return i < 0 ? BRK_SERVER_ORDER.length : i; };
+  return [...names].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b, "ko"));
 }
 
 function brkActiveServers() {
@@ -2663,8 +2667,16 @@ function renderPopRangeButtons() {
   els.popRangeButtons.innerHTML = POP_RANGES.map((range) => `
     <button class="pop-range-btn${!custom && range.key === etaPop.range ? " is-active" : ""}" type="button" data-pop-range="${range.key}">${range.label}</button>
   `).join("");
-  if (els.popFromDate) els.popFromDate.value = etaPop.from;
-  if (els.popToDate) els.popToDate.value = etaPop.to;
+  // 기간 버튼으로 골랐을 때도 날짜 칸에 그 기간을 채워 보여 준다 (에타 돌파 탭과 같은 동작)
+  const dates = popVisibleDates();
+  const all = popAllDates();
+  [els.popFromDate, els.popToDate].forEach((input) => {
+    if (!input) return;
+    input.min = all[0] || "";
+    input.max = all[all.length - 1] || "";
+  });
+  if (els.popFromDate) els.popFromDate.value = etaPop.from || (custom ? "" : dates[0] || "");
+  if (els.popToDate) els.popToDate.value = etaPop.to || (custom ? "" : dates[dates.length - 1] || "");
 }
 
 // 켠 구간만 불이 들어온다. 처음엔 전부 켜져 있고, 다 끄면 그릴 게 없다.
