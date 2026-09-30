@@ -2569,8 +2569,12 @@ function renderEtaBreak() {
 
   // 캐릭터 버튼의 인원: 구간 필터만 적용한 상태
   const codeCount = (group) => group.people.filter((person) => level === "all" || person.steps.some((step) => step.level === Number(level))).length;
+  // 이 기간에 돌파가 없는 캐릭터도 0으로 보여 준다 (아예 빠지면 없는 캐릭터처럼 보인다)
+  const groupByCode = new Map(all.map((group) => [group.code, group]));
+  const everyCode = Object.keys(ETA_CHARACTER_BY_CODE).map(Number).sort((a, b) => a - b)
+    .map((c) => groupByCode.get(c) || { code: c, name: ETA_CHARACTER_BY_CODE[c], people: [] });
   els.brkCodeButtons.innerHTML = [`<button class="pop-range-btn${code === "all" ? " is-active" : ""}" type="button" data-brk-code="all">전체</button>`]
-    .concat(all.map((group) => {
+    .concat(everyCode.map((group) => {
       const count = codeCount(group);
       return `<button class="pop-range-btn pop-lapis-char${String(group.code) === String(code) ? " is-active" : ""}" type="button" data-brk-code="${group.code}"${count ? "" : " disabled"}><img src="${ETA_CHAR_IMAGE_BASE}${group.code}.png" alt="" loading="lazy" decoding="async" />${escapeHtml(group.name)} <small>${formatNumber(count)}</small></button>`;
     }))
