@@ -2488,7 +2488,7 @@ async function openPopLapisDetail() {
   if (!els.popLapisModal || !etaPop.lapisContext) return;
   const { span } = etaPop.lapisContext;
   const servers = popActiveServers();
-  els.popLapisTitle.textContent = "라피스를 쓴 사람";
+  els.popLapisTitle.textContent = "에타 돌파";
   els.popLapisNote.textContent = `${span[0]} ~ ${span[span.length - 1]} · ${servers.join(" · ")} · 어제보다 레벨이 올라 구간(20·40·60·80·90)을 넘은 사람만입니다. 날짜는 수집일입니다.`;
   els.popLapisBody.innerHTML = `
     <div class="overlay-loading">
@@ -2543,7 +2543,7 @@ function renderPopLapisDetail() {
   const byCode = all.filter((group) => code === "all" || group.code === Number(code));
   const levelCount = (top) => byCode.reduce((sum, group) => sum + group.people.filter((person) => person.steps.some((step) => step.level === top)).length, 0);
   const levelButtons = [["all", "전체", byCode.reduce((sum, group) => sum + group.people.length, 0)]]
-    .concat(POP_COST_ITEMS.map((_, index) => [String(POP_BAND_TOPS[index]), `${POP_BAND_TOPS[index] + 1} 된 사람`, levelCount(POP_BAND_TOPS[index])]))
+    .concat(POP_COST_ITEMS.map((_, index) => [String(POP_BAND_TOPS[index]), String(POP_BAND_TOPS[index] + 1), levelCount(POP_BAND_TOPS[index])]))
     .map(([key, label, count]) => `<button class="pop-range-btn${key === level ? " is-active" : ""}" type="button" data-pop-lapis-level="${key}"${count ? "" : " disabled"}>${label} <small>${formatNumber(count)}</small></button>`)
     .join("");
 
