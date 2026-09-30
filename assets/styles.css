@@ -8797,6 +8797,32 @@ img.dmg-chk-icon {
   border-radius: 12px;
 }
 
+/* 에타 돌파 아이디 검색 */
+.brk-search {
+  width: min(260px, 100%);
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: #fff;
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+.brk-search:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(15, 111, 99, 0.14);
+}
+
+.brk-hit {
+  padding: 0 1px;
+  border-radius: 3px;
+  background: rgba(200, 138, 44, 0.3);
+  color: inherit;
+}
+
 /* 에타 돌파 표: 행은 사람, 열은 21·41·61·81·91 구간. 넘은 날짜가 칸에 들어간다 */
 .pop-lapis-table-wrap {
   overflow: auto;

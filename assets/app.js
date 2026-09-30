@@ -468,6 +468,7 @@ const els = {
   brkRangeLabel: document.querySelector("#brkRangeLabel"),
   brkLapis: document.querySelector("#brkLapis"),
   brkBody: document.querySelector("#brkBody"),
+  brkSearch: document.querySelector("#brkSearch"),
   popChart: document.querySelector("#popChart"),
   popEmpty: document.querySelector("#popEmpty"),
   popLegend: document.querySelector("#popLegend"),
@@ -2433,6 +2434,7 @@ const etaBreak = {
   to: "",
   level: "all",   // "all" | 구간 상한 (20·40·60·80·90)
   code: "all",    // "all" | 캐릭터 코드
+  query: "",      // 아이디 검색어 (소문자)
 };
 
 async function loadEtaBreak() {
@@ -2518,12 +2520,23 @@ function brkCollect(dates, servers) {
 
 const brkCostOf = (level) => POP_COST_ITEMS[POP_BAND_TOPS.indexOf(level)] || { lapis: 0 };
 
+// 아이디에서 검색어와 맞는 부분을 표시한다 (대소문자 구분 없이)
+function brkHighlight(userId, query) {
+  if (!query) return escapeHtml(userId);
+  const at = userId.toLowerCase().indexOf(query);
+  if (at < 0) return escapeHtml(userId);
+  return `${escapeHtml(userId.slice(0, at))}<mark class="brk-hit">${escapeHtml(userId.slice(at, at + query.length))}</mark>${escapeHtml(userId.slice(at + query.length))}`;
+}
+
 function renderEtaBreak() {
   if (!els.brkBody || !etaBreak.ids) return;
   const dates = brkVisibleDates();
   const servers = brkActiveServers();
-  const all = brkCollect(dates, servers);
-  const { level, code } = etaBreak;
+  const { level, code, query } = etaBreak;
+  // 검색어는 맨 먼저 건다. 구간·캐릭터 버튼의 인원도 검색 결과 안에서 센다
+  const all = brkCollect(dates, servers)
+    .map((group) => ({ ...group, people: query ? group.people.filter((person) => person.userId.toLowerCase().includes(query)) : group.people }))
+    .filter((group) => group.people.length);
 
   // 구간·캐릭터 필터. 사람마다 고른 구간의 기록만 남기고 라피스도 그만큼만 센다
   const filtered = all
@@ -2614,7 +2627,7 @@ function renderEtaBreak() {
             ${group.people.map((person) => {
               const byLevel = new Map(person.steps.map((step) => [step.level, step.date]));
               return `<tr>
-                <td class="is-id">${escapeHtml(person.userId)}${showServer ? `<small>${escapeHtml(person.server)}</small>` : ""}</td>
+                <td class="is-id">${brkHighlight(person.userId, query)}${showServer ? `<small>${escapeHtml(person.server)}</small>` : ""}</td>
                 ${levelTops.map((top) => {
                   const date = byLevel.get(top);
                   return `<td class="is-level${String(top) === level ? " is-picked" : ""}">${date ? `<span class="pop-lapis-day" title="${date}">${date.slice(5)}</span>` : `<span class="pop-lapis-none">·</span>`}</td>`;
@@ -2624,7 +2637,7 @@ function renderEtaBreak() {
             }).join("")}
           </tbody>`).join("")}
       </table>
-    </div>` : `<p class="eta-history-empty">이 조건에서 구간을 넘은 사람이 없습니다.</p>`;
+    </div>` : `<p class="eta-history-empty">${query ? `"${escapeHtml(els.brkSearch?.value.trim() || query)}"에 맞는 아이디가 없습니다.` : "이 조건에서 구간을 넘은 사람이 없습니다."}</p>`;
 }
 
 function wireEtaBreak() {
@@ -2661,6 +2674,15 @@ function wireEtaBreak() {
     if (!name) return;
     etaBreak.server = name;
     renderEtaBreak();
+  });
+  // 검색은 글자마다 다시 그리지 않고 잠깐 기다렸다 그린다. 입력 칸은 다시 그리지 않으므로 커서가 유지된다
+  let brkSearchTimer = null;
+  els.brkSearch?.addEventListener("input", () => {
+    clearTimeout(brkSearchTimer);
+    brkSearchTimer = setTimeout(() => {
+      etaBreak.query = els.brkSearch.value.trim().toLowerCase();
+      renderEtaBreak();
+    }, 200);
   });
 }
 
