@@ -1814,7 +1814,7 @@ async function openEtaHistory(server, userId, code) {
   const seq = ++etaHistory.seq;
   const name = ETA_CHARACTER_BY_CODE[code] || "";
   els.etaHistoryTitle.textContent = `${userId} · ${name} · ${server}`;
-  els.etaHistoryNote.textContent = "날짜별 에타 레벨과 그날 하루 획득 정수입니다 (다음 날 아침 집계 기준). 순위에 없던 날은 마지막으로 보인 값을 이어 씁니다. 획득 정수가 음수인 날은 보유 정수가 줄어든 날입니다.";
+  els.etaHistoryNote.textContent = "날짜별 에타 레벨과 그날 하루 획득 정수입니다 (다음 날 아침 집계 기준). 순위에 없던 날은 마지막으로 보인 값을 이어 씁니다. 처음 순위에 든 날은 그 전 기록이 없어 세지 않습니다(닉네임을 바꾼 경우도 같습니다). 획득 정수가 음수인 날은 보유 정수가 줄어든 날입니다.";
   els.etaHistoryBody.innerHTML = `
     <div class="overlay-loading">
       <div class="loading-spinner" role="status" aria-label="불러오는 중"></div>
@@ -1860,12 +1860,18 @@ function etaHistoryFilled(entry) {
 }
 
 // 하루 획득 정수 = (그 레벨까지 든 정수 합 + 보유 정수)의 전날 대비 증가분. 순위표의 획득 정수 열과 같은 규칙이다.
+// 처음 순위에 든 날은 그 전 기록이 없어 그동안 모은 정수가 하루 획득으로 잡힌다.
+// 닉네임을 바꾼 사람도 새 아이디로 처음 보이는 것이라 똑같이 튄다. 그 하루는 세지 않는다(null).
 function etaHistorySeries(entry) {
   const cum = etaEssenceCumulative();
   const { levels, essences } = etaHistoryFilled(entry);
   const total = (i) => (cum?.[levels[i]] || 0) + essences[i];
-  const gains = levels.map((_, i) => (i === 0 ? 0 : total(i) - total(i - 1)));
-  return { levels, gains };
+  const firstSeen = entry.l.findIndex((level, i) => level != null && entry.e[i] != null);
+  const gains = levels.map((_, i) => {
+    if (i === 0 || i === firstSeen) return null;
+    return total(i) - total(i - 1);
+  });
+  return { levels, gains, firstSeen };
 }
 
 // 랭킹은 다음 날 아침에 수집되므로, 수집일의 값은 그 전날 하루의 결과다. 화면에는 전날 날짜로 적는다
@@ -1887,7 +1893,7 @@ function renderEtaHistory() {
   const shownGains = gains.slice(from);
 
   const present = dates.filter((_, i) => cur.entry.l[from + i] != null).length;
-  const gainSum = shownGains.reduce((a, b) => a + b, 0);
+  const gainSum = shownGains.reduce((sum, value) => sum + (value ?? 0), 0);
   const first = shownLevels[0];
   const last = shownLevels[shownLevels.length - 1];
 
@@ -1945,6 +1951,7 @@ function etaHistorySvg(dates, values, { kind, color, label, axis }) {
     const barW = n > 1 ? Math.max(1.5, Math.min(18, stepX * 0.6)) : 18;
     const zero = y(0);
     body = values.map((v, i) => {
+      if (v == null) return "";   // 세지 않는 날 (처음 순위에 든 날)
       const bx = (x(i) - barW / 2).toFixed(1);
       if (v < 0) {
         // 소모한 날: 바닥에 붉은 짧은 막대. 크기는 값과 무관하다 (실제 값은 마우스를 올리면 보인다)
@@ -1992,7 +1999,8 @@ function wireEtaHistoryHover(wrap, dates, values, label) {
     cursor.setAttribute("x1", px);
     cursor.setAttribute("x2", px);
     cursor.hidden = false;
-    tooltip.innerHTML = `<strong>${dates[index]}</strong><span class="pop-tip-row">${escapeHtml(label)}<b>${values[index].toLocaleString("ko-KR")}</b></span>`;
+    const value = values[index];
+    tooltip.innerHTML = `<strong>${dates[index]}</strong><span class="pop-tip-row">${escapeHtml(label)}<b>${value == null ? "신규 진입" : value.toLocaleString("ko-KR")}</b></span>`;
     tooltip.hidden = false;
     const leftPx = (px / w) * box.width;
     tooltip.style.left = `${leftPx}px`;
