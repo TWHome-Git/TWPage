@@ -2075,6 +2075,7 @@ function ensureEtaInfo() {
 const ETA_POPULATION_URL = "./assets/eta-population.json";
 
 const POP_RANGES = [
+  { key: "1d", label: "1일", days: 1 },
   { key: "1w", label: "1주일", days: 7 },
   { key: "1m", label: "1개월", days: 30 },
   { key: "3m", label: "3개월", days: 90 },
@@ -2103,7 +2104,7 @@ const etaPop = {
   cost: null,        // { "yyyy-MM-dd": { 서버: { 캐릭터코드: [구간을 넘어간 인원] } } }
   loading: false,
   server: "",
-  range: "3m",
+  range: "1d",
   from: "",          // 직접 선택. 값이 있으면 range보다 우선한다
   to: "",
   bands: new Set(POP_BAND_TOPS.map((_, index) => index)), // 켜 둔 레벨 구간. 처음엔 전부 켜 둔다
@@ -2398,8 +2399,9 @@ function renderPopLapisUse(dates, shown) {
   const box = els.popLapisUse;
   if (!box) return;
   const cost = etaPop.cost;
-  // 그 날짜의 값은 "전날 대비"라 기간의 첫날은 빼고 더한다
-  const span = dates.slice(1).filter((date) => cost?.[date]);
+  // 그 날짜의 값은 "전날 대비"라 기간의 첫날은 빼고 더한다.
+  // 하루만 볼 때는 뺄 게 없으니 그 하루를 그대로 쓴다.
+  const span = (dates.length > 1 ? dates.slice(1) : dates).filter((date) => cost?.[date]);
   if (!cost || !span.length || !shown.length) {
     box.hidden = true;
     return;
@@ -2437,7 +2439,7 @@ const etaBreak = {
   ids: null,      // { "yyyy-MM-dd": { 서버: { 캐릭터코드: [[20→21 아이디...], [40→41...], ...] } } }
   loading: false,
   server: "",       // 처음 열 때 첫 서버(하이아칸)로 맞춘다
-  range: "1m",
+  range: "1d",
   from: "",       // 직접 선택. 값이 있으면 range보다 우선한다
   to: "",
   level: "all",   // "all" | 구간 상한 (20·40·60·80·90)
@@ -2482,6 +2484,14 @@ function brkActiveServers() {
 }
 
 // 표에 넣을 날짜. 직접 선택이 있으면 그 구간, 없으면 마지막 날에서 N일 전까지
+const brkShowDate = (date) => (date ? etaHistoryDayBefore(date) : "");
+function brkPickDate(date) {
+  if (!date) return "";
+  const [y, m, d] = date.split("-").map(Number);
+  const t = new Date(Date.UTC(y, m - 1, d + 1));
+  return `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, "0")}-${String(t.getUTCDate()).padStart(2, "0")}`;
+}
+
 function brkVisibleDates() {
   const dates = Object.keys(etaBreak.ids || {}).sort();
   if (!dates.length) return [];
@@ -2574,11 +2584,11 @@ function renderEtaBreak() {
   const allDates = Object.keys(etaBreak.ids).sort();
   [els.brkFromDate, els.brkToDate].forEach((input) => {
     if (!input) return;
-    input.min = allDates[0] || "";
-    input.max = allDates[allDates.length - 1] || "";
+    input.min = brkShowDate(allDates[0]);
+    input.max = brkShowDate(allDates[allDates.length - 1]);
   });
-  if (els.brkFromDate) els.brkFromDate.value = etaBreak.from || (custom ? "" : dates[0] || "");
-  if (els.brkToDate) els.brkToDate.value = etaBreak.to || (custom ? "" : dates[dates.length - 1] || "");
+  if (els.brkFromDate) els.brkFromDate.value = brkShowDate(etaBreak.from || (custom ? "" : dates[0] || ""));
+  if (els.brkToDate) els.brkToDate.value = brkShowDate(etaBreak.to || (custom ? "" : dates[dates.length - 1] || ""));
 
   // 구간 버튼의 인원: 캐릭터 필터만 적용한 상태에서 그 구간을 넘은 사람 수
   const byCode = all.filter((group) => code === "all" || group.code === Number(code));
@@ -2611,7 +2621,7 @@ function renderEtaBreak() {
   const lapis = filtered.reduce((sum, group) => sum + group.lapis, 0);
   const ring = filtered.reduce((sum, group) => sum + group.ring, 0);
   els.brkTotal.textContent = `${formatNumber(total)}명`;
-  els.brkRangeLabel.textContent = dates.length ? `${dates[0]} ~ ${dates[dates.length - 1]} · ${formatNumber(dates.length)}일` : "-";
+  els.brkRangeLabel.textContent = dates.length ? `${brkShowDate(dates[0])} ~ ${brkShowDate(dates[dates.length - 1])} · ${formatNumber(dates.length)}일` : "-";
   const icon = (file) => `<img class="eta-lapis-icon" src="${SIM_IMG_BASE}${encodeURIComponent(file)}" alt="" width="16" height="16" loading="lazy" />`;
   els.brkLapis.hidden = false;
   els.brkLapis.innerHTML = `${icon("에오니스_라피스.png")}라피스 <b>${formatNumber(lapis)}개</b> · ${icon("설계자의_반지.png")}설계자의 반지 <b>${formatNumber(ring)}개</b>`;
@@ -2637,7 +2647,7 @@ function renderEtaBreak() {
               return `<tr>
                 <td class="is-id">${brkHighlight(person.userId, query)}${showServer ? `<small>${escapeHtml(person.server)}</small>` : ""}</td>
                 ${levelTops.map((top) => {
-                  const date = byLevel.get(top);
+                  const date = brkShowDate(byLevel.get(top));
                   return `<td class="is-level${String(top) === level ? " is-picked" : ""}">${date ? `<span class="pop-lapis-day" title="${date}">${date.slice(5)}</span>` : `<span class="pop-lapis-none">·</span>`}</td>`;
                 }).join("")}
                 <td class="is-cost">${formatNumber(person.lapis)}${person.ring ? `<small>반지 ${formatNumber(person.ring)}</small>` : ""}</td>
@@ -2658,8 +2668,9 @@ function wireEtaBreak() {
     renderEtaBreak();
   });
   const onDate = () => {
-    etaBreak.from = els.brkFromDate?.value || "";
-    etaBreak.to = els.brkToDate?.value || "";
+    // 사람이 고른 날은 실제 돌파일이라 집계일(다음 날)로 바꿔 거른다
+    etaBreak.from = brkPickDate(els.brkFromDate?.value || "");
+    etaBreak.to = brkPickDate(els.brkToDate?.value || "");
     if (etaBreak.from && etaBreak.to && etaBreak.from > etaBreak.to) [etaBreak.from, etaBreak.to] = [etaBreak.to, etaBreak.from];
     renderEtaBreak();
   };
