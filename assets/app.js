@@ -499,13 +499,17 @@ const els = {
 // ══════════════════════════════════════════════════════════════
 //  주소 공유 — 지금 보고 있는 화면을 주소에 적어 링크로 나눌 수 있게 한다.
 //
-//  GitHub Pages는 정적 호스팅이라 talesdb.xyz/db/equipment/... 같은 진짜
-//  경로를 쓰면 새로고침에서 404가 난다. 서버가 그 경로의 파일을 찾기 때문이다.
-//  해시(#) 뒤는 서버로 가지 않고 브라우저 안에서만 처리돼서 그 문제가 없다.
+//  주소는 진짜 경로를 쓴다 (2026-10-02부터. 그 전에는 #/eta/info 같은 해시였다).
+//  해시 뒤는 검색엔진이 보지 않아 사이트 전체가 한 페이지로만 잡혔기 때문이다.
 //
-//    #/db/equipment/아퀼루스 블레이드
-//    #/eta/info
-//    #/calc/coefficient          (계산기는 첫 화면까지만. 캐릭터는 담지 않는다)
+//    /eta/info/
+//    /calculator/damage/
+//    /equipment/equipment/아퀼루스 블레이드/
+//
+//  GitHub Pages는 정적 호스팅이라 그 경로에 파일이 있어야 한다. scripts/build-pages.mjs가
+//  index.html을 틀로 삼아 화면마다 eta/info/index.html 같은 파일을 만들어 둔다 (제목·설명만 다르다).
+//  장비 이름처럼 끝없이 늘어나는 항목 주소는 파일이 없으므로 404.html이 같은 앱을 띄워 그 화면을 연다.
+//  옛 해시 주소로 들어오면 읽어서 새 주소로 바꿔 쓴다.
 // ══════════════════════════════════════════════════════════════
 
 // 메인 탭별 기본 하위 탭. 하위 탭이 기본값이면 주소에서 뺀다.
@@ -581,13 +585,26 @@ function routeCurrent() {
   return { main, sub, item };
 }
 
-function routeToHash(r) {
+// 화면 상태 → 주소 경로. 홈은 "/"이고 나머지는 "/eta/info/"처럼 끝에 /를 붙인다
+// (GitHub Pages가 폴더 주소를 /로 끝나는 쪽으로 넘기므로 처음부터 그 꼴로 쓴다)
+function routeToPath(r) {
   if (!r) return "";
+  if (r.main === "home" && !r.item) return "/";
   const parts = [r.main];
   const needSub = r.item || (r.sub && r.sub !== ROUTE_DEFAULT_SUB[r.main]);
   if (needSub) parts.push(r.sub);
   if (r.item) parts.push(r.item);
-  return "#/" + parts.map(encodeURIComponent).join("/");
+  return "/" + parts.map(encodeURIComponent).join("/") + "/";
+}
+
+// 주소 두 개가 같은 화면인지. 브라우저가 적어 주는 경로와 우리가 만든 경로의 인코딩 차이를 흡수한다
+function routeSamePath(a, b) {
+  const norm = (value) => {
+    let text = String(value || "");
+    try { text = decodeURI(text); } catch { /* 깨진 인코딩은 그대로 견준다 */ }
+    return text.replace(/\/+$/, "") || "/";
+  };
+  return norm(a) === norm(b);
 }
 
 // 주소를 지금 화면에 맞춘다. 화면을 옮길 때마다 이력을 한 칸 남겨서 브라우저 뒤로가기로 앞 화면에 돌아갈 수 있다.
@@ -595,11 +612,55 @@ function routeToHash(r) {
 function routeWrite({ replace = false } = {}) {
   if (route.applying) return;
   visitTrack();
-  const hash = routeToHash(routeCurrent());
-  if (!hash || hash === location.hash) return;
-  const url = location.pathname + location.search + hash;
-  if (replace || !route.ready) history.replaceState(null, "", url);
+  const path = routeToPath(routeCurrent());
+  if (!path) return;
+  routeTitleSync();
+  const legacyHash = location.hash.startsWith("#/");   // 옛 해시 주소로 들어온 경우 해시를 떼어 낸다
+  if (routeSamePath(path, location.pathname) && !legacyHash) return;
+  const url = path + location.search;
+  if (replace || !route.ready || legacyHash) history.replaceState(null, "", url);
   else history.pushState(null, "", url);
+}
+
+// ── 탭 제목 ──
+// 화면별 HTML은 저마다 제목을 달고 있지만, 그 뒤로 화면을 옮기면 주소만 바뀌고 제목은 그대로 남는다.
+// 화면별 HTML을 만들 때 쓰는 것과 같은 목록(assets/route-meta.json)을 읽어 제목을 맞춘다.
+const ROUTE_TITLE_SUFFIX = " | 테일즈DB";
+const routeMeta = { data: null, promise: null };
+
+function loadRouteMeta() {
+  if (!routeMeta.promise) {
+    routeMeta.promise = fetch("./assets/route-meta.json")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        routeMeta.data = data;
+        routeTitleSync();
+      })
+      .catch(() => { routeMeta.promise = null; });
+  }
+  return routeMeta.promise;
+}
+
+function routeTitleSync() {
+  const data = routeMeta.data;
+  const r = routeCurrent();
+  if (!data || !r) return;
+  if (r.main === "home") {
+    if (data.home?.title) document.title = data.home.title;
+    return;
+  }
+  const key = r.sub && r.sub !== ROUTE_DEFAULT_SUB[r.main] ? `${r.main}/${r.sub}` : r.main;
+  const label = (attr, value) => document.querySelector(`[data-${attr}="${CSS.escape(value)}"]`)?.textContent.trim() || "";
+  const base = data[key]?.title
+    || `테일즈위버 ${(r.sub && label(`${ROUTE_SUB[r.main]?.attr.replace(/[A-Z]/g, (c) => "-" + c.toLowerCase())}`, r.sub)) || label("main-tab", r.main)}`;
+  // 장비·아바타 상세는 항목 이름을 앞에 붙인다
+  document.title = `${r.item ? `${r.item} - ` : ""}${base}${ROUTE_TITLE_SUFFIX}`;
+}
+
+// 다른 화면으로 주소째 넘어간다 (홈 카드, 메뉴 바로가기). 이력에 한 칸 남긴다
+function routeGo(path) {
+  history.pushState(null, "", path);
+  routeApply(routeParse());
 }
 
 // ── 팝업 창과 뒤로가기 ──
@@ -623,7 +684,7 @@ function modalHide(el) {
   }
 }
 
-// 뒤로가기로 팝업 칸을 벗어나면 팝업을 닫는다. 주소가 바뀌는 뒤로가기는 hashchange가 따로 받는다
+// 뒤로가기로 팝업 칸을 벗어나면 팝업을 닫는다. 주소가 바뀌는 뒤로가기는 wireRoute의 popstate가 이어서 받는다
 function modalPop() {
   const el = modalNav.open;
   if (!el) return;
@@ -631,15 +692,21 @@ function modalPop() {
   el.hidden = true;
 }
 
+const ROUTE_HOME = { main: "home", sub: "", item: "" };
+
 function routeParse() {
-  const raw = location.hash.replace(/^#\/?/, "");
-  if (!raw) return null;
+  // 옛 해시 주소(#/eta/info)가 붙어 있으면 그쪽을 읽는다. 읽은 뒤 routeApply가 새 주소로 바꿔 쓴다
+  const raw = location.hash.startsWith("#/")
+    ? location.hash.slice(2)
+    : location.pathname.replace(/^\/+|\/+$/g, "").replace(/(^|\/)(index|404)\.html$/, "");
+  if (!raw) return ROUTE_HOME;
   const parts = raw.split("/").map((x) => {
     try { return decodeURIComponent(x); } catch { return x; }
   });
   const moved = ROUTE_MOVED[`${parts[0]}/${parts[1] || ""}`] || ROUTE_MOVED[parts[0]];
   const main = moved ? moved.main : (parts[0] || "");
-  if (!document.querySelector(`[data-main-tab="${CSS.escape(main)}"]`)) return null;
+  // 모르는 주소(404.html로 떨어진 경우 포함)는 홈으로 보낸다
+  if (!document.querySelector(`[data-main-tab="${CSS.escape(main)}"]`)) return ROUTE_HOME;
   let sub = moved ? (moved.sub || parts[1] || "") : parts[1];
   let item = parts.slice(2).join("/");
   // 옛 주소: 버프 아이템 탭(#/info/buff/rare, #/extra/buff/rare)은 경험치·레어 버프 하위 탭으로 나뉘었다
@@ -773,13 +840,25 @@ function routeResolvePending() {
 }
 
 function wireRoute() {
-  addEventListener("hashchange", () => {
+  addEventListener("popstate", () => {
     if (route.applying) return;
-    // 팝업이 열린 채 주소가 바뀌면 (뒤로가기를 빠르게 두 번 등) 팝업부터 닫는다
+    // 팝업이 열려 있으면 먼저 닫는다. 팝업 칸만 벗어난 것이면 주소는 그대로라 화면을 건드리지 않는다
     modalPop();
+    const want = routeParse();
+    if (!routeSamePath(routeToPath(want), routeToPath(routeCurrent()))) routeApply(want);
+  });
+  // 페이지를 연 채 주소창에 옛 해시 주소를 넣은 경우
+  addEventListener("hashchange", () => {
+    if (route.applying || !location.hash.startsWith("#/")) return;
     routeApply(routeParse());
   });
-  addEventListener("popstate", modalPop);
+  // 사이트 안 화면으로 가는 링크는 새로 불러오지 않고 화면만 바꾼다 (새 탭 열기 등은 브라우저에 맡긴다)
+  document.addEventListener("click", (event) => {
+    const link = event.target.closest("a[data-route]");
+    if (!link || event.button || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    routeGo(link.getAttribute("href"));
+  });
 }
 
 async function boot() {
@@ -802,6 +881,7 @@ async function boot() {
   visit.ready = true;
   routeApply(initialRoute);
   route.ready = true;
+  loadRouteMeta();
   visitTrack();               // 주소 없이 들어와도(홈) 첫 화면을 센다
   initDamageCalculator();
   initSimulators();
@@ -8159,7 +8239,7 @@ function wireEvents() {
   // 메뉴 줄의 바로가기. 다른 탭에 있는 계산기로 주소만 바꿔 넘어간다
   document.querySelectorAll("[data-goto]").forEach((button) => {
     button.addEventListener("click", () => {
-      location.hash = `#/${button.dataset.goto}`;
+      routeGo(`/${button.dataset.goto}/`);
     });
   });
 

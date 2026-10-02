@@ -1,4 +1,5 @@
 <!doctype html>
+<!-- 이 파일은 scripts/build-pages.mjs가 index.html에서 만든다. 직접 고치지 말고 index.html을 고친 뒤 다시 돌린다 -->
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
@@ -6,26 +7,26 @@
     <!-- 이 페이지는 /eta/, /calculator/damage/ 같은 하위 주소에도 복사돼 쓰인다 (scripts/build-pages.mjs).
          어느 깊이에서 열려도 ./assets/… 같은 상대 경로가 사이트 최상위를 가리키게 기준 주소를 고정한다 -->
     <base href="/" />
-    <title>테일즈DB - 테일즈위버 에타 순위 · 계산기 · 시뮬레이터 | TW DB</title>
+    <title>테일즈위버 인크립트 시뮬레이터 | 테일즈DB</title>
     <!-- 검색엔진·공유 미리보기용 정보. 화면은 주소의 # 뒤로 나뉘어 검색엔진에는 이 한 페이지만 보이므로,
          사이트 전체를 설명하는 문구를 여기에 둔다 -->
-    <meta name="description" content="테일즈DB(테일즈위버 DB)는 테일즈위버 에타 순위와 인구 통계, 에타 돌파 기록, 장비·어빌리티·아바타 DB, 대미지·명중·주간 시드 계산기, 강화·인크립트 시뮬레이터를 한곳에 모은 팬 사이트입니다." />
+    <meta name="description" content="테일즈위버 인크립트 강화를 확률대로 돌려 보고 기대 비용을 계산합니다." />
     <meta name="keywords" content="테일즈DB, 테일즈 DB, 테일즈디비, 테일즈위버, 테일즈위버 DB, 테일즈위버 에타, 에타 순위, 에타 돌파, 테일즈위버 계산기, 대미지 계산기, 테일즈위버 시뮬레이터, TalesWeaver" />
-    <link rel="canonical" href="https://talesdb.xyz/" />
+    <link rel="canonical" href="https://talesdb.xyz/simulator/" />
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
     <meta name="theme-color" content="#0f6f63" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="테일즈DB" />
     <meta property="og:locale" content="ko_KR" />
-    <meta property="og:url" content="https://talesdb.xyz/" />
-    <meta property="og:title" content="테일즈DB - 테일즈위버 에타 순위 · 계산기 · 시뮬레이터 | TW DB" />
-    <meta property="og:description" content="테일즈DB(테일즈위버 DB)는 테일즈위버 에타 순위와 인구 통계, 에타 돌파 기록, 장비·어빌리티·아바타 DB, 대미지·명중·주간 시드 계산기, 강화·인크립트 시뮬레이터를 한곳에 모은 팬 사이트입니다." />
+    <meta property="og:url" content="https://talesdb.xyz/simulator/" />
+    <meta property="og:title" content="테일즈위버 인크립트 시뮬레이터 | 테일즈DB" />
+    <meta property="og:description" content="테일즈위버 인크립트 강화를 확률대로 돌려 보고 기대 비용을 계산합니다." />
     <meta property="og:image" content="https://talesdb.xyz/images/home/eta.jpg" />
     <meta property="og:image:width" content="720" />
     <meta property="og:image:height" content="405" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="테일즈DB - 테일즈위버 에타 순위 · 계산기 · 시뮬레이터 | TW DB" />
-    <meta name="twitter:description" content="테일즈DB(테일즈위버 DB)는 테일즈위버 에타 순위와 인구 통계, 에타 돌파 기록, 장비·어빌리티·아바타 DB, 대미지·명중·주간 시드 계산기, 강화·인크립트 시뮬레이터를 한곳에 모은 팬 사이트입니다." />
+    <meta name="twitter:title" content="테일즈위버 인크립트 시뮬레이터 | 테일즈DB" />
+    <meta name="twitter:description" content="테일즈위버 인크립트 강화를 확률대로 돌려 보고 기대 비용을 계산합니다." />
     <meta name="twitter:image" content="https://talesdb.xyz/images/home/eta.jpg" />
     <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"테일즈DB","alternateName":["테일즈 DB","테일즈위버 DB","테일즈디비","TW DB","TalesDB"],"url":"https://talesdb.xyz/","inLanguage":"ko","description":"테일즈DB(테일즈위버 DB)는 테일즈위버 에타 순위와 인구 통계, 에타 돌파 기록, 장비·어빌리티·아바타 DB, 대미지·명중·주간 시드 계산기, 강화·인크립트 시뮬레이터를 한곳에 모은 팬 사이트입니다."}</script>
     <!-- 이미지 CDN. 첫 이미지 요청 전에 DNS+TLS를 미리 끝내둔다 -->
