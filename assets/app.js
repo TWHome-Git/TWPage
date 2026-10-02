@@ -10418,8 +10418,8 @@ function encAppendLog(e) {
     `<span class="log-seq">${e.attempts.toLocaleString("ko-KR")}번째</span>` +
     `<span class="log-step">${e.inkBefore}→${e.inkAfter} 인크</span>` +
     (scroll > 0
-      ? `<span class="log-cost">인크 ${encFmtCost(e.cost - scroll)}</span>`
-        + `<span class="log-scroll">에타 인크 ${e.tp ? `${Math.round(e.tp).toLocaleString("ko-KR")} TP (${encFmtCost(scroll)})` : encFmtCost(scroll)}</span>`
+      ? `<span class="log-cost">인크립트 비용 ${encFmtCost(e.cost - scroll)}</span>`
+        + `<span class="log-scroll">에타 인크립트 주문서 비용 ${e.tp ? `${Math.round(e.tp).toLocaleString("ko-KR")} TP (${encFmtCost(scroll)})` : encFmtCost(scroll)}</span>`
       : `<span class="log-cost">비용 ${encFmtCost(e.cost)}</span>`);
   if (expectedCost != null) {
     const diff = expectedCost - e.cost;
@@ -10451,7 +10451,7 @@ function encUpdateCumulative() {
     `<span class="cum-cost">누적 비용: ${encFmtCost(encSim.totalCost)}</span>` +
     (encSim.totalScroll > 0
       ? `<span class="cum-cost">인크립트 비용: ${encFmtCost(encSim.totalCost - encSim.totalScroll)}</span>`
-        + `<span class="cum-cost">에타 인크 비용: ${encSim.totalTp > 0 ? `${Math.round(encSim.totalTp).toLocaleString("ko-KR")} TP (${encFmtCost(encSim.totalScroll)})` : encFmtCost(encSim.totalScroll)}</span>`
+        + `<span class="cum-cost">에타 인크립트 주문서 비용: ${encSim.totalTp > 0 ? `${Math.round(encSim.totalTp).toLocaleString("ko-KR")} TP (${encFmtCost(encSim.totalScroll)})` : encFmtCost(encSim.totalScroll)}</span>`
       : "") +
     `<span class="cum-exp">누적 기대 비용: ${encFmtCost(displayExpected)}</span>` +
     `<span class="cum-diff">기대값 차이: <span class="${diff >= 0 ? "sim-pos" : "sim-neg"}">${encFmtSigned(diff)}</span></span>`;
