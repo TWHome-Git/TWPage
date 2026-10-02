@@ -2279,7 +2279,7 @@ function popVisibleDates() {
   if (!range || !range.days) return dates;
 
   const last = new Date(`${dates[dates.length - 1]}T00:00:00`);
-  last.setDate(last.getDate() - (range.days - 1));
+  last.setDate(last.getDate() - range.days);
   const pad = (value) => String(value).padStart(2, "0");
   const start = `${last.getFullYear()}-${pad(last.getMonth() + 1)}-${pad(last.getDate())}`;
   return dates.filter((date) => date >= start);
@@ -2381,7 +2381,7 @@ function renderEtaPopulation() {
   els.popTotal.textContent = `${lastTotal.toLocaleString("ko-KR")}명`;
   // 통합은 서버가 다 모인 날부터라 기간이 잘린다. 왜 짧은지 적어 준다.
   const clipped = etaPop.server === POP_ALL_SERVERS && dates[0] > popAllDates()[0];
-  els.popRangeLabel.textContent = `${dates[0]} ~ ${dates[dates.length - 1]} · ${dates.length}일`
+  els.popRangeLabel.textContent = `${dates[0]} ~ ${dates[dates.length - 1]} · ${formatNumber(Math.max(1, dates.length - 1))}일`
     + (clipped ? " · 서버가 모두 수집된 날부터" : "");
 
   renderPopLapisUse(dates, shown);
