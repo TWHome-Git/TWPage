@@ -5525,6 +5525,10 @@ const hitCalc = (() => {
 // 넘은 만큼은 버려지므로 "남은 수치 이상을 가장 싸게 덮기" 문제가 된다.
 // 다만 한 장을 바르려면 인크립트를 성공해야 하고, 그 값이 주문서 값보다 크다.
 // 그래서 "몇 장을 바르느냐"까지 값에 들어가고, 장수마다 최선을 따로 구해 견준다.
+// 에타 인크립트는 시도 비용 말고 주문서도 따로 든다.
+// 한 장씩 사면 시드 2억 / 엘소 3만, TP로는 100장 묶음 46,800 TP (한 장 468 TP).
+const ENC_ETA_SCROLL = { man: 20000, elso: 30000, tpBundle: 100, tpPrice: 46800 };
+
 const ENCRYPT_OPT_SAVE_KEY = "tw-encrypt-opt-save-v1";
 
 const encryptOptCalc = (() => {
@@ -5536,6 +5540,10 @@ const encryptOptCalc = (() => {
     type: "vianu",     // 비아누 / 에타
     // 한 번 시도할 때 드는 시드 (만원). 값이 워낙 달라 따로 들고 있다가 골라 쓴다
     fee: { vianu: "666", eta: "29668" },
+    // 에타는 시도 비용 말고 주문서도 한 장씩 든다 (실패해도 사라진다)
+    scrollFee: String(ENC_ETA_SCROLL.man),
+    tpBundle: 1200,    // TP를 시드로 환산할 때 견줄 묶음
+    tpSeed: "",        // 그 묶음이 시드로 몇 억인지
     discount: false,   // 인크립트 시뮬과 같은 20% 할인
     // 수치와 가격만 다르고 하는 일은 같다. 처음엔 흔히 쓰는 네 등급을 깔아 둔다
     scrolls: [12, 14, 15, 16].map((value) => ({ on: true, value, price: "" })),
@@ -5568,8 +5576,11 @@ const encryptOptCalc = (() => {
     ? 0.01
     : Math.max(0.0001, 0.0007 - Math.max(0, stage) * 0.00005));
 
-  // 한 번 시도에 드는 시드를 억으로 (1억 = 10,000만원)
-  const feeEok = () => ((parseAmount(opt.fee[opt.type]) ?? 0) * (opt.discount ? 0.8 : 1)) / 10000;
+  // 한 번 시도에 드는 시드를 억으로 (1억 = 10,000만원).
+  // 에타는 주문서도 시도할 때마다 사라지므로 같이 더한다. 20% 할인은 인크립트 비용에만 걸린다.
+  const scrollMan = () => (opt.type === "eta" ? (parseAmount(opt.scrollFee) ?? 0) : 0);
+  const feeMan = () => (parseAmount(opt.fee[opt.type]) ?? 0) * (opt.discount ? 0.8 : 1) + scrollMan();
+  const feeEok = () => feeMan() / 10000;
 
   // 지금 인크에서 한 장 더 바르는 데 드는 인크립트 값 (성공할 때까지의 기대값)
   const feePerSheet = (index) => feeEok() / chanceAt(Math.round(num(opt.stage)) + index);
@@ -5578,6 +5589,13 @@ const encryptOptCalc = (() => {
   function feeFor(n) {
     let sum = 0;
     for (let k = 0; k < n; k += 1) sum += feePerSheet(k);
+    return sum;
+  }
+
+  // n장을 바르기까지 인크립트를 몇 번 시도하게 되는지 (성공할 때까지 거듭한다)
+  function attemptsFor(n) {
+    let sum = 0;
+    for (let k = 0; k < n; k += 1) sum += 1 / chanceAt(Math.round(num(opt.stage)) + k);
     return sum;
   }
 
@@ -5643,19 +5661,68 @@ const encryptOptCalc = (() => {
     .map(([value, count]) => `<b>${value}주문서</b> ${formatNumber(count)}장`)
     .join(" + ");
 
+  // 에타 인크는 TP 100장 묶음(46,800 TP)으로도 산다. TP 시세를 넣으면 한 장 값을 시드로 바꾼다.
+  const TP_BUNDLES = [1200, 2000, 3000, 4000, 20000, 40000];
+  const tpPerScroll = () => ENC_ETA_SCROLL.tpPrice / ENC_ETA_SCROLL.tpBundle;   // 한 장에 드는 TP (468)
+  function tpScrollMan() {
+    const bundle = Math.round(num(opt.tpBundle));
+    const seed = parseAmount(opt.tpSeed);
+    if (!bundle || seed === null || seed <= 0) return null;
+    // 억 / TP → 한 장 값(억) → 만원
+    return (seed / bundle) * tpPerScroll() * 10000;
+  }
+
+  // 비아누는 몇백만원, 에타는 몇억이라 단위를 값에 맞춘다
+  const priceText = (man) => (man >= 10000
+    ? `${formatNumber(Math.round((man / 10000) * 100) / 100)}억`
+    : `${formatNumber(Math.round(man))}만원`);
+
+  // 지금 칸에 든 값과 같은 단추는 고른 것처럼 칠한다
+  const same = (a, b) => Math.round(a ?? -1) === Math.round(b ?? -2);
+  const onClass = (on) => (on ? " is-active" : "");
+
+  function renderPresets() {
+    if (!els.presets) return;
+    const fee = parseAmount(opt.fee[opt.type]);
+    els.presets.innerHTML = (ENC_PRESETS[opt.type] || ENC_PRESETS.vianu).man
+      .map(([name, value]) => `<button class="sim-preset${onClass(same(Number(value), fee))}" type="button" data-opt-fee="${value}">${escapeHtml(name)} <em>${priceText(Number(value))}</em></button>`)
+      .join("");
+
+    // 주문서는 에타에만 든다
+    if (els.scroll) els.scroll.hidden = opt.type !== "eta";
+    if (els.scrollPresets) {
+      const tp = tpScrollMan();
+      const npc = ENC_ETA_SCROLL.man;
+      const cur = parseAmount(opt.scrollFee);
+      els.scrollPresets.innerHTML = `<button class="sim-preset${onClass(same(npc, cur))}" type="button" data-opt-scroll="${npc}">NPC <em>${priceText(npc)}</em></button>`
+        + (tp ? `<button class="sim-preset${onClass(same(tp, cur))}" type="button" data-opt-scroll="${Math.round(tp)}">TP로 사기 <em>${priceText(tp)}</em></button>` : "");
+    }
+  }
+
+  // TP 시세를 고치면 NPC와 견줘 싼 쪽을 주문서 칸에 넣어 준다
+  function applyCheaperScroll() {
+    const tp = tpScrollMan();
+    const best = tp === null ? ENC_ETA_SCROLL.man : Math.min(ENC_ETA_SCROLL.man, tp);
+    opt.scrollFee = String(Math.round(best));
+    if (els.scrollFee) els.scrollFee.value = opt.scrollFee;
+  }
+
   function renderFeeNote() {
     if (!els.feeNote) return;
     const stage = Math.round(num(opt.stage));
     const chance = chanceAt(stage);
     const pct = (value) => `${(value * 100).toFixed(3)}%`;
+    // 한 번 시도에 실제로 드는 값. 에타는 주문서까지 더한 값이다
+    const once = `<br />한 번 시도에 <b>${priceText(feeMan())}</b>${opt.type === "eta" ? " (비용 + 주문서)" : ""}`;
     if (opt.type === "eta") {
-      els.feeNote.innerHTML = `성공 확률 <b>${pct(chance)}</b><br />단계와 상관없이 같음`;
+      els.feeNote.innerHTML = `성공 확률 <b>${pct(chance)}</b><br />단계와 상관없이 같음${once}`;
       return;
     }
     els.feeNote.innerHTML = `인크립트 <b>${formatNumber(stage)}</b>단계 성공 확률 <b>${pct(chance)}</b>`
       + (chance > 0.0001
         ? "<br />인크립트 1단계마다 0.005%p 하락"
-        : "<br />여기서 더 내려가지 않음");
+        : "<br />여기서 더 내려가지 않음")
+      + once;
   }
 
   function renderResult() {
@@ -5700,6 +5767,15 @@ const encryptOptCalc = (() => {
     }
     rows.sort((a, b) => a.cost - b.cost);
 
+    // 인크립트 값은 "시도 비용"과 "에타 주문서"가 섞여 있다. 보기 좋게 갈라 둔다.
+    const attempts = attemptsFor(best.sheets);
+    const tpPicked = opt.type === "eta" && same(tpScrollMan(), parseAmount(opt.scrollFee));
+    const split = {
+      ink: (attempts * (feeMan() - scrollMan())) / 10000,
+      scroll: (attempts * scrollMan()) / 10000,
+      tp: tpPicked ? attempts * tpPerScroll() : 0,
+    };
+
     const gapText = (cost) => (cost - best.cost <= 1e-9 ? "-" : `+${money(cost - best.cost)}`);
 
     els.result.innerHTML = `
@@ -5708,8 +5784,9 @@ const encryptOptCalc = (() => {
         <p class="encrypt-opt-plan-main">${planText(best.counts)}</p>
         <div class="encrypt-opt-plan-stats">
           <div><span>총 비용</span><b>${money(best.cost)}</b></div>
-          <div><span>주문서</span><b>${money(best.scrolls)}</b></div>
-          <div><span>인크립트</span><b>${money(best.fee)}</b></div>
+          <div><span>인챈트 주문서</span><b>${money(best.scrolls)}</b></div>
+          <div><span>인크립트 비용</span><b>${money(split.ink)}</b></div>
+          ${split.scroll > 0 ? `<div><span>에타 주문서</span><b>${split.tp ? `${formatNumber(Math.round(split.tp))} TP` : money(split.scroll)}</b>${split.tp ? `<em>시드 ${money(split.scroll)}</em>` : ""}</div>` : ""}
           <div><span>인크립트</span><b>${formatNumber(stage)} → ${formatNumber(stage + best.sheets)}</b></div>
           <div><span>도달</span><b>+${formatNumber(limit)}</b>${best.over ? `<em>${best.over} 버림</em>` : ""}</div>
         </div>
@@ -5737,6 +5814,7 @@ const encryptOptCalc = (() => {
   }
 
   function refresh() {
+    renderPresets();
     renderFeeNote();
     renderResult();
     save();
@@ -5747,6 +5825,7 @@ const encryptOptCalc = (() => {
       localStorage.setItem(ENCRYPT_OPT_SAVE_KEY, JSON.stringify({
         current: opt.current, limit: opt.limit,
         stage: opt.stage, type: opt.type, fee: opt.fee, discount: opt.discount, scrolls: opt.scrolls,
+        scrollFee: opt.scrollFee, tpBundle: opt.tpBundle, tpSeed: opt.tpSeed,
       }));
     } catch { /* 저장은 편의일 뿐 */ }
   }
@@ -5767,6 +5846,9 @@ const encryptOptCalc = (() => {
       });
     }
     opt.discount = saved.discount === true;
+    if (typeof saved.scrollFee === "string") opt.scrollFee = saved.scrollFee;
+    if (TP_BUNDLES.includes(Number(saved.tpBundle))) opt.tpBundle = Number(saved.tpBundle);
+    if (typeof saved.tpSeed === "string") opt.tpSeed = saved.tpSeed;
     if (Array.isArray(saved.scrolls) && saved.scrolls.length) {
       opt.scrolls = saved.scrolls.slice(0, 8).map((scroll) => ({
         on: scroll?.on !== false,
@@ -5795,6 +5877,11 @@ const encryptOptCalc = (() => {
     if (els.stage) els.stage.value = String(opt.stage);
     if (els.fee) els.fee.value = opt.fee[opt.type];
     if (els.discount) els.discount.checked = opt.discount;
+    if (els.tpBundle) {
+      els.tpBundle.innerHTML = TP_BUNDLES.map((n) => `<option value="${n}"${n === opt.tpBundle ? " selected" : ""}>${formatNumber(n)} TP</option>`).join("");
+    }
+    if (els.tpSeed) els.tpSeed.value = opt.tpSeed;
+    if (els.scrollFee) els.scrollFee.value = opt.scrollFee;
     const typeInput = document.querySelector(`input[name="encryptOptType"][value="${opt.type}"]`);
     if (typeInput) typeInput.checked = true;
     buildRows();
@@ -5808,6 +5895,12 @@ const encryptOptCalc = (() => {
     els.fee = document.querySelector("#encryptOptFee");
     els.discount = document.querySelector("#encryptOptDiscount");
     els.feeNote = document.querySelector("#encryptOptFeeNote");
+    els.presets = document.querySelector("#encryptOptPresets");
+    els.scroll = document.querySelector("#encryptOptScroll");
+    els.scrollFee = document.querySelector("#encryptOptScrollFee");
+    els.scrollPresets = document.querySelector("#encryptOptScrollPresets");
+    els.tpBundle = document.querySelector("#encryptOptTpBundle");
+    els.tpSeed = document.querySelector("#encryptOptTpSeed");
     els.rows = document.querySelector("#encryptOptRows");
     els.result = document.querySelector("#encryptOptResult");
     if (!els.rows || !els.result) return;
@@ -5833,6 +5926,34 @@ const encryptOptCalc = (() => {
     });
     els.discount?.addEventListener("change", () => {
       opt.discount = els.discount.checked;
+      refresh();
+    });
+    els.presets?.addEventListener("click", (event) => {
+      const value = event.target.closest("[data-opt-fee]")?.dataset.optFee;
+      if (value === undefined) return;
+      opt.fee[opt.type] = value;
+      if (els.fee) els.fee.value = value;
+      refresh();
+    });
+    els.scrollPresets?.addEventListener("click", (event) => {
+      const value = event.target.closest("[data-opt-scroll]")?.dataset.optScroll;
+      if (value === undefined) return;
+      opt.scrollFee = value;
+      if (els.scrollFee) els.scrollFee.value = value;
+      refresh();
+    });
+    els.scrollFee?.addEventListener("input", () => {
+      opt.scrollFee = els.scrollFee.value;
+      refresh();
+    });
+    els.tpBundle?.addEventListener("change", () => {
+      opt.tpBundle = Number(els.tpBundle.value) || 1200;
+      applyCheaperScroll();
+      refresh();
+    });
+    els.tpSeed?.addEventListener("input", () => {
+      opt.tpSeed = els.tpSeed.value;
+      applyCheaperScroll();
       refresh();
     });
 
@@ -9910,6 +10031,7 @@ function initSimulators() {
   [
     "encElso", "encDiscount", "encBaseCost", "encCostLabel", "encStartInk", "encTargetInk",
     "encManualCount", "encPresets", "encRunBatch", "encRunTarget", "encReset", "encStatus", "encLog",
+    "encScroll", "encScrollPresets", "encScrollTp", "encTpBundle", "encTpSeed",
     "coreMainStat", "coreHasDust", "coreStartStage", "coreTargetStage",
     "coreBoxPrice", "coreBoxPriceField", "coreCalc", "coreSim", "coreSummary", "coreTable", "coreElso", "coreDiscount",
     "relicCurrent", "relicTarget", "relicDifficulty", "relicCalc", "relicSim", "relicSummary", "relicTable",
@@ -10161,11 +10283,14 @@ const ENC_PRESETS = {
   },
 };
 
+
 const encSim = {
   currentInk: 0,
   totalAttempts: 0,
   successCount: 0,
   totalCost: 0,
+  totalScroll: 0,   // 그중 에타 주문서 값
+  totalTp: 0,       // TP로 샀다면 그 TP 수
   attemptsSinceLastSuccess: 0,
   totalExpectedCost: 0,
   totalExpectedSuccesses: 0,
@@ -10182,6 +10307,35 @@ function encGetChance(ink, isEta) {
   if (isEta) return 0.01;
   return Math.max(0.0001, 0.0007 - ink * 0.00005);
 }
+// 에타 인크립트 주문서. 시드로 셀 때는 TP로 사는 길도 있어서 값을 따로 들고 있다.
+const encScrollState = { fee: String(ENC_ETA_SCROLL.man), tpBundle: 1200, tpSeed: "" };
+const ENC_TP_BUNDLES = [1200, 2000, 3000, 4000, 20000, 40000];
+
+// TP로 살 때 주문서 한 장이 시드로 몇 만원인지. 시세를 안 넣었으면 null.
+function encTpScrollMan() {
+  const seed = Number(String(simEls.encTpSeed?.value || "").replace(/,/g, ""));
+  const bundle = Number(encScrollState.tpBundle);
+  if (!bundle || !Number.isFinite(seed) || seed <= 0) return null;
+  return (seed / bundle) * (ENC_ETA_SCROLL.tpPrice / ENC_ETA_SCROLL.tpBundle) * 10000;
+}
+
+// TP로 사는 중이면 한 장에 드는 TP, 아니면 0
+function encScrollTp() {
+  if (!encIsEta() || encIsElso()) return 0;
+  const tp = encTpScrollMan();
+  if (tp === null) return 0;
+  return Math.round(tp) === Math.round(Number(encScrollState.fee) || 0)
+    ? ENC_ETA_SCROLL.tpPrice / ENC_ETA_SCROLL.tpBundle
+    : 0;
+}
+
+// 에타는 시도할 때마다 주문서도 사라진다. 20% 할인은 인크립트 비용에만 걸린다.
+function encScrollCost() {
+  if (!encIsEta()) return 0;
+  if (encIsElso()) return ENC_ETA_SCROLL.elso;
+  return (Number(encScrollState.fee) || 0) * 10000;
+}
+
 function encUnitCost() {
   const raw = String(simEls.encBaseCost.value || "").replace(/만원|만|엘소/g, "").replace(/,/g, "").trim();
   if (!raw) return null;
@@ -10189,12 +10343,15 @@ function encUnitCost() {
   if (!Number.isFinite(n) || n < 0) return null;
   let cost = encIsElso() ? n : n * 10000;
   if (simEls.encDiscount.checked) cost = Math.round(cost * 0.8);
-  return cost;
+  return cost + encScrollCost();
 }
 function encFmtCost(v) {
   const amount = Math.floor(Math.abs(v));
   const eok = Math.floor(amount / 1e8);
   const man = Math.floor((amount % 1e8) / 1e4);
+  // "548억 0만"처럼 뒤가 비면 빼고, 1억이 안 되면 만원만 적는다
+  if (eok && !man) return `${eok.toLocaleString("ko-KR")}억`;
+  if (!eok) return `${man.toLocaleString("ko-KR")}만`;
   return `${eok.toLocaleString("ko-KR")}억 ${man.toLocaleString("ko-KR")}만`;
 }
 function encFmtSigned(v) {
@@ -10253,10 +10410,14 @@ function encAppendLog(e) {
   const expectedCost = e.rate > 0 ? e.unit * (100 / e.rate) : null;
   // 토막마다 span으로 감싼다. 좁은 화면에서 숫자 중간이 아니라
   // 토막 단위로 줄이 바뀌어야 읽을 수 있다.
+  const scroll = e.scroll || 0;
   let html =
     `<span class="log-seq">${e.attempts.toLocaleString("ko-KR")}번째</span>` +
     `<span class="log-step">${e.inkBefore}→${e.inkAfter} 인크</span>` +
-    `<span class="log-cost">비용 ${encFmtCost(e.cost)}</span>`;
+    (scroll > 0
+      ? `<span class="log-cost">인크 ${encFmtCost(e.cost - scroll)}</span>`
+        + `<span class="log-scroll">에타 인크 ${e.tp ? `${Math.round(e.tp).toLocaleString("ko-KR")} TP (${encFmtCost(scroll)})` : encFmtCost(scroll)}</span>`
+      : `<span class="log-cost">비용 ${encFmtCost(e.cost)}</span>`);
   if (expectedCost != null) {
     const diff = expectedCost - e.cost;
     encSim.totalExpectedCost += expectedCost;
@@ -10285,6 +10446,10 @@ function encUpdateCumulative() {
   div.innerHTML =
     `<span class="cum-head">▼ 누적 합산 (${encSim.totalAttempts.toLocaleString("ko-KR")}회 시도)</span>` +
     `<span class="cum-cost">누적 비용: ${encFmtCost(encSim.totalCost)}</span>` +
+    (encSim.totalScroll > 0
+      ? `<span class="cum-cost">인크립트 비용: ${encFmtCost(encSim.totalCost - encSim.totalScroll)}</span>`
+        + `<span class="cum-cost">에타 인크 비용: ${encSim.totalTp > 0 ? `${Math.round(encSim.totalTp).toLocaleString("ko-KR")} TP (${encFmtCost(encSim.totalScroll)})` : encFmtCost(encSim.totalScroll)}</span>`
+      : "") +
     `<span class="cum-exp">누적 기대 비용: ${encFmtCost(displayExpected)}</span>` +
     `<span class="cum-diff">기대값 차이: <span class="${diff >= 0 ? "sim-pos" : "sim-neg"}">${encFmtSigned(diff)}</span></span>`;
   simEls.encLog.appendChild(div);
@@ -10298,6 +10463,8 @@ function encRunLoop(mode) {
   }
 
   const isEta = encIsEta();
+  const scrollUnit = encScrollCost();   // 한 번 시도에 사라지는 주문서 값
+  const tpUnit = encScrollTp();         // TP로 산다면 그 TP 수
   let remaining = 0;
   let target = 0;
   if (mode === "batch") {
@@ -10327,6 +10494,8 @@ function encRunLoop(mode) {
     encSim.totalAttempts = 0;
     encSim.successCount = 0;
     encSim.totalCost = 0;
+    encSim.totalScroll = 0;
+    encSim.totalTp = 0;
     encSim.attemptsSinceLastSuccess = 0;
     encSim.totalExpectedCost = 0;
     encSim.totalExpectedSuccesses = 0;
@@ -10343,6 +10512,8 @@ function encRunLoop(mode) {
     guard++;
     encSim.totalAttempts++;
     encSim.totalCost += unit;
+    encSim.totalScroll += scrollUnit;
+    encSim.totalTp += tpUnit;
     encSim.attemptsSinceLastSuccess++;
     const chance = encGetChance(encSim.currentInk, isEta);
     encAccumulate(chance);
@@ -10355,6 +10526,8 @@ function encRunLoop(mode) {
         inkBefore,
         inkAfter: encSim.currentInk,
         cost: unit * encSim.attemptsSinceLastSuccess,
+        scroll: scrollUnit * encSim.attemptsSinceLastSuccess,
+        tp: tpUnit * encSim.attemptsSinceLastSuccess,
         unit,
         rate: chance * 100,
       });
@@ -10370,6 +10543,8 @@ function encReset() {
   encSim.totalAttempts = 0;
   encSim.successCount = 0;
   encSim.totalCost = 0;
+  encSim.totalScroll = 0;
+  encSim.totalTp = 0;
   encSim.attemptsSinceLastSuccess = 0;
   encSim.totalExpectedCost = 0;
   encSim.totalExpectedSuccesses = 0;
@@ -10385,8 +10560,61 @@ function encRenderPresets() {
     .join("");
   simEls.encCostLabel.textContent = encIsElso() ? "1회 비용 (엘소)" : "1회 비용 (만원)";
   simEls.encBaseCost.value = list[0][1];
+  encRenderScroll();
+}
+
+// 에타 주문서 묶음. 엘소로 셀 때는 TP 시세를 시드로 받으므로 환산하지 않는다.
+function encRenderScroll() {
+  if (!simEls.encScroll) return;
+  const eta = encIsEta();
+  simEls.encScroll.hidden = !eta;
+  if (!eta) return;
+
+  const elso = encIsElso();
+  if (simEls.encScrollTp) simEls.encScrollTp.hidden = elso;
+  const price = (man) => (man >= 10000
+    ? `${formatNumber(Math.round((man / 10000) * 100) / 100)}억`
+    : `${formatNumber(Math.round(man))}만원`);
+
+  if (elso) {
+    simEls.encScrollPresets.innerHTML = `<button class="sim-preset is-active" type="button" data-scroll="${ENC_ETA_SCROLL.elso}">NPC <em>${formatNumber(ENC_ETA_SCROLL.elso)} 엘소</em></button>`;
+    return;
+  }
+  const tp = encTpScrollMan();
+  const cur = Number(encScrollState.fee) || 0;
+  const on = (v) => (Math.round(v) === Math.round(cur) ? " is-active" : "");
+  simEls.encScrollPresets.innerHTML = `<button class="sim-preset${on(ENC_ETA_SCROLL.man)}" type="button" data-scroll="${ENC_ETA_SCROLL.man}">NPC <em>${price(ENC_ETA_SCROLL.man)}</em></button>`
+    + (tp ? `<button class="sim-preset${on(tp)}" type="button" data-scroll="${Math.round(tp)}">TP로 사기 <em>${price(tp)}</em></button>` : "");
+}
+
+// TP 시세를 고치면 NPC와 견줘 싼 쪽을 쓴다
+function encApplyCheaperScroll() {
+  const tp = encTpScrollMan();
+  encScrollState.fee = String(Math.round(tp === null ? ENC_ETA_SCROLL.man : Math.min(ENC_ETA_SCROLL.man, tp)));
 }
 function wireEncryptSim() {
+  if (simEls.encTpBundle) {
+    simEls.encTpBundle.innerHTML = ENC_TP_BUNDLES
+      .map((n) => `<option value="${n}"${n === encScrollState.tpBundle ? " selected" : ""}>${formatNumber(n)} TP</option>`).join("");
+  }
+  simEls.encScrollPresets?.addEventListener("click", (event) => {
+    const value = event.target.closest("[data-scroll]")?.dataset.scroll;
+    if (value === undefined) return;
+    encScrollState.fee = value;
+    encRenderScroll();
+    encRefreshStatus();
+  });
+  simEls.encTpBundle?.addEventListener("change", () => {
+    encScrollState.tpBundle = Number(simEls.encTpBundle.value) || 1200;
+    encApplyCheaperScroll();
+    encRenderScroll();
+    encRefreshStatus();
+  });
+  simEls.encTpSeed?.addEventListener("input", () => {
+    encApplyCheaperScroll();
+    encRenderScroll();
+    encRefreshStatus();
+  });
   encRenderPresets();
   encRefreshStatus();
   document.querySelectorAll('input[name="encInkType"]').forEach((r) =>

@@ -6,9 +6,9 @@
     <title>TW DB</title>
     <!-- 이미지 CDN. 첫 이미지 요청 전에 DNS+TLS를 미리 끝내둔다 -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
-    <link rel="stylesheet" href="./assets/styles.css?v=20261001-newcomer2" />
+    <link rel="stylesheet" href="./assets/styles.css?v=20261002-simwide" />
     <!-- 모바일 전용. media 속성 덕에 넓은 화면에서는 렌더링을 막지 않는다 -->
-    <link rel="stylesheet" href="./assets/mobile.css?v=20261001-newcomer2" media="(max-width: 720px)" />
+    <link rel="stylesheet" href="./assets/mobile.css?v=20261002-simwide" media="(max-width: 720px)" />
   </head>
   <body>
     <main class="app-shell">
@@ -942,6 +942,20 @@
                     <input id="encryptOptFee" type="text" inputmode="numeric" autocomplete="off" value="666" placeholder="예: 666" />
                   </label>
                 </div>
+                <div id="encryptOptPresets" class="sim-presets encrypt-opt-presets"></div>
+
+                <div id="encryptOptScroll" class="encrypt-opt-scroll" hidden>
+                  <span class="encrypt-opt-tp-label">에타 인크립트 주문서</span>
+                  <div id="encryptOptScrollPresets" class="sim-presets encrypt-opt-presets"></div>
+                  <div class="encrypt-opt-tp">
+                    <span class="encrypt-opt-tp-label">TP 시세</span>
+                    <div class="encrypt-opt-tp-row">
+                      <select id="encryptOptTpBundle" aria-label="TP 묶음"></select>
+                      <input id="encryptOptTpSeed" class="encrypt-opt-input is-tp" type="text" inputmode="decimal" autocomplete="off" placeholder="0" aria-label="TP 시드 가격 (억)" />
+                      <span>억</span>
+                    </div>
+                  </div>
+                </div>
                 <p id="encryptOptFeeNote" class="encrypt-opt-note"></p>
               </section>
             </div>
@@ -1036,6 +1050,18 @@
                 <label class="sim-check"><input id="encDiscount" type="checkbox" /><span>20% 할인</span></label>
               </div>
               <div id="encPresets" class="sim-presets"></div>
+              <div id="encScroll" class="encrypt-opt-scroll" hidden>
+                <span class="encrypt-opt-tp-label">에타 인크립트 주문서</span>
+                <div id="encScrollPresets" class="sim-presets encrypt-opt-presets"></div>
+                <div id="encScrollTp" class="encrypt-opt-tp">
+                  <span class="encrypt-opt-tp-label">TP 시세</span>
+                  <div class="encrypt-opt-tp-row">
+                    <select id="encTpBundle" aria-label="TP 묶음"></select>
+                    <input id="encTpSeed" class="encrypt-opt-input is-tp" type="text" inputmode="decimal" autocomplete="off" placeholder="0" aria-label="TP 시드 가격 (억)" />
+                    <span>억</span>
+                  </div>
+                </div>
+              </div>
               <div class="sim-fields">
                 <label class="field"><span id="encCostLabel">1회 비용 (만원)</span><input id="encBaseCost" type="text" value="666" /></label>
                 <label class="field"><span>현재 인크립트</span><input id="encStartInk" type="number" value="0" /></label>
@@ -1344,7 +1370,7 @@
       </div>
     </template>
 
-    <script src="./assets/app.js?v=20261001-newcomer2" type="module"></script>
+    <script src="./assets/app.js?v=20261002-simwide" type="module"></script>
     <!-- GoatCounter 방문자 분석 (localhost 방문은 count.js가 기본으로 집계 제외)
          자동 집계를 끄고 app.js의 라우터가 탭 단위 경로(/eta/ranking 등)로 직접 보낸다 -->
     <script>window.goatcounter = { no_onload: true };</script>

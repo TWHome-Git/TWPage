@@ -1305,6 +1305,12 @@ select {
   gap: 14px;
 }
 
+/* 인크립트 시뮬은 로그 한 줄에 인크·에타 인크·기대값이 다 들어가 길다.
+   왼쪽을 줄여 오른쪽에 자리를 더 준다 (상속서 쪽은 그대로) */
+[data-simulator-panel="encrypt"] .sim-grid {
+  grid-template-columns: 420px minmax(0, 1fr);
+}
+
 .sim-controls {
   display: grid;
   gap: 12px;
@@ -1564,14 +1570,20 @@ select {
   background: var(--panel);
 }
 
-/* 제목과 기대값 차이는 제 줄을 갖고, 누적 비용 둘은 넓을 때만 한 줄에 묶인다 */
-.log-cumulative .cum-head,
-.log-cumulative .cum-diff {
-  display: block;
+/* 값마다 제 줄을 준다. 한 줄에 몰아 두면 숫자 중간에서 줄이 꺾여 읽기 나쁘다 */
+.sim-log .log-cumulative {
+  display: grid;
+  gap: 2px;
 }
 
-.log-cumulative .cum-cost {
-  margin-right: 14px;
+.log-cumulative .cum-head {
+  margin-bottom: 2px;
+  font-weight: 700;
+}
+
+.log-cumulative .cum-exp,
+.log-cumulative .cum-diff {
+  margin-top: 2px;
 }
 
 .mobile-unsupported {
@@ -6013,6 +6025,81 @@ img.dmg-chk-icon {
 
 .encrypt-opt-section .buff-section-title {
   margin-bottom: 0;
+}
+
+.encrypt-opt-presets {
+  margin-top: 10px;
+}
+
+/* 지금 칸에 든 값. 싼 쪽을 자동으로 골라 주므로 보통 여기가 칠해진다 */
+.encrypt-opt-presets .sim-preset.is-active {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+.encrypt-opt-presets .sim-preset.is-active em {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.encrypt-opt-presets .sim-preset em {
+  font-style: normal;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+/* 에타만 쓰는 주문서 묶음 */
+/* 인크립트 시뮬 로그: 에타 주문서 토막 */
+.log-scroll {
+  color: var(--gold);
+}
+
+.encrypt-opt-scroll {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--line);
+}
+
+.encrypt-opt-scroll .ok-field {
+  display: block;
+}
+
+/* TP를 시드로 바꿔 보는 줄.
+   기둥이 236px뿐이라 이름은 윗줄, 칸은 아랫줄에 나란히 둔다 */
+.encrypt-opt-tp {
+  margin-top: 10px;
+}
+
+.encrypt-opt-tp-label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.encrypt-opt-tp-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.encrypt-opt-tp-row select {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 7px 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.encrypt-opt-input.is-tp {
+  flex: 0 0 auto;
+  width: 66px;
 }
 
 .encrypt-opt-note {
