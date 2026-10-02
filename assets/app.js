@@ -1542,7 +1542,7 @@ function renderEtaNewDateSelect(dates) {
   const ordered = [...dates].reverse();
   els.etaNewDateSelect.innerHTML = ordered
     .map((d, i) => {
-      const label = i === 0 ? `${d} (최신)` : d;
+      const label = i === 0 ? `${etaHistoryDayBefore(d)} (최신)` : etaHistoryDayBefore(d);
       return `<option value="${d}"${d === etaNew.date ? " selected" : ""}>${label}</option>`;
     })
     .join("");
@@ -1718,8 +1718,8 @@ function renderEtaNewcomers() {
 
   els.etaNewRange.textContent = etaNew.baseDate
     ? (etaNew.prevDate
-        ? `${etaNew.prevDate} → ${etaNew.baseDate}`
-        : `${etaNew.baseDate} (이전 날짜 없음)`)
+        ? `${etaHistoryDayBefore(etaNew.prevDate)} → ${etaHistoryDayBefore(etaNew.baseDate)}`
+        : `${etaHistoryDayBefore(etaNew.baseDate)} (이전 날짜 없음)`)
     : "날짜를 불러오는 중입니다";
 
   const groups = etaNewcomerGroups();
@@ -1878,6 +1878,17 @@ function etaHistorySeries(entry) {
 function etaHistoryDayBefore(date) {
   const [y, m, d] = date.split("-").map(Number);
   const t = new Date(Date.UTC(y, m - 1, d - 1));
+  return `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, "0")}-${String(t.getUTCDate()).padStart(2, "0")}`;
+}
+
+// 집계는 다음 날 아침에 돌아서, 수집일 D의 자료는 D-1 하루의 결과다.
+// 안쪽은 수집일로 두고 화면에 적을 때만 하루 당긴다(etaShowDate).
+// 사람이 날짜를 고를 때는 거꾸로 수집일로 바꾼다(etaPickDate).
+const etaShowDate = (date) => (date ? etaHistoryDayBefore(date) : "");
+function etaPickDate(date) {
+  if (!date) return "";
+  const [y, m, d] = date.split("-").map(Number);
+  const t = new Date(Date.UTC(y, m - 1, d + 1));
   return `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, "0")}-${String(t.getUTCDate()).padStart(2, "0")}`;
 }
 
@@ -2173,8 +2184,9 @@ function wireEtaPopulation() {
   });
 
   const applyCustom = () => {
-    etaPop.from = els.popFromDate.value;
-    etaPop.to = els.popToDate.value;
+    // 사람이 고른 날은 실제 날짜라 수집일(다음 날)로 바꿔 거른다
+    etaPop.from = etaPickDate(els.popFromDate.value);
+    etaPop.to = etaPickDate(els.popToDate.value);
     renderEtaPopulation();
   };
   els.popFromDate?.addEventListener("change", applyCustom);
@@ -2381,13 +2393,15 @@ function renderEtaPopulation() {
   els.popTotal.textContent = `${lastTotal.toLocaleString("ko-KR")}명`;
   // 통합은 서버가 다 모인 날부터라 기간이 잘린다. 왜 짧은지 적어 준다.
   const clipped = etaPop.server === POP_ALL_SERVERS && dates[0] > popAllDates()[0];
-  els.popRangeLabel.textContent = `${dates[0]} ~ ${dates[dates.length - 1]} · ${formatNumber(Math.max(1, dates.length - 1))}일`
+  els.popRangeLabel.textContent = `${etaShowDate(dates[0])} ~ ${etaShowDate(dates[dates.length - 1])} · ${formatNumber(Math.max(1, dates.length - 1))}일`
     + (clipped ? " · 서버가 모두 수집된 날부터" : "");
 
   renderPopLapisUse(dates, shown);
   const plotted = popPlotSeries(shown);
-  els.popChart.innerHTML = popChartSvg(dates, plotted);
-  wirePopChartHover(dates, plotted);
+  // 그래프 축·툴팁에는 실제 날짜(수집일 하루 전)를 적는다
+  const shownDates = dates.map(etaShowDate);
+  els.popChart.innerHTML = popChartSvg(shownDates, plotted);
+  wirePopChartHover(shownDates, plotted);
 }
 
 // 날짜별 소모량은 파일을 만들 때 사람마다 어제·오늘 레벨을 견줘 세어 둔 값이다.
@@ -2484,14 +2498,6 @@ function brkActiveServers() {
 }
 
 // 표에 넣을 날짜. 직접 선택이 있으면 그 구간, 없으면 마지막 날에서 N일 전까지
-const brkShowDate = (date) => (date ? etaHistoryDayBefore(date) : "");
-function brkPickDate(date) {
-  if (!date) return "";
-  const [y, m, d] = date.split("-").map(Number);
-  const t = new Date(Date.UTC(y, m - 1, d + 1));
-  return `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, "0")}-${String(t.getUTCDate()).padStart(2, "0")}`;
-}
-
 function brkVisibleDates() {
   const dates = Object.keys(etaBreak.ids || {}).sort();
   if (!dates.length) return [];
@@ -2584,11 +2590,11 @@ function renderEtaBreak() {
   const allDates = Object.keys(etaBreak.ids).sort();
   [els.brkFromDate, els.brkToDate].forEach((input) => {
     if (!input) return;
-    input.min = brkShowDate(allDates[0]);
-    input.max = brkShowDate(allDates[allDates.length - 1]);
+    input.min = etaShowDate(allDates[0]);
+    input.max = etaShowDate(allDates[allDates.length - 1]);
   });
-  if (els.brkFromDate) els.brkFromDate.value = brkShowDate(etaBreak.from || (custom ? "" : dates[0] || ""));
-  if (els.brkToDate) els.brkToDate.value = brkShowDate(etaBreak.to || (custom ? "" : dates[dates.length - 1] || ""));
+  if (els.brkFromDate) els.brkFromDate.value = etaShowDate(etaBreak.from || (custom ? "" : dates[0] || ""));
+  if (els.brkToDate) els.brkToDate.value = etaShowDate(etaBreak.to || (custom ? "" : dates[dates.length - 1] || ""));
 
   // 구간 버튼의 인원: 캐릭터 필터만 적용한 상태에서 그 구간을 넘은 사람 수
   const byCode = all.filter((group) => code === "all" || group.code === Number(code));
@@ -2621,7 +2627,7 @@ function renderEtaBreak() {
   const lapis = filtered.reduce((sum, group) => sum + group.lapis, 0);
   const ring = filtered.reduce((sum, group) => sum + group.ring, 0);
   els.brkTotal.textContent = `${formatNumber(total)}명`;
-  els.brkRangeLabel.textContent = dates.length ? `${brkShowDate(dates[0])} ~ ${brkShowDate(dates[dates.length - 1])} · ${formatNumber(dates.length)}일` : "-";
+  els.brkRangeLabel.textContent = dates.length ? `${etaShowDate(dates[0])} ~ ${etaShowDate(dates[dates.length - 1])} · ${formatNumber(dates.length)}일` : "-";
   const icon = (file) => `<img class="eta-lapis-icon" src="${SIM_IMG_BASE}${encodeURIComponent(file)}" alt="" width="16" height="16" loading="lazy" />`;
   els.brkLapis.hidden = false;
   els.brkLapis.innerHTML = `${icon("에오니스_라피스.png")}라피스 <b>${formatNumber(lapis)}개</b> · ${icon("설계자의_반지.png")}설계자의 반지 <b>${formatNumber(ring)}개</b>`;
@@ -2647,7 +2653,7 @@ function renderEtaBreak() {
               return `<tr>
                 <td class="is-id">${brkHighlight(person.userId, query)}${showServer ? `<small>${escapeHtml(person.server)}</small>` : ""}</td>
                 ${levelTops.map((top) => {
-                  const date = brkShowDate(byLevel.get(top));
+                  const date = etaShowDate(byLevel.get(top));
                   return `<td class="is-level${String(top) === level ? " is-picked" : ""}">${date ? `<span class="pop-lapis-day" title="${date}">${date.slice(5)}</span>` : `<span class="pop-lapis-none">·</span>`}</td>`;
                 }).join("")}
                 <td class="is-cost">${formatNumber(person.lapis)}${person.ring ? `<small>반지 ${formatNumber(person.ring)}</small>` : ""}</td>
@@ -2669,8 +2675,8 @@ function wireEtaBreak() {
   });
   const onDate = () => {
     // 사람이 고른 날은 실제 돌파일이라 집계일(다음 날)로 바꿔 거른다
-    etaBreak.from = brkPickDate(els.brkFromDate?.value || "");
-    etaBreak.to = brkPickDate(els.brkToDate?.value || "");
+    etaBreak.from = etaPickDate(els.brkFromDate?.value || "");
+    etaBreak.to = etaPickDate(els.brkToDate?.value || "");
     if (etaBreak.from && etaBreak.to && etaBreak.from > etaBreak.to) [etaBreak.from, etaBreak.to] = [etaBreak.to, etaBreak.from];
     renderEtaBreak();
   };
@@ -2717,11 +2723,11 @@ function renderPopRangeButtons() {
   const all = popAllDates();
   [els.popFromDate, els.popToDate].forEach((input) => {
     if (!input) return;
-    input.min = all[0] || "";
-    input.max = all[all.length - 1] || "";
+    input.min = etaShowDate(all[0]);
+    input.max = etaShowDate(all[all.length - 1]);
   });
-  if (els.popFromDate) els.popFromDate.value = etaPop.from || (custom ? "" : dates[0] || "");
-  if (els.popToDate) els.popToDate.value = etaPop.to || (custom ? "" : dates[dates.length - 1] || "");
+  if (els.popFromDate) els.popFromDate.value = etaShowDate(etaPop.from || (custom ? "" : dates[0] || ""));
+  if (els.popToDate) els.popToDate.value = etaShowDate(etaPop.to || (custom ? "" : dates[dates.length - 1] || ""));
 }
 
 // 켠 구간만 불이 들어온다. 처음엔 전부 켜져 있고, 다 끄면 그릴 게 없다.
