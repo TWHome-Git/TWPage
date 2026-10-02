@@ -1337,7 +1337,8 @@ function renderEtaDateSelect() {
   const dates = eta.index ? Object.keys(eta.index).sort().reverse() : [];
   els.etaDateSelect.innerHTML = [
     `<option value=""${eta.date === "" ? " selected" : ""}>최신</option>`,
-    ...dates.map((d) => `<option value="${d}"${d === eta.date ? " selected" : ""}>${d}</option>`),
+    // 값은 수집일 그대로, 글만 자료가 가리키는 날(하루 전)로 적는다
+    ...dates.map((d) => `<option value="${d}"${d === eta.date ? " selected" : ""}>${etaShowDate(d)}</option>`),
   ].join("");
   els.etaDateSelect.disabled = !dates.length;
 }
@@ -3323,7 +3324,7 @@ function renderEtaRanking() {
   // 이어 붙일 때마다 다시 만들면 5천 행을 그때마다 정렬하게 된다.
   // 조건이 바뀌면 어차피 이 함수를 다시 타므로 여기서 한 번만 만든다 (prevMap은 위에서 이미 만들었다)
   eta.prevMap = prevMap;
-  eta.deltaTitle = eta.prevDate ? ` title="${escapeHtml(eta.prevDate)} 대비"` : "";
+  eta.deltaTitle = eta.prevDate ? ` title="${escapeHtml(etaShowDate(eta.prevDate))} 대비"` : "";
   // 변동 데이터가 뒤늦게 와서 다시 그릴 때는 보던 만큼 그대로 되살린다
   eta.shown = Math.min(visible.length, Math.max(ETA_CHUNK, eta.shown));
   els.etaRankingBody.innerHTML = etaRowsHtml(visible.slice(0, eta.shown));
@@ -3397,12 +3398,12 @@ function renderEtaLapisUse(rows, prevMap) {
     ring += cost.ring;
   });
   box.hidden = false;
-  box.title = eta.prevDate ? `${eta.prevDate} 대비 레벨업에 쓴 양` : "";
+  box.title = eta.prevDate ? `${etaShowDate(eta.prevDate)} 대비 레벨업에 쓴 양` : "";
   const icon = (file) => `<img class="eta-lapis-icon" src="${SIM_IMG_BASE}${encodeURIComponent(file)}" alt="" width="16" height="16" loading="lazy" />`;
   // 기간을 글로도 적는다. 증감 기준을 바꾸면 이 말도 같이 바뀐다.
   // 그만큼 거슬러 올라갈 자료가 없으면 실제로 견준 날짜를 적는다
   const spanText = { 1: "최근 하루", 7: "최근 1주일", 30: "최근 1달" }[eta.compareDays] || `최근 ${eta.compareDays}일`;
-  const label = eta.prevShort ? `${eta.prevDate} 이후` : spanText;
+  const label = eta.prevShort ? `${etaShowDate(eta.prevDate)} 이후` : spanText;
   box.innerHTML = `${label} 소모 ${icon("에오니스_라피스.png")}라피스 <b>${formatNumber(lapis)}개</b>`
     + ` · ${icon("설계자의_반지.png")}설계자의 반지 <b>${formatNumber(ring)}개</b>`;
 }
