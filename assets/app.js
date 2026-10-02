@@ -9983,10 +9983,13 @@ function simLuckStats(steps, actual) {
 }
 
 // 정규분포 모양 막대에 내 위치를 ◆로 찍는다
-function simLuckGraph(z) {
+// width를 주면 그 폭에 맞게 막대 수를 줄인다 (칸이 좁은 곳에서 글자가 잘리지 않게)
+function simLuckGraph(z, width) {
   const levels = "▁▂▃▄▅▆▇█";
-  // 막대는 줄바꿈이 안 되므로 폰에서는 개수를 줄여 폭을 맞춘다
-  const n = window.matchMedia("(max-width: 560px)").matches ? 19 : 33;
+  // 막대는 줄바꿈이 안 되므로 개수로 폭을 맞춘다. 가운데가 생기게 홀수로 둔다.
+  const wide = window.matchMedia("(max-width: 560px)").matches ? 19 : 33;
+  const fit = width > 0 ? (Math.floor(width / 13) | 1) : wide;
+  const n = Math.max(15, Math.min(wide, fit));
   const chars = [];
   for (let i = 0; i < n; i++) {
     const x = -3 + (6 * i) / (n - 1);
@@ -10398,7 +10401,7 @@ function encRefreshStatus() {
     const luckText = simLuckText(simLuckRank(topPercent), topPercent, "span");
     rows.push(`<div>${luckText}</div>`);
     rows.push(`<div class="sim-graph-legend"><span>운 좋음</span><span>평균</span><span>운 나쁨</span></div>`);
-    rows.push(`<div class="sim-graph">${simLuckGraph(luck.z)}</div>`);
+    rows.push(`<div class="sim-graph">${simLuckGraph(luck.z, (simEls.encStatus?.clientWidth || 0) - 24)}</div>`);
   }
   simEls.encStatus.innerHTML = rows.join("");
 }
