@@ -10366,14 +10366,12 @@ function encUnitCost() {
   if (simEls.encDiscount.checked) cost = Math.round(cost * 0.8);
   return cost + encScrollCost();
 }
+// "415억 3,520만"처럼 두 토막으로 적으면 로그 한 줄이 길어 자꾸 꺾인다.
+// 억 하나로 소수 첫째 자리까지만 적는다 (415.4억).
 function encFmtCost(v) {
-  const amount = Math.floor(Math.abs(v));
-  const eok = Math.floor(amount / 1e8);
-  const man = Math.floor((amount % 1e8) / 1e4);
-  // "548억 0만"처럼 뒤가 비면 빼고, 1억이 안 되면 만원만 적는다
-  if (eok && !man) return `${eok.toLocaleString("ko-KR")}억`;
-  if (!eok) return `${man.toLocaleString("ko-KR")}만`;
-  return `${eok.toLocaleString("ko-KR")}억 ${man.toLocaleString("ko-KR")}만`;
+  // 버리지 않고 반올림한다 (415.35억 -> 415.4억)
+  const eok = Math.round((Math.abs(v) / 1e8) * 10) / 10;
+  return `${eok.toLocaleString("ko-KR", { maximumFractionDigits: 1 })}억`;
 }
 function encFmtSigned(v) {
   const sign = v > 0 ? "+" : v < 0 ? "-" : "";
