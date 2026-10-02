@@ -115,7 +115,10 @@ async function main() {
     "",
   ].join("\n"), "utf8");
 
-  console.log(`화면 ${written.length}개 + 404.html + sitemap.xml`);
+  // 같은 주소를 한 줄씩 적은 텍스트 사이트맵. 검색엔진이 XML을 못 읽겠다고 할 때 대신 제출한다
+  await writeFile(join(ROOT, "sitemap.txt"), urls.map((path) => `${SITE}${path}`).join("\n") + "\n", "utf8");
+
+  console.log(`화면 ${written.length}개 + 404.html + sitemap.xml + sitemap.txt`);
   written.forEach((path) => console.log(`  /${path}/`));
 }
 
