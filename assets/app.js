@@ -8082,8 +8082,14 @@ function updateDerived() {
   // 주/보조 스탯은 "기본(강화)" 한 칸으로 합쳐 자리를 아끼고,
   // 맨 왼쪽에 총 주스탯을 둔다 (콘텐츠 요약 줄에서 올라온 값).
   const withEnchant = (base, enchant) => `${f0(base)}(${f0(enchant)})`;
+  // 물리 복합·마법베기는 두 스탯이 다 계수에 들어가므로 맨 왼쪽 합계도 두 스탯(강화 포함)을 합쳐 적는다
+  const hybrid = calc.type === CALC.PHYSICAL_HYBRID || calc.type === CALC.MAGIC_HACK;
+  const totalLabel = hybrid ? `총 ${CALC_TYPE_DISPLAY[calc.type]}` : `총 ${pLabel}`;
+  const totalValue = hybrid
+    ? totals.totalPrimarySum + totals.secondarySum + totals.secondaryEnchantSum
+    : totals.totalPrimarySum;
   els.coefficientMainTotal.innerHTML = [
-    [`총 ${pLabel}`, f0(totals.totalPrimarySum)],
+    [totalLabel, f0(totalValue)],
     [pLabel, withEnchant(totals.primaryBaseSum, totals.primaryEnchantSum)],
     [sLabel, withEnchant(totals.secondarySum, totals.secondaryEnchantSum)],
     ["명중", f0(totals.hitSum)],
