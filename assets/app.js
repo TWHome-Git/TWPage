@@ -10448,9 +10448,14 @@ function encUnitCost() {
 }
 // "415억 3,520만"처럼 두 토막으로 적으면 로그 한 줄이 길어 자꾸 꺾인다.
 // 억 하나로 소수 첫째 자리까지만 적는다 (415.4억).
-// 엘소로 셀 때는 억으로 줄이면 0억이 되므로 엘소 개수를 그대로 적는다
+// 엘소로 셀 때는 억으로 줄이면 0억이 된다. 1만 이상은 만 단위로(142.7만 엘소), 그 아래는 그대로(999 엘소) 적는다
 function encFmtCost(v) {
-  if (encIsElso()) return `${Math.round(Math.abs(v)).toLocaleString("ko-KR")} 엘소`;
+  if (encIsElso()) {
+    const n = Math.abs(v);
+    if (n < 1e4) return `${Math.round(n).toLocaleString("ko-KR")} 엘소`;
+    const man = Math.round((n / 1e4) * 10) / 10;
+    return `${man.toLocaleString("ko-KR", { maximumFractionDigits: 1 })}만 엘소`;
+  }
   // 버리지 않고 반올림한다 (415.35억 -> 415.4억)
   const eok = Math.round((Math.abs(v) / 1e8) * 10) / 10;
   return `${eok.toLocaleString("ko-KR", { maximumFractionDigits: 1 })}억`;
