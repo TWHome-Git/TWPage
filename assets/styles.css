@@ -5242,7 +5242,10 @@ img.dmg-chk-icon {
   white-space: nowrap;
 }
 
+/* 칸을 채우지 않고 글자만큼만. 폰에서는 답변·댓글 딱지가 같은 칸으로 내려와
+   칸이 넓어지는데, 그때 분류 딱지까지 같이 늘어나 줄마다 길이가 달라 보였다 */
 .board-cat {
+  justify-self: start;
   padding: 2px 8px;
   border-radius: 999px;
   font-size: 11px;

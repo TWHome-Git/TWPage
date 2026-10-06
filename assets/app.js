@@ -12937,7 +12937,6 @@ const boardEls = {
   body: document.querySelector("#boardBody"),
   // 홈 화면에 같이 그리는 자리. 창을 열지 않아도 글 목록이 보인다
   homeBody: document.querySelector("#homeBoardBody"),
-  homeWrite: document.querySelector("#homeBoardWrite"),
 };
 
 const boardApi = (params) => `${BOARD_API_URL}?${new URLSearchParams(params)}`;
@@ -13464,7 +13463,11 @@ function wireBoard() {
         return boardRender();
       }
       const viewButton = event.target.closest("[data-board-view]");
-      if (viewButton) return boardSetView(viewButton.dataset.boardView);
+      if (viewButton) {
+        // 홈 카드는 좁아서 글쓰기는 창을 열어 보여준다
+        if (viewButton.dataset.boardView === "write") modalShow(boardEls.modal);
+        return boardSetView(viewButton.dataset.boardView);
+      }
       const item = event.target.closest("[data-board-post]");
       if (item) boardOpenPost(item.dataset.boardPost);
     });
@@ -13478,11 +13481,6 @@ function wireBoard() {
       boardSubmit(event.target);
     });
   }
-  // 홈의 글쓰기 버튼은 창을 열어 글쓰기 화면부터 보여준다
-  boardEls.homeWrite?.addEventListener("click", () => {
-    modalShow(boardEls.modal);
-    boardSetView("write");
-  });
 }
 
 wireBoard();
