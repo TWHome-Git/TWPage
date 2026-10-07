@@ -5231,7 +5231,7 @@ const HIT_BUFFS = [
   { key: "insight", name: "통찰의 비약 (대)", kind: "fixed", input: "check", value: 100, icon: "통찰_대.png", excl: "insight" },
   { key: "insightXL", name: "통찰의 비약 (특대)", kind: "fixed", input: "check", value: 200, icon: "통찰_특대.png", excl: "insight" },
   { key: "crown", name: "크라운", kind: "final", input: "num", min: 0, max: 300, icon: "크라운.png" },
-  { key: "relicGoods", name: "신조의 성물", kind: "final", input: "num", min: 0, max: 300, icon: "신조의_성물.png" },
+  { key: "relicGoods", name: "신조의 성물", kind: "final", input: "num", min: 0, max: 400, icon: "신조의_성물.png" },
   { key: "helmet", name: "투구 부가 옵션", kind: "fixed", input: "num", min: 0, max: 60, icon: "Exp/투구_부가.png" },
   { key: "card", name: "몬스터 카드 옵션", kind: "fixed", input: "num", min: 0, max: 70, icon: "Exp/카드.png" },
   { key: "petS", name: "펫 S 스킬", kind: "fixed", input: "num", min: 0, max: 70, icon: "펫_덱스.png" },
