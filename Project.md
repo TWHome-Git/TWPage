@@ -81,7 +81,6 @@ GitHub Pages로 서비스 중입니다. 주소는 <https://twhome-git.github.io/
 
 | 파일 | 언제 | 하는 일 |
 | --- | --- | --- |
-| `cdn-warm.yml` | `v*` 태그 push | 새 태그가 덮는 이미지를 jsDelivr에서 한 번씩 받아 캐시를 데운다 |
 | `eta-population.yml` | 매일 02:00 UTC (11시 KST) | 에타 스냅샷에서 캐릭터별·레벨 구간별 인원수를 세어 `assets/eta-population.json`에 없는 날짜만 덧붙이고, 바뀌면 커밋한다 |
 
 `eta-population.yml`이 커밋을 밀면 그 push로 Pages가 다시 배포됩니다. 집계 로직은 `scripts/build-eta-population.mjs`에 있고, 로컬에서 `node scripts/build-eta-population.mjs`로도 돌릴 수 있습니다.
@@ -258,33 +257,23 @@ curl -s "https://twhome-git.github.io/TWPage/index.html" | grep -o 'app.js?v=[^"
 
 CSS나 JS 수정 후 배포했는데 브라우저가 예전 화면을 보여주면 `?v=...` 값을 바꾸는 방식으로 캐시를 우회합니다.
 
-### 이미지 CDN 태그 (중요)
+### 이미지 (Cloudflare R2)
 
-아바타/어빌리티 이미지는 jsDelivr로 서빙하고, `assets/app.js`의 `CDN_IMAGE_ROOT`가 **semver 태그로 고정**되어 있습니다.
+이미지는 이 저장소에 두지 않습니다. Cloudflare R2(`talesdb` 버킷)에 올리고 `https://cdn.talesdb.xyz/` 로 서빙합니다.
 
-```js
-const CDN_IMAGE_ROOT = "https://cdn.jsdelivr.net/gh/TWHome-Git/TWPage@v1.0.0/";
-```
+| R2 경로 | 내용 |
+|---|---|
+| `avatar-images/` (Icons·Details·Sets) | 아바타 목록 아이콘·상세 이미지(TW_Tools 시뮬레이터가 뽑은 그림)·세트 |
+| `equipment-images/` | 장비 |
+| `character-images/` | 캐릭터 |
+| `ability-images/` | 어빌리티 |
+| `images/` | 그 외(버프·씨앗·에타 캐릭터·계산기 아이콘·홈 화면 이미지) |
+| `avatar-sim/` | 아바타 시뮬레이터 데이터(TW_Tools `web\data`) |
 
-jsDelivr는 참조 방식에 따라 캐시 정책을 다르게 줍니다. 실측값입니다.
-
-| 참조 | Cache-Control | 엣지 캐시 |
-|---|---|---|
-| `@main` | `max-age=604800, s-maxage=43200` | 12시간마다 만료 |
-| `@images-v1` (semver 아닌 태그) | `max-age=604800, s-maxage=43200` | 12시간마다 만료 |
-| `@v1.0.0` (semver 태그) | `max-age=31536000, immutable` | 1년 |
-| `@<커밋 SHA>` | `max-age=31536000, immutable` | 1년 |
-
-엣지 캐시에 있으면 이미지 한 장에 10~20ms, 만료돼서 없으면 400~800ms입니다.
-
-**이미지를 추가하거나 교체하면 새 semver 태그를 찍고 `CDN_IMAGE_ROOT`를 함께 올려야 합니다.**
-
-```bash
-git tag v1.0.1 && git push origin v1.0.1
-# assets/app.js의 CDN_IMAGE_ROOT를 @v1.0.1로 수정 후 커밋
-```
-
-기존 태그를 옮기면 안 됩니다. 캐시가 `immutable`이라 이미 배포된 태그 URL은 1년간 옛 내용을 그대로 내보냅니다. 태그를 올리지 않으면 새로 추가한 이미지는 404가 납니다.
+- 코드: `assets/app.js` 의 `CDN_ROOT = "https://cdn.talesdb.xyz/"`(묶음별 상수 `CDN_AVATAR_ROOT` 등은 모두 같은 값), `index.html` 의 이미지·미리보기(og:image)도 같은 주소.
+- 원본·업로드: `D:\Projects\TWPageUpload` 의 같은 이름 폴더가 원본이고, 그 폴더의 `업로드_테일즈DB이미지.bat` 로 올립니다(바뀐 파일만, 지운 파일은 R2 에서도 지움).
+- 캐시: Cloudflare CDN 이 1일 캐시합니다(캐시 규칙: Hostname `cdn.talesdb.xyz` → Eligible for cache, Cache-Control 따름). 새 파일은 바로 보이고, **같은 이름의 파일을 고쳤다면** 대시보드 > talesdb.xyz > Caching > Configuration > **Purge Cache**.
+- 예전에는 jsDelivr 의 semver 태그 묶음(v1~v4)으로 서빙했습니다. 태그·`cdn-warm.yml` 은 더 이상 쓰지 않습니다.
 
 ## 11. 알려진 이슈 / 확인 필요 사항
 

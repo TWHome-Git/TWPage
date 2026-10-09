@@ -1,32 +1,16 @@
 const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS78PnupM0NaJzkrkFCr2Llja9TJKrLcRZqeCqlCUV4GPGlsJd3xSIn3SQAvHwzy_tGtxDbTFtl8oZQ/pub?gid=898941035&single=true&output=csv";
 const SNAPSHOT_URL = "./data/equipment-snapshot.json";
 
-// 이미지는 jsDelivr CDN으로 서빙해 GitHub Pages 대역폭을 아낀다.
-//
-// @main이 아니라 semver 태그로 고정한다. jsDelivr는 semver 태그와 커밋 SHA만 immutable로 보고
-// max-age=1년을 주고, @main이나 그 외 이름의 태그는 엣지 캐시가 12시간마다 만료된다(s-maxage=43200).
-// 만료된 뒤 첫 요청은 400~800ms가 걸리는 반면 캐시에 있으면 10~20ms다.
-//
-// 태그를 올리면 URL이 통째로 바뀌어 그 태그가 덮는 이미지의 브라우저 캐시가 전부 날아간다.
-// 아바타만 4,800여 개 68MB라, 아이콘 하나 고치자고 전부 다시 받게 할 수는 없다.
-// 그래서 바뀌는 빈도가 다른 묶음끼리 태그를 나눠 둔다.
-//
-// 접두사를 붙인 태그(avatar-v1 등)는 semver로 인식되지 않아 12시간 캐시가 되므로,
-// 유효한 semver를 유지하면서 메이저 번호로 묶음을 구분한다.
-//   v1.x  아바타 목록 (avatar-images/Icons, Sets) — 회차 추가 때만 바뀜
-//   v2.x  장비   (equipment-images)   — 373개
-//   v3.x  그 외  (ability/character/images)
-//   v4.x  아바타 상세 (avatar-images/Details) — TW_Tools의 시뮬레이터가 뽑은 그림(아나이스, 2,485장 8.6MB).
-//         시뮬레이터를 고쳐 다시 뽑을 때마다 바뀌므로 목록 아이콘과 묶음을 나눴다. 다시 뽑으면 v4.0.1, v4.0.2 …로 올린다
-//
-// 해당 묶음의 이미지를 추가/교체하면 그 묶음의 새 태그를 찍고 아래 상수를 함께 올린다.
-// 기존 태그를 옮기면 안 된다. 캐시가 immutable이라 옛 이미지가 1년간 그대로 나간다.
-//   git tag v3.0.1 && git push origin v3.0.1
-const CDN_ROOT = "https://cdn.jsdelivr.net/gh/TWHome-Git/TWPage@";
-const CDN_AVATAR_ROOT = `${CDN_ROOT}v1.0.15/`;
-const CDN_EQUIP_ROOT = `${CDN_ROOT}v2.0.8/`;
-const CDN_ETC_ROOT = `${CDN_ROOT}v3.0.9/`;
-const CDN_AVATAR_DETAIL_ROOT = `${CDN_ROOT}v4.0.0/`;
+// 이미지는 이 저장소에 두지 않고 Cloudflare R2(talesdb 버킷)에서 서빙한다: https://cdn.talesdb.xyz/<폴더>/...
+//   avatar-images/(Icons·Details·Sets)  equipment-images/  character-images/  ability-images/  images/
+// 원본은 D:\Projects\TWPageUpload 에 있고, 그 폴더의 업로드_테일즈DB이미지.bat 로 올린다(바뀐 파일만).
+// Cloudflare CDN 이 1일 캐시한다. 새 파일은 바로 보이고, 같은 이름의 파일을 고쳤다면 대시보드에서 Purge Cache.
+// (예전에는 jsDelivr 의 semver 태그 묶음 v1~v4 로 서빙했다. 묶음별 상수는 호출부를 그대로 두려고 남긴다)
+const CDN_ROOT = "https://cdn.talesdb.xyz/";
+const CDN_AVATAR_ROOT = CDN_ROOT;
+const CDN_EQUIP_ROOT = CDN_ROOT;
+const CDN_ETC_ROOT = CDN_ROOT;
+const CDN_AVATAR_DETAIL_ROOT = CDN_ROOT;
 
 const IMAGE_BASE = `${CDN_EQUIP_ROOT}equipment-images/`;
 const CHARACTER_IMAGE_BASE = `${CDN_ETC_ROOT}character-images/`;
@@ -3291,7 +3275,7 @@ function renderEtaInfo() {
         <tr>
           <th>${escapeHtml(row[0])}</th>
           ${row.slice(1, 10).map((cell, i) => `<td data-label="${escapeHtml(summaryHead[i + 1] || "")}">${escapeHtml(cell || "-")}</td>`).join("")}
-          <td class="eta-info-note" data-label="${escapeHtml(summaryHead[10] || "")}">${row[10] ? `<img class="eta-note-icon" src="./images/${encodeURIComponent("경험의 정수.png")}" alt="경험의 정수" title="누적 경험의 정수" decoding="async" /> - ${escapeHtml(row[10])}` : ""}</td>
+          <td class="eta-info-note" data-label="${escapeHtml(summaryHead[10] || "")}">${row[10] ? `<img class="eta-note-icon" src="${CDN_ETC_ROOT}images/${encodeURIComponent("경험의 정수.png")}" alt="경험의 정수" title="누적 경험의 정수" decoding="async" /> - ${escapeHtml(row[10])}` : ""}</td>
         </tr>
       `).join("")}
     </tbody>
@@ -4587,9 +4571,8 @@ const SEED_EOK = 1e8;
 const SEED_MAN = 1e4;
 const SEED_SAVE_KEY = "tw-seed-weekly-save-v3";
 
-// 카드 아이콘 — 게임 "콘텐츠 클리어 현황" 창의 초상화를 잘라 images/seed/에 WebP로 둔다.
-// 로컬에서는 폴더를 바로 읽고, 배포본은 다른 이미지처럼 CDN 태그(v3.x)를 탄다.
-const SEED_ICON_BASE = IS_LOCAL ? "./images/seed/" : `${CDN_ETC_ROOT}images/seed/`;
+// 카드 아이콘 — 게임 "콘텐츠 클리어 현황" 창의 초상화를 잘라 images/seed/에 WebP로 둔다 (다른 이미지처럼 R2).
+const SEED_ICON_BASE = `${CDN_ETC_ROOT}images/seed/`;
 const SEED_ICONS = {
   "로카고스": "로카고스", "에토스": "에토스", "체리아": "체리아", "마티아": "마티아", "라이코스": "라이코스", "티로로스": "티로로스",
   "이클립스 토벌전": "이클립스 토벌전", "보급품 탈환": "보급품 탈환", "훈련소": "훈련소", "최후의 결전": "최후의 결전",
@@ -9724,7 +9707,7 @@ function dmgRenderBuffs(skillKey) {
     ? buffs
         .map((b) => {
           const icon = b.icon
-            ? `<img class="dmg-chk-icon" src="./images/buff/${encodeURIComponent(b.icon)}" alt="" />`
+            ? `<img class="dmg-chk-icon" src="${CDN_ETC_ROOT}images/buff/${encodeURIComponent(b.icon)}" alt="" />`
             : '<span class="dmg-chk-icon"></span>';
           const on = dmg.buffChecked.has(b.name) ? " checked" : "";
           const locked = dmgBuffLocked(b, held);
