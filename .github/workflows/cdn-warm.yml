@@ -5,9 +5,10 @@
 # 미리 한 번씩 긁어두면 그 부담을 사용자가 아니라 이 워크플로가 진다.
 #
 # 태그 메이저 번호로 묶음을 구분한다 (assets/app.js의 CDN_* 상수와 같은 규칙).
-#   v1.x  아바타   avatar-images
+#   v1.x  아바타   avatar-images/Icons, Sets (목록)
 #   v2.x  장비     equipment-images
 #   v3.x  그 외    ability-images, character-images, images
+#   v4.x  아바타   avatar-images/Details (상세, 시뮬레이터가 뽑은 그림)
 name: CDN 캐시 워밍
 
 on:
@@ -33,9 +34,10 @@ jobs:
         run: |
           TAG="${{ github.event.inputs.tag || github.ref_name }}"
           case "$TAG" in
-            v1.*) DIRS="avatar-images" ;;
+            v1.*) DIRS="avatar-images/Icons avatar-images/Sets" ;;
             v2.*) DIRS="equipment-images" ;;
             v3.*) DIRS="ability-images character-images images" ;;
+            v4.*) DIRS="avatar-images/Details" ;;
             *)    echo "::error::메이저 번호로 묶음을 알 수 없는 태그: $TAG"; exit 1 ;;
           esac
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"

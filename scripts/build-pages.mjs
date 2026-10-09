@@ -30,14 +30,15 @@ const SUB_ATTR = { info: "info", eta: "eta", equipment: "db", calculator: "calcu
 // 적어 두지 않은 화면은 버튼 글자로 기본 문구를 만든다
 const GENERATED = "<!-- 이 파일은 scripts/build-pages.mjs가 index.html에서 만든다. 직접 고치지 말고 index.html을 고친 뒤 다시 돌린다 -->";
 
-// 버튼 태그에서 탭 키와 글자를 읽는다. 아직 공개하지 않은(data-local-only) 화면은 뺀다
+// 버튼 태그에서 탭 키와 글자를 읽는다. 아직 공개하지 않은(data-local-only) 화면은 뺀다.
+// 알리지 않는(data-unlisted) 화면은 주소로 열리게 페이지는 만들되 noindex를 달고 사이트맵에서 뺀다
 function tabsOf(html, attr) {
   const out = [];
   const re = new RegExp(`<button\\b([^>]*\\bdata-${attr}-tab="([a-z0-9]+)"[^>]*)>([^<]*)</button>`, "g");
   let m;
   while ((m = re.exec(html))) {
     if (/\bdata-local-only\b/.test(m[1])) continue;
-    if (!out.some((t) => t.key === m[2])) out.push({ key: m[2], label: m[3].trim() });
+    if (!out.some((t) => t.key === m[2])) out.push({ key: m[2], label: m[3].trim(), unlisted: /\bdata-unlisted\b/.test(m[1]) });
   }
   return out;
 }
@@ -51,7 +52,7 @@ function routesOf(html) {
     if (!attr) continue;
     for (const sub of tabsOf(html, attr)) {
       if (sub.key === DEFAULT_SUB[main.key]) continue;   // 기본 하위 탭은 메인 탭 주소가 대신한다
-      routes.push({ path: `${main.key}/${sub.key}`, label: sub.label, parent: main.label });
+      routes.push({ path: `${main.key}/${sub.key}`, label: sub.label, parent: main.label, unlisted: sub.unlisted });
     }
   }
   return routes;
@@ -93,8 +94,8 @@ async function main() {
       || [`테일즈위버 ${route.label}`, `${SITE_NAME}의 ${route.parent ? `${route.parent} · ` : ""}${route.label} 화면입니다. 테일즈위버 플레이에 필요한 자료와 도구를 한곳에 모았습니다.`];
     const file = join(ROOT, route.path, "index.html");
     await mkdir(dirname(file), { recursive: true });
-    await writeFile(file, pageHtml(template, { title: `${title} | ${SITE_NAME}`, description, url: `${SITE}${route.path}/` }), "utf8");
-    written.push(route.path);
+    await writeFile(file, pageHtml(template, { title: `${title} | ${SITE_NAME}`, description, url: `${SITE}${route.path}/`, noindex: route.unlisted }), "utf8");
+    if (!route.unlisted) written.push(route.path);
   }
 
   // 파일이 없는 주소로 들어왔을 때 GitHub Pages가 내주는 페이지. 같은 앱이 떠서 주소를 읽고 그 화면을 연다

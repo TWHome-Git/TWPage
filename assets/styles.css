@@ -1298,6 +1298,31 @@ select {
   padding: 14px;
 }
 
+/* 아직 알리지 않는 화면(data-unlisted): 메뉴에는 그 화면을 열었을 때만 보인다. hidden 속성은 쓰지 않는다
+   (activate*Tab이 hidden 버튼의 화면을 열지 않으므로 주소로도 못 들어가게 된다) */
+.db-subtab[data-unlisted]:not(.is-active) {
+  display: none;
+}
+
+/* 아바타 시뮬레이터(별도 저장소의 페이지). 높이는 그 페이지가 postMessage로 알려 주는 값으로 바뀐다 */
+.avatar-sim-frame {
+  display: block;
+  width: 100%;
+  height: 760px;
+  border: 0;
+}
+
+.avatar-sim-frame[hidden] {
+  display: none;
+}
+
+.avatar-sim-mobile {
+  margin: 0;
+  padding: 48px 16px;
+  text-align: center;
+  color: var(--muted);
+}
+
 .sim-grid {
   display: grid;
   /* 왼쪽 폭은 행운 지표(정규분포 그래프)를 담을 수 있게 미리 확보 */

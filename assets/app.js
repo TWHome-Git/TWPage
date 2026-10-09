@@ -13,9 +13,11 @@ const SNAPSHOT_URL = "./data/equipment-snapshot.json";
 //
 // 접두사를 붙인 태그(avatar-v1 등)는 semver로 인식되지 않아 12시간 캐시가 되므로,
 // 유효한 semver를 유지하면서 메이저 번호로 묶음을 구분한다.
-//   v1.x  아바타 (avatar-images)      — 4,838개 68MB, 회차 추가 때만 바뀜
+//   v1.x  아바타 목록 (avatar-images/Icons, Sets) — 회차 추가 때만 바뀜
 //   v2.x  장비   (equipment-images)   — 373개
 //   v3.x  그 외  (ability/character/images)
+//   v4.x  아바타 상세 (avatar-images/Details) — TW_Tools의 시뮬레이터가 뽑은 그림(아나이스, 2,485장 8.6MB).
+//         시뮬레이터를 고쳐 다시 뽑을 때마다 바뀌므로 목록 아이콘과 묶음을 나눴다. 다시 뽑으면 v4.0.1, v4.0.2 …로 올린다
 //
 // 해당 묶음의 이미지를 추가/교체하면 그 묶음의 새 태그를 찍고 아래 상수를 함께 올린다.
 // 기존 태그를 옮기면 안 된다. 캐시가 immutable이라 옛 이미지가 1년간 그대로 나간다.
@@ -24,6 +26,7 @@ const CDN_ROOT = "https://cdn.jsdelivr.net/gh/TWHome-Git/TWPage@";
 const CDN_AVATAR_ROOT = `${CDN_ROOT}v1.0.15/`;
 const CDN_EQUIP_ROOT = `${CDN_ROOT}v2.0.8/`;
 const CDN_ETC_ROOT = `${CDN_ROOT}v3.0.9/`;
+const CDN_AVATAR_DETAIL_ROOT = `${CDN_ROOT}v4.0.0/`;
 
 const IMAGE_BASE = `${CDN_EQUIP_ROOT}equipment-images/`;
 const CHARACTER_IMAGE_BASE = `${CDN_ETC_ROOT}character-images/`;
@@ -3585,7 +3588,7 @@ const AVATAR_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS78Pnup
 // 두 폴더 모두 파일이 2000개를 넘어 GitHub 목록이 1000개에서 잘리므로, 다시 부위별 하위 폴더로 나눠 담는다.
 // 시트는 폴더 없이 파일명만 주므로 여기서 폴더를 붙인다.
 const AVATAR_ICON_BASE = `${CDN_AVATAR_ROOT}avatar-images/Icons/`;
-const AVATAR_DETAIL_BASE = `${CDN_AVATAR_ROOT}avatar-images/Details/`;
+const AVATAR_DETAIL_BASE = `${CDN_AVATAR_DETAIL_ROOT}avatar-images/Details/`;
 // 세트 대표 이미지는 개별 상세와 성격이 달라 폴더를 나눠 둔다
 const AVATAR_SET_BASE = `${CDN_AVATAR_ROOT}avatar-images/Sets/`;
 
@@ -4080,7 +4083,7 @@ function activateCalculatorTab(key) {
 }
 
 // 시뮬레이터 탭
-const SIMULATOR_TITLES = { encrypt: "인크립트", core: "코어 강화", relic: "신조 렐릭", enhance: "장비 강화", siena: "시에나 증폭", sienaaura: "시에나 기운", hammer: "에이라의 망치" };
+const SIMULATOR_TITLES = { encrypt: "인크립트", core: "코어 강화", relic: "신조 렐릭", enhance: "장비 강화", siena: "시에나 증폭", sienaaura: "시에나 기운", hammer: "에이라의 망치", avatar: "아바타" };
 
 function activateSimulatorTab(key) {
   const target = [...els.simulatorTabButtons].find((b) => b.dataset.simulatorTab === key);
@@ -4098,9 +4101,39 @@ function activateSimulatorTab(key) {
     panel.hidden = !isActive;
     panel.classList.toggle("is-active", isActive);
   });
+  if (key === "avatar") openAvatarSim();
 
   routeWrite();
 }
+
+// 아바타 시뮬레이터는 별도 저장소(GitHub Pages)의 페이지를 iframe으로 띄운다.
+// 데이터(애니메이션·텍스처 약 450MB)는 jsDelivr 패키지 한도(150MB)를 넘어 이 저장소의 태그 묶음에 넣을 수 없다.
+// 목록 아이콘·캐릭터 그림은 이 사이트의 CDN 주소를 넘겨 같은 파일(브라우저 캐시)을 쓰게 한다 — v1 태그를 올리면 따라간다.
+// 주소는 탭을 처음 열 때만 넣는다. 다른 화면만 보는 방문자가 시뮬레이터를 받지 않게.
+const AVATAR_SIM_URL = "https://twhome-git.github.io/TWAvatarSim/";
+// PC 전용: 휴대폰·태블릿에서는 iframe을 불러오지 않고 안내만 보여 준다 (데이터도 받지 않게)
+const AVATAR_SIM_MOBILE = /Android|iPhone|iPad|iPod|Mobile|Windows Phone/i.test(navigator.userAgent) ||
+  (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent)) ||
+  (matchMedia("(pointer: coarse)").matches && !matchMedia("(any-pointer: fine)").matches);
+function openAvatarSim() {
+  const frame = document.getElementById("avatarSimFrame");
+  if (!frame || frame.getAttribute("src")) return;
+  if (AVATAR_SIM_MOBILE) {
+    const note = document.getElementById("avatarSimMobile");
+    if (note) note.hidden = false;
+    frame.hidden = true;
+    return;
+  }
+  const q = new URLSearchParams({ embed: "1", tdb: AVATAR_ICON_BASE, art: CHARACTER_IMAGE_BASE });
+  frame.src = `${AVATAR_SIM_URL}?${q}`;
+}
+// 시뮬레이터가 자기 높이를 알려 오면 iframe을 그 높이로 맞춘다 (안쪽 스크롤 없이 페이지처럼 보이게)
+window.addEventListener("message", (event) => {
+  const frame = document.getElementById("avatarSimFrame");
+  if (!frame || event.source !== frame.contentWindow || event.origin !== new URL(AVATAR_SIM_URL).origin) return;
+  const h = event.data && event.data.type === "tw-avatar-height" ? Number(event.data.height) : 0;
+  if (h > 0) frame.style.height = `${Math.min(Math.ceil(h), 4000)}px`;
+});
 
 const INFO_TITLES = { seed: "주간 시드 한도", exp: "경험치 버프", rare: "레어 버프", soul: "소울 링크" };
 
