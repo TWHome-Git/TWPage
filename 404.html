@@ -32,7 +32,7 @@
     <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"테일즈DB","alternateName":["테일즈 DB","테일즈위버 DB","테일즈디비","TW DB","TalesDB"],"url":"https://talesdb.xyz/","inLanguage":"ko","description":"테일즈DB(테일즈위버 DB)는 테일즈위버 에타 순위와 인구 통계, 에타 돌파 기록, 장비·어빌리티·아바타 DB, 대미지·명중·주간 시드 계산기, 강화·인크립트 시뮬레이터를 한곳에 모은 팬 사이트입니다."}</script>
     <!-- 이미지 CDN. 첫 이미지 요청 전에 DNS+TLS를 미리 끝내둔다 -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
-    <link rel="stylesheet" href="./assets/styles.css?v=20261006-board" />
+    <link rel="stylesheet" href="./assets/styles.css?v=20261009-avatar" />
     <!-- 모바일 전용. media 속성 덕에 넓은 화면에서는 렌더링을 막지 않는다 -->
     <link rel="stylesheet" href="./assets/mobile.css?v=20261006-board" media="(max-width: 720px)" />
   </head>
@@ -1051,6 +1051,8 @@
           <button class="db-subtab" type="button" data-simulator-tab="siena">시에나 증폭</button>
           <button class="db-subtab" type="button" data-simulator-tab="sienaaura">시에나 기운</button>
           <button class="db-subtab" type="button" data-simulator-tab="hammer">에이라의 망치</button>
+          <!-- data-unlisted: 메뉴에 안 보이고 사이트맵·검색에서도 빠지지만, 주소(/simulator/avatar/)로는 열린다 -->
+          <button class="db-subtab" type="button" data-simulator-tab="avatar" data-unlisted>아바타</button>
         </nav>
 
         <section class="toolbar" aria-label="시뮬레이터">
@@ -1231,6 +1233,13 @@
           </div>
           <ol id="auraLog" class="aura-log" aria-label="재설정 기록" hidden></ol>
         </section>
+        <!-- 아바타 시뮬레이터: 별도 저장소(GitHub Pages)의 페이지를 띄운다. 주소는 탭을 처음 열 때 app.js가 넣는다
+             (다른 화면만 보는 방문자는 받지 않게) -->
+        <section class="addon-content sim-panel" data-simulator-panel="avatar" hidden>
+          <p id="avatarSimMobile" class="avatar-sim-mobile" hidden>아바타 시뮬레이터는 PC에서만 이용할 수 있습니다.</p>
+          <iframe id="avatarSimFrame" class="avatar-sim-frame" title="아바타 시뮬레이터"></iframe>
+        </section>
+
         <section class="addon-content sim-panel" data-simulator-panel="hammer" hidden>
           <div class="sim-controls">
             <div class="sim-fields hammer-fields">
@@ -1395,7 +1404,7 @@
       </div>
     </template>
 
-    <script src="./assets/app.js?v=20261008-relic400" type="module"></script>
+    <script src="./assets/app.js?v=20261009-avatar" type="module"></script>
     <!-- GoatCounter 방문자 분석 (localhost 방문은 count.js가 기본으로 집계 제외)
          자동 집계를 끄고 app.js의 라우터가 탭 단위 경로(/eta/ranking 등)로 직접 보낸다 -->
     <script>window.goatcounter = { no_onload: true };</script>
