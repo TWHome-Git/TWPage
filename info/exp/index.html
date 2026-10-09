@@ -1232,7 +1232,7 @@
           </div>
           <ol id="auraLog" class="aura-log" aria-label="재설정 기록" hidden></ol>
         </section>
-        <!-- 아바타 시뮬레이터: 별도 저장소(GitHub Pages)의 페이지를 띄운다. 주소는 탭을 처음 열 때 app.js가 넣는다
+        <!-- 아바타 시뮬레이터: avatar-sim/ 의 페이지를 띄운다(데이터는 R2). 주소는 탭을 처음 열 때 app.js가 넣는다
              (다른 화면만 보는 방문자는 받지 않게) -->
         <section class="addon-content sim-panel" data-simulator-panel="avatar" hidden>
           <p id="avatarSimMobile" class="avatar-sim-mobile" hidden>아바타 시뮬레이터는 PC에서만 이용할 수 있습니다.</p>
@@ -1403,7 +1403,7 @@
       </div>
     </template>
 
-    <script src="./assets/app.js?v=20261010-r2" type="module"></script>
+    <script src="./assets/app.js?v=20261010-avsim" type="module"></script>
     <!-- GoatCounter 방문자 분석 (localhost 방문은 count.js가 기본으로 집계 제외)
          자동 집계를 끄고 app.js의 라우터가 탭 단위 경로(/eta/ranking 등)로 직접 보낸다 -->
     <script>window.goatcounter = { no_onload: true };</script>

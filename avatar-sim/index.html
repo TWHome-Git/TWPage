@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TW 아바타 시뮬레이터</title>
+<link rel="stylesheet" href="css/app.css?v=1791587114">
+</head>
+<body>
+<div id="pick" class="pick-modal hidden">   <!-- character picker: a small window over the simulator -->
+  <div class="pick-box">
+    <div class="pick-head"><h1>캐릭터 선택</h1><button id="pickClose" class="pick-close" title="닫기">×</button></div>
+    <div id="pickGrid" class="pick-grid"></div>
+    <div id="pickStatus" class="status"></div>
+  </div>
+</div>
+
+<div id="sim" class="screen hidden">
+  <div class="left">
+    <div class="who">
+      <div id="whoCard" class="who-card" title="클릭 = 캐릭터 바꾸기"><img id="whoArt" alt=""><div id="whoTf" class="hidden"></div><div id="whoName" class="nm"></div></div>
+      <div class="who-right">
+        <div id="cats" class="group"></div>
+        <div class="btn-row" style="margin:0">
+          <span id="kinds" class="group"></span>
+          <input id="search" type="search" placeholder="이름 검색" autocomplete="off">
+          <span id="countLabel" class="muted"></span>
+        </div>
+      </div>
+    </div>
+    <div id="grid" class="grid"></div>
+  </div>
+  <div class="right panel">
+    <div class="stage">
+      <canvas id="view" width="516" height="600"></canvas>
+      <div class="ov ov-left"><span class="ov-title">동작</span><div id="motions" class="ov-col"></div></div>
+      <div class="ov ov-right"><span class="ov-title">헤어</span><div id="hairModes" class="ov-col"></div></div>
+      <div id="cdye" class="ov-dye hidden closed"></div>   <!-- 확장 의상 염색: shown while a dyeable outfit is worn -->
+      <button class="arrow ar-up" data-motion="-1" title="이전 동작">▲</button>
+      <button class="arrow ar-left" data-step="-1" title="왼쪽으로 한 칸 회전">◀</button>
+      <button class="arrow ar-right" data-step="1" title="오른쪽으로 한 칸 회전">▶</button>
+      <button class="arrow ar-down" data-motion="1" title="다음 동작">▼</button><span id="dirLabel" class="ar-label"></span>
+    </div>
+    <div id="slots" class="slots"></div>
+    <div class="btn-row hidden" id="playRow">   <!-- zoom / play / tick: kept for scripts, hidden from the page -->
+      <span class="lbl">확대</span><span id="zooms" class="group"></span>
+      <button id="btnPlay" class="btn">⏸ 정지</button>
+      <input id="tick" type="range" min="0" max="0" value="0">
+      <span id="tickLabel" class="muted"></span>
+    </div>
+    <div class="btn-row hidden" id="presetRow">   <!-- presets: hidden from the page, kept for scripts -->
+      <span class="lbl">프리셋</span><span id="presets" class="group"></span>
+    </div>
+    <div class="btn-row hidden" id="exportRow">   <!-- export buttons: hidden from the page, kept for scripts -->
+      <button id="btnPng" class="btn">PNG 저장</button>
+      <button id="btnSheet" class="btn">8방향 시트</button>
+      <button id="btnGif" class="btn">프레임 PNG 묶음</button>
+    </div>
+    <div id="status" class="status hidden"></div>
+  </div>
+</div>
+<!-- the data lives on Cloudflare R2 (bucket talesdb, folder avatar-sim/, uploaded by D:\Projects\TWPageUpload); only the
+     TW_Tools preview server (TW_Web.bat: localhost:8765 / 8766, serving web\ with data\) reads ./data/. The page itself is
+     published into TalesDB (TWPage avatar-sim/) by TW_Publish.bat -->
+<script>if (!(/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname) && /^876[56]$/.test(location.port))) window.TW_DATA_BASE = 'https://cdn.talesdb.xyz/avatar-sim/';</script>
+<script src="js/compose.js?v=1791587114"></script>
+<script src="js/app.js?v=1791587114"></script>
+</body>
+</html>
