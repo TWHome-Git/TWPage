@@ -161,14 +161,33 @@ const TW = (() => {
   }
 
   // 기본 의상 염색 (basedye.json / DB 0186 + 0068): each character's own outfit has up to 6 parts, each with up to 10
-  // preset ramps {palette index: rrggbb} - the colours the game offers. choice = {part index: preset index}
+  // preset ramps {palette index: rrggbb} - the colours the game offers. choice = {part index: preset index, or 'rrggbb'
+  // for a colour picked freely}
   function baseDyes(ci) { return ((S.bdye || {}).chars || {})[ci] || []; }
+  // a freely picked colour: the part's shading (each palette index's brightness, averaged over the part's presets) put
+  // on that colour. The index a preset's swatch shows (45% into the run, app.js presetSwatch) gets the colour itself,
+  // darker indices are scaled down towards black, lighter ones mixed towards white
+  const luma = c => 0.299 * (c >> 16 & 255) + 0.587 * (c >> 8 & 255) + 0.114 * (c & 255);
+  function customRamp(presets, hex) {
+    const ks = Object.keys(presets[0] || {}).map(Number).sort((a, b) => a - b), c = parseInt(hex, 16), rgb = [c >> 16 & 255, c >> 8 & 255, c & 255];
+    const L = k => { const v = presets.filter(r => r && r[k]).map(r => luma(parseInt(r[k], 16))); return v.reduce((a, b) => a + b, 0) / (v.length || 1); };
+    const ref = Math.max(1, L(ks[Math.floor(ks.length * 0.45)])), ramp = {};
+    for (const k of ks) {
+      const l = L(k);
+      ramp[k] = rgb.map(v => Math.round(l <= ref ? v * l / ref : v + (255 - v) * Math.min(1, (l - ref) / Math.max(1, 255 - ref)))).map(v => v.toString(16).padStart(2, '0')).join('');
+    }
+    return ramp;
+  }
   function baseImage(t, ci, choice) {
-    const parts = baseDyes(ci), ks = Object.keys(choice || {}).filter(k => parts[k] && parts[k][2][choice[k]]).sort();
+    const parts = baseDyes(ci), ks = Object.keys(choice || {}).filter(k => parts[k] && (typeof choice[k] === 'string' || parts[k][2][choice[k]])).sort();
     if (!ks.length) return t.img;
     const key = 'b' + ci + ':' + ks.map(k => k + '=' + choice[k]).join(','); if (t.dyed[key]) return t.dyed[key];
+    const old = Object.keys(t.dyed).filter(k => k[0] === 'b'); if (old.length > 24) for (const k of old.slice(0, 12)) delete t.dyed[k];   // colour-square dragging
     const lut = new Array(256).fill(null);
-    for (const k of ks) { const ramp = parts[k][2][choice[k]]; for (const i in ramp) { const c = parseInt(ramp[i], 16); lut[+i] = [c >> 16 & 255, c >> 8 & 255, c & 255]; } }
+    for (const k of ks) {
+      const ramp = typeof choice[k] === 'string' ? customRamp(parts[k][2], choice[k]) : parts[k][2][choice[k]];
+      for (const i in ramp) { const c = parseInt(ramp[i], 16); lut[+i] = [c >> 16 & 255, c >> 8 & 255, c & 255]; }
+    }
     return lutImage(t, key, lut);
   }
 
@@ -394,7 +413,7 @@ const TW = (() => {
     if (cdi !== undefined && body.a !== S.extras.transforms[cdi].anim) {
       cdye = {}; costumeDyes(cdi).forEach(([n], k) => { if (pose.cdye[k] && !n.startsWith('머리')) cdye[k] = pose.cdye[k]; });
     }
-    // 기본 의상 염색: pose.bdye = {part index: preset index}, only while the character's own body is drawn (its weapon
+    // 기본 의상 염색: pose.bdye = {part index: preset index or 'rrggbb'}, only while the character's own body is drawn (its weapon
     // bodies included), not a costume / transform standing in for it
     const cb = S.chars[pose.char], ownBody = cb && (body.a === S.index.chars[pose.char].body || Object.values(cb.weapon_body || {}).includes(body.a));
     const bdye = ownBody && pose.bdye && Object.keys(pose.bdye).length ? pose.bdye : null;

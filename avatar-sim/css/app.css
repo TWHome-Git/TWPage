@@ -89,7 +89,6 @@ input[type=search]:focus { outline: none; border-color: var(--primary); box-shad
 .ar-down { bottom: 8px; left: 50%; transform: translateX(-50%); }
 .ar-left { left: 8px; top: 50%; transform: translateY(-50%); }
 .ar-right { right: 8px; top: 50%; transform: translateY(-50%); }
-.ar-label { position: absolute; bottom: 16px; left: calc(50% + 28px); color: #d8e0dd; font-size: 13px; }
 #tick { flex: 1 1 200px; accent-color: var(--primary); }
 
 .slots { display: grid; grid-template-columns: repeat(5, 96px); gap: 6px; margin: 10px 0 6px; }   /* 5 per row like the category cards */
@@ -246,7 +245,7 @@ input[type=search]:focus { outline: none; border-color: var(--primary); box-shad
 .parts .btn { font-size: 12px; padding: 3px 12px; }
 /* the closed 염색 window (just its button) sits in the stage's bottom right corner; opened, it keeps its own place */
 .ov-dye.closed { right: 8px; bottom: 8px; }
-/* 확장 의상 염색: the part's colour swatch (opens the picker below) */
+/* 확장 의상 / 기본 의상 염색: the part's colour swatch (opens the picker below) */
 .ov-dye .sw { flex: none; width: 26px; height: 20px; padding: 0; border: 1px solid #5d6966; border-radius: 4px; cursor: pointer; }
 .ov-dye .sw.unset { opacity: .45; }
 /* colour picker (app.js colorPicker): square + hue bar + R G B, 취소 / 확인 under them; fixed over the page */
@@ -269,12 +268,8 @@ input[type=search]:focus { outline: none; border-color: var(--primary); box-shad
 .cpick .act .btn { font-size: 12px; padding: 4px 14px; }
 .cpick .act .ok { background: var(--primary); border-color: var(--primary); color: #fff; font-weight: 600; }
 .cpick .act .ok:hover { background: var(--primary-dark); }
-/* 기본 의상 염색 (app.js basePanel): per part its name (× clears) and the game's colours as dots under it */
-.ov-dye .brow { display: flex; flex-direction: column; gap: 3px; color: #e6ecea; font-size: 12px; }
-.ov-dye .btop { display: flex; align-items: center; gap: 6px; }
-.ov-dye .btop span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ov-dye .btop .x.unset { opacity: .35; }
-.ov-dye .bsw { display: flex; flex-wrap: wrap; gap: 3px; }
-.ov-dye .bsw .p { width: 14px; height: 14px; padding: 0; border: 1px solid rgba(255, 255, 255, .35); border-radius: 50%; cursor: pointer; }
-.ov-dye .bsw .p:hover { border-color: #fff; }
-.ov-dye .bsw .p.on { border: 2px solid #fff; box-shadow: 0 0 0 1px var(--primary); }
+/* the picker's presets (기본 의상 염색: the part's game colours, app.js basePanel): 5 boxes a row under R G B */
+.cpick .pre { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.cpick .pre .p { height: 22px; padding: 0; border: 1px solid var(--line-strong); border-radius: 5px; cursor: pointer; }
+.cpick .pre .p:hover { box-shadow: 0 0 0 1px var(--text); }
+.cpick .pre .p.on { box-shadow: 0 0 0 2px var(--primary); border-color: #fff; }

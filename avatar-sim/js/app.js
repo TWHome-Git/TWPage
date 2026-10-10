@@ -42,7 +42,7 @@
       <!-- dir_order runs 정면 → 정면좌 → 좌 → …: ◀ steps forward (the character turns to the left), ▶ back (to the right) -->
       <button class="arrow ar-left" data-step="1" title="왼쪽으로 한 칸 회전">◀</button>
       <button class="arrow ar-right" data-step="-1" title="오른쪽으로 한 칸 회전">▶</button>
-      <button class="arrow ar-down" data-motion="1" title="다음 동작">▼</button><span id="dirLabel" class="ar-label"></span>
+      <button class="arrow ar-down" data-motion="1" title="다음 동작">▼</button>
     </div>
     <div id="slots" class="slots"></div>
     <div class="btn-row hidden" id="playRow">   <!-- zoom / play / tick: kept for scripts, hidden from the page -->
@@ -97,7 +97,7 @@
                playing: true, loading: 0, timer: null, lastPose: null, mode: 'char', tf: 0,     // mode 'tf' = transform cloak screen
                secret: false,                                                                    // the hidden items are listed
                part: 'all',                                                                      // weapon type shown (PART_CATS lists)
-               bdye: {} };                                                                       // 기본 의상 염색: {part index: preset index}
+               bdye: {} };                                                                       // 기본 의상 염색: {part index: preset index or 'rrggbb'}
   const settings = loadLS('tw_avatar_settings', { hatHairModes: {}, presets: {}, lastChar: null });
   function loadLS(k, def) { try { return Object.assign(def, JSON.parse(localStorage.getItem(k) || '{}')); } catch (e) { return def; } }
   function saveLS() { try { localStorage.setItem('tw_avatar_settings', JSON.stringify(settings)); } catch (e) { } }
@@ -220,7 +220,7 @@
     if (!CAT_ORDER.includes(st.cat)) st.cat = 'head';   // coming from the transform cloak screen: start on 투구 확장
     st.hair = idx.chars[ci].default_hair; st.motion = 0; st.dir = 10; st.tick = 0; st.q = ''; $('search').value = '';
     settings.lastChar = ci; saveLS();
-    $('whoArt').src = artUrl(idx.chars[ci].art); $('whoName').textContent = idx.chars[ci].name; $('whoCard').title = idx.chars[ci].full + ' (클릭 = 캐릭터 바꾸기)';
+    $('whoArt').src = artUrl(idx.chars[ci].art); $('whoName').textContent = idx.chars[ci].name; $('whoCard').title = idx.chars[ci].full;
     // 5 per row: 머리 얼굴 의상 등 발자국 / 헤어 확장의상 무기 보조 변신
     const byKey = Object.fromEntries(idx.slots.map(s => [s.key, [s.key, s.label.replace(' (방패/펜듈럼)', ''), s.label]]));
     byKey.weapon_av = ['weapon_av', '확장 무기', '아바타 무기']; byKey.weapon_eq = ['weapon_eq', '일반 무기', '장비 무기'];
@@ -490,7 +490,7 @@
       ic.innerHTML = '';
       const tu = key !== 'hair' && tdbUrl(key, id);
       if (tu) {                                                // TalesDB icon in the slot too
-        ic.style.backgroundImage = ''; ic.style.clipPath = ''; ic.classList.add('tdbbox'); ic.innerHTML = tdbImg(tu); ic.title = name + ' (더블클릭 = 벗기)';
+        ic.style.backgroundImage = ''; ic.style.clipPath = ''; ic.classList.add('tdbbox'); ic.innerHTML = tdbImg(tu); ic.title = name;
         cb.checked = !st.hidden.has(id); lb.textContent = lb.textContent.split(':')[0] + ': ' + name; lb.title = name; return;
       }
       ic.classList.remove('tdbbox');
@@ -499,22 +499,24 @@
       const sheetW = TW.S.index.icon.cols * sh.w;
       ic.style.backgroundImage = `url('${sh.url}')`; ic.style.backgroundSize = `${sheetW * f}px auto`;
       ic.style.backgroundPosition = `${-sh.x * f + (B - sh.w * f) / 2}px ${-sh.y * f + (B - sh.h * f) / 2}px`;
-      ic.style.clipPath = `inset(${(B - sh.h * f) / 2}px ${(B - sh.w * f) / 2}px)`; ic.title = name + ' (더블클릭 = 벗기)';
+      ic.style.clipPath = `inset(${(B - sh.h * f) / 2}px ${(B - sh.w * f) / 2}px)`; ic.title = name;
       cb.checked = key === 'hair' ? !st.hairHidden : !st.hidden.has(id);
       lb.textContent = lb.textContent.split(':')[0] + ': ' + name; lb.title = name;
     });
   }
 
   // ---------------------------------------------------------------- presets
+  // the dye choices are copied in and out: the saved preset must not follow later changes (settings are saved again later)
+  const copy = o => JSON.parse(JSON.stringify(o));
   function preset(n, save) {
     if (!save && !settings.presets[n]) save = true;
     if (save) {
-      settings.presets[n] = { char: st.ci, hair: st.hair, dye: st.dye, hairMode: st.hairMode, items: Object.values(st.equip), hidden: [...st.hidden], cdye: st.cdye }; saveLS();
+      settings.presets[n] = { char: st.ci, hair: st.hair, dye: st.dye, hairMode: st.hairMode, items: Object.values(st.equip), hidden: [...st.hidden], cdye: copy(st.cdye), bdye: copy(st.bdye) }; saveLS();
       status(`프리셋 ${n} 저장: ${TW.S.index.chars[st.ci].name}, 헤어 ${st.hair}, 아이템 ${Object.keys(st.equip).length}개`); return;
     }
     const p = settings.presets[n];
     if (p.char !== st.ci) { status(`프리셋 ${n}은 ${TW.S.index.chars[p.char].name} 것입니다. 먼저 그 캐릭터로 바꾸세요.`); return; }
-    st.equip = {}; st.hidden = new Set(p.hidden || []); st.cdye = p.cdye || {};
+    st.equip = {}; st.hidden = new Set(p.hidden || []); st.cdye = copy(p.cdye || {}); st.bdye = copy(p.bdye || {}); $('cdye').dataset.iid = '';   // the 염색 window is built anew on the loaded choices
     for (const id of p.items) { const it = st.char.byId[id]; if (it) st.equip[it.slot] = id; }
     st.hair = st.char.hairById[p.hair] ? p.hair : st.hair; st.dye = st.hair === p.hair ? p.dye || 0 : 0; st.dyeBy[st.hair] = st.dye; st.hairHidden = false; st.hairMode = p.hairMode || 'all';
     syncHair(); markSelected(); refresh(); status(`프리셋 ${n} 불러옴`);
@@ -526,10 +528,9 @@
     return { char: st.ci, motion: st.motion, dir: st.dir, hair: st.hairHidden ? -1 : st.hair, dye: st.dye, items: Object.values(st.equip), hairMode: st.hairMode, hidden: st.hidden,
              cdye: st.equip.costume ? st.cdye[st.equip.costume] || null : null, bdye: st.equip.costume ? null : st.bdye };
   }
-  function setDir(d) { st.dir = d; stageLabel(); refresh(); }
+  function setDir(d) { st.dir = d; refresh(); }
   function stepDir(s) { const o = TW.S.index.dir_order; setDir(o[(o.indexOf(st.dir) + s + o.length) % o.length]); }
   function stepMotion(s) { const ms = st.mode === 'tf' ? tfMotions(st.tf) : TW.S.index.chars[st.ci].motions; st.motion = ms[(ms.indexOf(st.motion) + s + ms.length) % ms.length]; st.tick = 0; syncGroup($('motions'), () => st.motion); refresh(); }
-  function stageLabel() { const ix = TW.S.index; $('dirLabel').textContent = `${ix.dir_names[st.dir] || st.dir} · ${ix.motion_names[st.motion] || st.motion}`; }
   function applyZoom() { const v = $('view'); v.width = VIEW[0]; v.height = VIEW[1]; if (st.lastPose) { const [w, h] = logical(); anchor = TW.centeredAnchor(pose(), w, h); } drawNow(); }
   let anchor = null;
   // ---------------------------------------------------------------- 염색 window on the stage: the worn 확장 의상 (DB 0351,
@@ -541,7 +542,7 @@
     const cur = st.cdye[iid] || (st.cdye[iid] = {});
     if (box.dataset.iid !== String(iid)) {
       box.dataset.iid = String(iid); box.innerHTML = '';
-      dyeChrome(box, '부위별로 색을 고릅니다 (게임의 염색 UI처럼 자유 색상; 부위의 첫 음영 칸 = 고른 색, 나머지는 기준 음영 차이만큼 밝게)');
+      dyeChrome(box, '부위별로 색을 고릅니다');
       parts.forEach(([name], k) => {
         const row = document.createElement('div'); row.className = 'row'; if (name.startsWith('머리')) row.dataset.hairPart = '1';
         // the part's colour: a swatch opening colorPicker (previews while picking; 확인 keeps it, 취소 puts the old one back)
@@ -589,60 +590,69 @@
     };
     bar.appendChild(ttl); bar.appendChild(cls); box.appendChild(bar);
   }
-  // 기본 의상 염색: per part the game's colours (up to 10 presets) as dots; the same dot again or × = undyed. The part
-  // called 머리 is the hair, which the body does not draw (hair styles have their own dyes): not offered
+  // 기본 의상 염색: the same window as 확장 의상 염색 (per part a swatch opening colorPicker, × = undyed), the picker
+  // also offering the game's colours of that part (up to 10 presets): a preset keeps the game's own shading, a colour
+  // picked freely gets the part's shading (compose.js customRamp). The part called 머리 is the hair, which the body does
+  // not draw (hair styles have their own dyes): not offered
   const presetSwatch = ramp => { const ks = Object.keys(ramp).map(Number).sort((a, b) => a - b); return ramp[ks[Math.floor(ks.length * 0.45)]] || 'ffffff'; };
   function basePanel(box) {
     const parts = TW.baseDyes(st.ci).map((p, k) => [p, k]).filter(([p]) => p[0] !== '머리');
     if (!parts.length) { box.classList.add('hidden'); box.dataset.iid = ''; return; }
-    const mark = () => box.querySelectorAll('.brow').forEach(r => {
-      const k = +r.dataset.k; r.querySelectorAll('.p').forEach(b => b.classList.toggle('on', st.bdye[k] === +b.dataset.j));
-      r.querySelector('.x').classList.toggle('unset', st.bdye[k] === undefined);
-    });
     if (box.dataset.iid !== 'base' + st.ci) {
       box.dataset.iid = 'base' + st.ci; box.innerHTML = '';
-      dyeChrome(box, '기본 옷을 부위별로 게임의 염색 색 중에서 골라 입힙니다 (확장 의상을 입으면 그 의상의 염색으로 바뀝니다)');
+      dyeChrome(box, '부위별로 색을 고릅니다');
       for (const [[name, , presets, order, names], k] of parts) {
-        const row = document.createElement('div'); row.className = 'brow'; row.dataset.k = k;
-        const top = document.createElement('div'); top.className = 'btop';
-        const nm = document.createElement('span'); nm.textContent = name; nm.title = name;
+        // the presets in the order the shop sells the dyes (basedye.json: columns without a dye item last), named by the dye
+        const pre = (order || presets.map((_, j) => j)).filter(j => presets[j])
+          .map((j, pos) => ({ value: j, hex: presetSwatch(presets[j]), title: (names && names[j]) || `${pos + 1}번 색` }));
+        const row = document.createElement('div'); row.className = 'row'; row.dataset.k = k;
+        const sw = document.createElement('button'); sw.className = 'sw';
+        // the swatch shows the part's current dye (st.bdye[k]: a preset index or 'rrggbb'); kept in step by basePanel
+        row.show = () => {
+          const v = st.bdye[k], p = pre.find(q => q.value === v);
+          sw.style.background = '#' + (typeof v === 'string' ? v : p ? p.hex : 'ffffff'); sw.classList.toggle('unset', v === undefined);
+          sw.title = v === undefined ? name : `${name} · ${typeof v === 'string' ? '#' + v : p ? p.title : ''}`;
+        };
+        sw.onclick = () => {
+          const before = st.bdye[k], p = pre.find(q => q.value === before); let last = 0;
+          const set = (hex, preset) => { st.bdye[k] = preset !== undefined ? preset : hex; row.show(); };
+          colorPicker(sw, typeof before === 'string' ? before : p ? p.hex : 'ffffff',
+            (hex, preset) => { set(hex, preset); const now = Date.now(); if (now - last > 120) { last = now; drawNow(); } },
+            (hex, preset) => { if (hex) set(hex, preset); else if (before !== undefined) st.bdye[k] = before; else delete st.bdye[k]; row.show(); refresh(); },
+            { presets: pre, preset: p ? before : undefined });
+        };
+        const nm = document.createElement('span'); nm.textContent = name; nm.title = name;   // cut short by css: whole on hover
         const x = document.createElement('button'); x.className = 'x'; x.textContent = '×'; x.title = '이 부위 염색 지우기';
-        x.onclick = () => { delete st.bdye[k]; mark(); refresh(); };
-        top.appendChild(nm); top.appendChild(x); row.appendChild(top);
-        const dots = document.createElement('div'); dots.className = 'bsw';
-        // in the order the shop sells the dyes (basedye.json: columns without a dye item last); the dye's name on hover
-        (order || presets.map((_, j) => j)).forEach((j, pos) => {
-          const ramp = presets[j]; if (!ramp) return;
-          const b = document.createElement('button'); b.className = 'p'; b.dataset.j = j; b.style.background = '#' + presetSwatch(ramp);
-          b.title = names && names[j] ? `${name} · ${names[j]}` : `${name} · ${pos + 1}번 색`;
-          b.onclick = () => { if (st.bdye[k] === j) delete st.bdye[k]; else st.bdye[k] = j; mark(); refresh(); };
-          dots.appendChild(b);
-        });
-        row.appendChild(dots); box.appendChild(row);
+        x.onclick = () => { delete st.bdye[k]; row.show(); refresh(); };
+        row.appendChild(sw); row.appendChild(nm); row.appendChild(x); box.appendChild(row);
       }
       const all = document.createElement('button'); all.className = 'btn foot'; all.textContent = '전부 지우기';
-      all.onclick = () => { st.bdye = {}; mark(); refresh(); }; box.appendChild(all);
+      all.onclick = () => { st.bdye = {}; refresh(); }; box.appendChild(all);
     }
-    mark(); box.classList.remove('hidden'); placeDye();
+    box.querySelectorAll('.row').forEach(r => r.show());
+    box.classList.remove('hidden'); placeDye();
   }
-  // ---------------------------------------------------------------- colour picker (확장 의상 염색)
+  // ---------------------------------------------------------------- colour picker (확장 의상 / 기본 의상 염색)
   // The browser's own picker has no 확인 / 취소, so this one: saturation / brightness square, hue bar, R G B, the
-  // eyedropper where the browser has one. onLive(hex) while picking; onDone(hex) on 확인, onDone(null) on 취소 / Esc /
-  // a click outside it. One open at a time.
+  // eyedropper where the browser has one, and opt.presets [{value, hex, title}] (기본 의상: the game's colours) as boxes
+  // under R G B. onLive(hex, preset) while picking; onDone(hex, preset) on 확인, onDone(null) on 취소 / Esc / a click
+  // outside it. preset = the chosen preset's value until the colour is changed by hand (opt.preset: the one at the
+  // start), else undefined. One open at a time.
   let pickerClose = null;
   const hsv2rgb = (h, s, v) => { const f = n => { const k = (n + h / 60) % 6; return Math.round(255 * (v - v * s * Math.max(0, Math.min(k, 4 - k, 1)))); }; return [f(5), f(3), f(1)]; };
   const rgb2hsv = (r, g, b) => { r /= 255; g /= 255; b /= 255; const mx = Math.max(r, g, b), d = mx - Math.min(r, g, b);
     const h = !d ? 0 : mx === r ? ((g - b) / d + 6) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; return [h * 60, mx ? d / mx : 0, mx]; };
   const hex2rgb = hex => [0, 2, 4].map(i => parseInt(hex.slice(i, i + 2), 16));
   const rgb2hex = rgb => rgb.map(v => Math.max(0, Math.min(255, v | 0)).toString(16).padStart(2, '0')).join('');
-  function colorPicker(anchor, hex, onLive, onDone) {
+  function colorPicker(anchor, hex, onLive, onDone, opt = {}) {
     if (pickerClose) pickerClose(null);
-    let [h, s, v] = rgb2hsv(...hex2rgb(hex));
+    let [h, s, v] = rgb2hsv(...hex2rgb(hex)), pv = opt.preset;
     const el = document.createElement('div'); el.className = 'cpick';
     el.innerHTML = `<div class="sv"><canvas width="200" height="132"></canvas><i></i></div>
       <div class="mid">${window.EyeDropper ? '<button class="eye" title="화면에서 색 가져오기"><svg viewBox="0 0 24 24" width="18" height="18"><path d="M19.4 3.6a2.1 2.1 0 0 0-3 0l-2.6 2.6-1.1-1.1-1.4 1.4 1.1 1.1-7.2 7.2V18h3.2l7.2-7.2 1.1 1.1 1.4-1.4-1.1-1.1 2.6-2.6a2.1 2.1 0 0 0 0-3zM7.6 16H6v-1.6l7-7 1.6 1.6z" fill="currentColor"/></svg></button>' : ''}
         <span class="now"></span><div class="hue"><i></i></div></div>
       <div class="rgb">${['R', 'G', 'B'].map(c => `<label><input type="number" min="0" max="255" step="1">${c}</label>`).join('')}</div>
+      ${opt.presets && opt.presets.length ? '<div class="pre"></div>' : ''}
       <div class="act"><button class="btn cancel">취소</button><button class="btn ok">확인</button></div>`;
     root.appendChild(el);
     const sv = el.querySelector('.sv'), cv = sv.querySelector('canvas'), dot = sv.querySelector('i'), hue = el.querySelector('.hue'), knob = hue.querySelector('i');
@@ -657,7 +667,14 @@
       if (!fromNums) nums.forEach((n, i) => { n.value = rgb[i]; });
       return rgb2hex(rgb);
     };
-    const live = fromNums => onLive(paint(fromNums));
+    // the presets: a box per game colour (its dye name on hover); the chosen one is outlined while the colour is its own
+    const boxes = (opt.presets || []).map(p => {
+      const b = document.createElement('button'); b.className = 'p'; b.style.background = '#' + p.hex; b.title = p.title;
+      b.onclick = () => { [h, s, v] = rgb2hsv(...hex2rgb(p.hex)); pv = p.value; mark(); onLive(paint(), pv); };
+      el.querySelector('.pre').appendChild(b); return b;
+    });
+    const mark = () => boxes.forEach((b, i) => b.classList.toggle('on', opt.presets[i].value === pv));
+    const live = fromNums => { pv = undefined; mark(); onLive(paint(fromNums), pv); };
     const drag = (target, set) => target.onpointerdown = ev => {
       if (ev.button !== 0) return; ev.preventDefault(); target.setPointerCapture(ev.pointerId);
       const at = e => { const b = target.getBoundingClientRect(); set(Math.max(0, Math.min(1, (e.clientX - b.left) / b.width)), Math.max(0, Math.min(1, (e.clientY - b.top) / b.height))); live(); };
@@ -674,7 +691,7 @@
     el.style.left = Math.max(8, x) + 'px'; el.style.top = Math.max(8, Math.min(a.top - 40, innerHeight - P.height - 8)) + 'px';
     const close = result => {
       pickerClose = null; el.remove(); document.removeEventListener('pointerdown', outside, true); document.removeEventListener('keydown', key, true);
-      onDone(result);
+      onDone(result, result ? pv : undefined);
     };
     const outside = ev => { if (!ev.composedPath().includes(el)) close(null); };
     const key = ev => { if (ev.key === 'Escape') { ev.stopPropagation(); close(null); } else if (ev.key === 'Enter') close(paint()); };
@@ -682,7 +699,7 @@
     el.querySelector('.cancel').onclick = () => close(null);
     setTimeout(() => { document.addEventListener('pointerdown', outside, true); document.addEventListener('keydown', key, true); });
     pickerClose = close;
-    paint();
+    mark(); paint();
   }
   // the open window sits where it was last dragged (st.cdyePos, stage pixels); closed, the 염색 button is in its own corner (css)
   function placeDye() {
@@ -700,7 +717,6 @@
     st.maxT = TW.maxDuration(p); if (st.tick > st.maxT) st.tick = 0;
     $('tick').max = st.maxT; $('tick').value = st.tick;
     { const [w, h] = logical(); anchor = TW.centeredAnchor(p, w, h); } st.lastPose = p;
-    stageLabel();
     drawNow(); status(`${TW.S.index.chars[st.ci].name}: 아이템 ${Object.keys(st.equip).length}개, ${st.maxT + 1}틱`);
   }
   function drawNow() {
