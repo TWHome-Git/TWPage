@@ -3581,7 +3581,6 @@ img.dmg-chk-icon {
    폭이 줄면 높이도 같이 줄어든다(캔버스 비율 유지) */
 .avatar-wear-canvas {
   max-width: 100%;
-  max-height: 420px;
   image-rendering: pixelated;
 }
 

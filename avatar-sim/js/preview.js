@@ -45,21 +45,21 @@ const TWAvatarPreview = (() => {
       return false; };
     if (!foot && motion === 0 && !tr && !(await drawn())) { motion = 14; if (!(await drawn())) motion = 0; }
     await Promise.all(dirs.map(d => TW.prepare(pose(d))));
-    // the canvas holds every facing over its whole animation (footprint trail included), with the feet at one fixed
-    // point so the figure turns in place
-    let box = null; const dur = {};
+    // the canvas holds every facing over its whole animation, with the feet at one fixed point so the figure turns in
+    // place. Always drawn at 2x so the character is the same size for every item: a long footprint trail (허수아비,
+    // 박스냥 ...) is cut TRAIL px behind the figure instead of shrinking the whole picture
+    const TRAIL = 110, grow = (b, L) => b ? { x0: Math.min(b.x0, L.x), y0: Math.min(b.y0, L.y), x1: Math.max(b.x1, L.x + L.w), y1: Math.max(b.y1, L.y + L.h) }
+                                          : { x0: L.x, y0: L.y, x1: L.x + L.w, y1: L.y + L.h };
+    let box = null, trail = null; const dur = {};
     for (const d of dirs) {
       const p = pose(d); dur[d] = TW.maxDuration(p) + 1;
-      for (let t = 0; t < dur[d]; t += 3) {
-        for (const L of TW.compose(p, t)) {
-          box = box ? { x0: Math.min(box.x0, L.x), y0: Math.min(box.y0, L.y), x1: Math.max(box.x1, L.x + L.w), y1: Math.max(box.y1, L.y + L.h) }
-                    : { x0: L.x, y0: L.y, x1: L.x + L.w, y1: L.y + L.h };
-        }
-      }
+      for (let t = 0; t < dur[d]; t += 3) for (const L of TW.compose(p, t)) { if (String(L.tag).startsWith('foot')) trail = grow(trail, L); else box = grow(box, L); }
     }
     if (!box) return null;
+    if (trail) box = { x0: Math.max(Math.min(box.x0, trail.x0), box.x0 - TRAIL), y0: Math.max(Math.min(box.y0, trail.y0), box.y0 - 30),
+                       x1: Math.min(Math.max(box.x1, trail.x1), box.x1 + TRAIL), y1: Math.min(Math.max(box.y1, trail.y1), box.y1 + 30) };
     const pad = 6, w = box.x1 - box.x0 + pad * 2, h = box.y1 - box.y0 + pad * 2;
-    const sc = opts.scale || (w * 2 <= 420 && h * 2 <= 420 ? 2 : 1);
+    const sc = opts.scale || 2;
     canvas.width = w * sc; canvas.height = h * sc; canvas.style.width = w * sc + 'px'; canvas.style.height = 'auto';   // a narrower box scales it down whole
     const anchor = [pad - box.x0, pad - box.y0];
     // loop: the animation runs on; the facing changes every TURN ms (a drawn frame per TICK)
