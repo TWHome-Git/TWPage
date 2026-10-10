@@ -283,7 +283,10 @@ const TW = (() => {
       if (cur[7]) {                                                // attach-point key
         const name = attr ? attr.n : '';
         if (parent && parent[name]) {
-          const p = parent[name], pv = attr ? attr.p : [0, 0]; ux = p[0] + pv[0]; uy = p[1] + pv[1]; ox = p[2]; oy = p[3];
+          const p = parent[name], pv = attr ? attr.p : [0, 0]; uy = p[1] + pv[1]; ox = p[2]; oy = p[3];
+          // 0x40 on an attach-point key: the opposite facing's picture - mirrored about the point it hangs on, so the
+          // pivot comes out on the other side (검은 바람 필드 정면좌: the tail streams the other way, the wrap stays on the neck)
+          ux = cur[4] & 64 ? p[0] - pv[0] - fr[2] : p[0] + pv[0];
           const ang = p[4] || 0, scx = p[5] || 1, scy = p[6] || 1;        // scale 0 = not set (예프넨 잠옷 'Head'), not invisible
           if (ang || scx !== 1 || scy !== 1) { rot = spinBox(fr[2], fr[3], pv, ang, scx, scy); rotDeg = ang * ROT_SIGN; }   // the point's rotation / scale (예프넨 소드셰이프 beam)
         }
@@ -302,9 +305,8 @@ const TW = (() => {
       // flag 8: mirrored about the anchor (the mirrored directions); flag 0x40: the picture flipped where it stands - a
       // texture without mirrored copies of its frames reuses them this way (이스핀 이클립스 방패 = the 어비스 shield's
       // mirrored frames 5-7; a spinning object's second half). Both: the picture comes out unflipped, placed mirrored.
-      // Not on attach-point keys: 0x40 there is not a flip (천상의 날개 / 골드윙의 날개 in 필드 정면좌 came out mirrored and
-      // off the back)
-      const about = (cur[4] & 8) !== 0, flip = about !== (!cur[7] && (cur[4] & 64) !== 0);
+      // On an attach-point key the picture is mirrored about its point (placed above, where the parent's point is used)
+      const about = (cur[4] & 8) !== 0, flip = about !== ((cur[4] & 64) !== 0);
       const x = about ? -(ux + fr[2]) + ox : ux + ox;
       out.push({ img: tex.img, tex, sx: fr[0], sy: fr[1], w: fr[2], h: fr[3], x, y: uy + oy, flip, layer, ei, blend: blend[ei] || 0, alpha: alpha[ei] !== undefined ? alpha[ei] / 255 : 1 });
     });
