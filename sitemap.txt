@@ -26,5 +26,6 @@ https://talesdb.xyz/simulator/enhance/
 https://talesdb.xyz/simulator/siena/
 https://talesdb.xyz/simulator/sienaaura/
 https://talesdb.xyz/simulator/hammer/
+https://talesdb.xyz/simulator/avatar/
 https://talesdb.xyz/overlay/
 https://talesdb.xyz/etachecker/

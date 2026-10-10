@@ -13,7 +13,6 @@
     <meta name="description" content="테일즈위버 아바타·헤어(염색)·확장 의상(염색)·무기·변신 망토를 캐릭터에 입혀 8방향 동작으로 미리 봅니다." />
     <meta name="keywords" content="테일즈DB, 테일즈 DB, 테일즈디비, 테일즈위버, 테일즈위버 DB, 테일즈위버 에타, 에타 순위, 에타 돌파, 테일즈위버 계산기, 대미지 계산기, 테일즈위버 시뮬레이터, TalesWeaver" />
     <link rel="canonical" href="https://talesdb.xyz/simulator/avatar/" />
-    <meta name="robots" content="noindex" />
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
     <meta name="theme-color" content="#0f6f63" />
     <meta property="og:type" content="website" />
@@ -514,6 +513,11 @@
                 <span>카테고리</span>
                 <select id="avatarSourceSelect"></select>
               </label>
+              <!-- 아바타 시뮬레이터 바로가기 (시뮬레이터 > 아바타) -->
+              <div class="field avatar-sim-nav">
+                <span>시뮬레이터</span>
+                <a class="avatar-sim-link" href="/simulator/avatar/" data-route>아바타 시뮬레이터 →</a>
+              </div>
               <label class="field">
                 <span>분류</span>
                 <select id="avatarSlotSelect"></select>
@@ -1051,8 +1055,7 @@
           <button class="db-subtab" type="button" data-simulator-tab="siena">시에나 증폭</button>
           <button class="db-subtab" type="button" data-simulator-tab="sienaaura">시에나 기운</button>
           <button class="db-subtab" type="button" data-simulator-tab="hammer">에이라의 망치</button>
-          <!-- data-unlisted: 메뉴에 안 보이고 사이트맵·검색에서도 빠지지만, 주소(/simulator/avatar/)로는 열린다 -->
-          <button class="db-subtab" type="button" data-simulator-tab="avatar" data-unlisted>아바타</button>
+          <button class="db-subtab" type="button" data-simulator-tab="avatar">아바타</button>
         </nav>
 
         <section class="toolbar" aria-label="시뮬레이터">
