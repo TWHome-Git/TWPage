@@ -3317,7 +3317,7 @@ function renderEtaInfo() {
         <tr>
           <th>${escapeHtml(row[0])}</th>
           ${row.slice(1, 10).map((cell, i) => `<td data-label="${escapeHtml(summaryHead[i + 1] || "")}">${escapeHtml(cell || "-")}</td>`).join("")}
-          <td class="eta-info-note" data-label="${escapeHtml(summaryHead[10] || "")}">${row[10] ? `<img class="eta-note-icon" src="${CDN_ETC_ROOT}images/${encodeURIComponent("경험의 정수.png")}" alt="경험의 정수" title="누적 경험의 정수" decoding="async" /> - ${escapeHtml(row[10])}` : ""}</td>
+          <td class="eta-info-note" data-label="${escapeHtml(summaryHead[10] || "")}">${row[10] ? `<img loading="lazy" class="eta-note-icon" src="${CDN_ETC_ROOT}images/${encodeURIComponent("경험의 정수.png")}" alt="경험의 정수" title="누적 경험의 정수" decoding="async" /> - ${escapeHtml(row[10])}` : ""}</td>
         </tr>
       `).join("")}
     </tbody>
@@ -3930,12 +3930,12 @@ function renderAvatarDetail() {
   }
 
   const iconHtml = record.listImage
-    ? `<img src="${AVATAR_ICON_BASE}${encodeImagePath(record.listImage)}" alt="" decoding="async" />`
+    ? `<img loading="lazy" src="${AVATAR_ICON_BASE}${encodeImagePath(record.listImage)}" alt="" decoding="async" />`
     : "";
   // 개별 착용 이미지만 보인다. 세트 대표 이미지(Sets, 시트 8열)는 움직이는 착용 모습과 겹쳐 보여 넣지 않는다
   const wearFiles = record.detailImages.map((file) => [AVATAR_DETAIL_BASE, file]);
   const wearHtml = wearFiles
-    .map(([base, file]) => `<img class="avatar-wear-image" src="${base}${encodeImagePath(file)}${AVATAR_DETAIL_V}" alt="${escapeHtml(record.displayName)} 착용 이미지" decoding="async" />`)
+    .map(([base, file]) => `<img loading="lazy" class="avatar-wear-image" src="${base}${encodeImagePath(file)}${AVATAR_DETAIL_V}" alt="${escapeHtml(record.displayName)} 착용 이미지" decoding="async" />`)
     .join("");
 
   const sourceRows = record.sources.length
@@ -4066,7 +4066,7 @@ function renderAbilityList() {
       <td class="equip-info-cell"${split ? ' rowspan="2"' : ""}>
         <div class="equip-info">
           <span class="equip-thumb ability-thumb">
-            ${record.imageFile ? `<img src="${ABILITY_IMAGE_BASE}${encodeImagePath(record.imageFile)}" alt="" decoding="async" />` : ""}
+            ${record.imageFile ? `<img loading="lazy" src="${ABILITY_IMAGE_BASE}${encodeImagePath(record.imageFile)}" alt="" decoding="async" />` : ""}
           </span>
           <span class="equip-name-block">
             <strong>${escapeHtml(record.name)}</strong>
@@ -6873,13 +6873,13 @@ function renderOverlayMarkdown(source, rawBase) {
       const src = /\bsrc\s*=\s*["']([^"']+)["']/i.exec(tag)?.[1] || "";
       if (!resolveOverlayUrl(src, rawBase)) return "";
       const alt = /\balt\s*=\s*["']([^"']*)["']/i.exec(tag)?.[1] || "";
-      rawImages.push(`<img src="${escapeHtml(src)}" alt="${escapeHtml(alt)}" />`);
+      rawImages.push(`<img loading="lazy" src="${escapeHtml(src)}" alt="${escapeHtml(alt)}" />`);
       return `@@TWIMG${rawImages.length - 1}@@`;
     });
 
   const inline = (value) => escapeHtml(value)
     .replace(/`([^`]+)`/g, (match, code) => `<code>${code}</code>`)
-    .replace(/!\[([^\]]*)\]\(\s*([^)\s]+)[^)]*\)/g, (match, alt, url) => `<img src="${url}" alt="${alt}" />`)
+    .replace(/!\[([^\]]*)\]\(\s*([^)\s]+)[^)]*\)/g, (match, alt, url) => `<img loading="lazy" src="${url}" alt="${alt}" />`)
     .replace(/\[([^\]]+)\]\(\s*([^)\s]+)[^)]*\)/g, (match, label, url) => `<a href="${url}">${label}</a>`)
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
     .replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<em>$2</em>")
@@ -9043,7 +9043,7 @@ function renderCard() {
   els.equipmentCard.innerHTML = `
     <div class="item-hero">
       <div class="item-image">
-        ${record.imageFile ? `<img src="${IMAGE_BASE}${encodeURIComponent(record.imageFile)}" alt="" />` : ""}
+        ${record.imageFile ? `<img loading="lazy" src="${IMAGE_BASE}${encodeURIComponent(record.imageFile)}" alt="" />` : ""}
         <span>${escapeHtml(record.name.slice(0, 2))}</span>
       </div>
       <div>
@@ -9815,7 +9815,7 @@ function dmgRenderBuffs(skillKey) {
     ? buffs
         .map((b) => {
           const icon = b.icon
-            ? `<img class="dmg-chk-icon" src="${CDN_ETC_ROOT}images/buff/${encodeURIComponent(b.icon)}" alt="" />`
+            ? `<img loading="lazy" class="dmg-chk-icon" src="${CDN_ETC_ROOT}images/buff/${encodeURIComponent(b.icon)}" alt="" />`
             : '<span class="dmg-chk-icon"></span>';
           const on = dmg.buffChecked.has(b.name) ? " checked" : "";
           const locked = dmgBuffLocked(b, held);
@@ -12534,7 +12534,7 @@ const AURA_BOOKS = {
   jung: { name: "정환의 서", icon: "정환의서.png", seed: 10000, elso: 15000, cash: 1300 },
 };
 const AURA_IMG_BASE = SIM_IMG_BASE;
-const auraBookIcon = (book) => `<img class="aura-book-icon" src="${AURA_IMG_BASE}${encodeURIComponent(AURA_BOOKS[book].icon)}" alt="" />`;
+const auraBookIcon = (book) => `<img loading="lazy" class="aura-book-icon" src="${AURA_IMG_BASE}${encodeURIComponent(AURA_BOOKS[book].icon)}" alt="" />`;
 const AURA_LOG_MAX = 3; // 최근 기록만 보여준다
 
 const aura = {
@@ -14043,7 +14043,7 @@ function eqcMaterialIcon(name) {
   const [src, ...fallbacks] = materialImageUrls(eqcIconName(name));
   if (!src) return "";
   // 숨겨진 탭에서 만들어지므로 lazy로 두면 로드가 걸리지 않는다. 재료 수가 적어 바로 받는다
-  return `<img class="material-icon eqc-icon" src="${src}" alt="" decoding="async"`
+  return `<img loading="lazy" class="material-icon eqc-icon" src="${src}" alt="" decoding="async"`
     + ` data-fallbacks="${escapeHtml(JSON.stringify(fallbacks))}" />`;
 }
 
