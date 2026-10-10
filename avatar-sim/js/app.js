@@ -1,7 +1,65 @@
 // UI of the web avatar simulator (mirrors csharp/TwAvatar/AvatarPanel.cs). Needs compose.js (TW).
 'use strict';
+// TWAvatarSim.mount(host, opts) draws the simulator into host's shadow root, so its styles and element ids never meet
+// the page around it: TalesDB shows it inside its own page (no iframe), web/index.html shows it alone.
+//   opts.css   the stylesheet (css/app.css with its ?v=)       opts.data  where the exported data lives (default: data/)
+//   opts.tdb   TalesDB's avatar list icon base                 opts.art   TalesDB's character art base
+//   opts.embed true inside TalesDB: no page background / padding of its own, TalesDB's font
 (() => {
-  const $ = id => document.getElementById(id);
+  let root = null;
+  const $ = id => root.getElementById(id);
+  const MARKUP = `
+<div id="pick" class="pick-modal hidden">   <!-- character picker: a small window over the simulator -->
+  <div class="pick-box">
+    <div class="pick-head"><h1>캐릭터 선택</h1><button id="pickClose" class="pick-close" title="닫기">×</button></div>
+    <div id="pickGrid" class="pick-grid"></div>
+    <div id="pickStatus" class="status"></div>
+  </div>
+</div>
+<div id="sim" class="screen hidden">
+  <div class="left">
+    <div class="who">
+      <div id="whoCard" class="who-card" title="클릭 = 캐릭터 바꾸기"><img id="whoArt" alt=""><div id="whoTf" class="hidden"></div><div id="whoName" class="nm"></div></div>
+      <div class="who-right">
+        <div id="cats" class="group"></div>
+        <div class="btn-row" style="margin:0">
+          <span id="kinds" class="group"></span>
+          <input id="search" type="search" placeholder="이름 검색" autocomplete="off">
+          <span id="countLabel" class="muted"></span>
+        </div>
+      </div>
+    </div>
+    <div id="grid" class="grid"></div>
+  </div>
+  <div class="right panel">
+    <div class="stage">
+      <canvas id="view" width="516" height="600"></canvas>
+      <div class="ov ov-left"><span class="ov-title">동작</span><div id="motions" class="ov-col"></div></div>
+      <div class="ov ov-right"><span class="ov-title">헤어</span><div id="hairModes" class="ov-col"></div></div>
+      <div id="cdye" class="ov-dye hidden closed"></div>   <!-- 확장 의상 염색: shown while a dyeable outfit is worn -->
+      <button class="arrow ar-up" data-motion="-1" title="이전 동작">▲</button>
+      <button class="arrow ar-left" data-step="-1" title="왼쪽으로 한 칸 회전">◀</button>
+      <button class="arrow ar-right" data-step="1" title="오른쪽으로 한 칸 회전">▶</button>
+      <button class="arrow ar-down" data-motion="1" title="다음 동작">▼</button><span id="dirLabel" class="ar-label"></span>
+    </div>
+    <div id="slots" class="slots"></div>
+    <div class="btn-row hidden" id="playRow">   <!-- zoom / play / tick: kept for scripts, hidden from the page -->
+      <span class="lbl">확대</span><span id="zooms" class="group"></span>
+      <button id="btnPlay" class="btn">⏸ 정지</button>
+      <input id="tick" type="range" min="0" max="0" value="0">
+      <span id="tickLabel" class="muted"></span>
+    </div>
+    <div class="btn-row hidden" id="presetRow">   <!-- presets: hidden from the page, kept for scripts -->
+      <span class="lbl">프리셋</span><span id="presets" class="group"></span>
+    </div>
+    <div class="btn-row hidden" id="exportRow">   <!-- export buttons: hidden from the page, kept for scripts -->
+      <button id="btnPng" class="btn">PNG 저장</button>
+      <button id="btnSheet" class="btn">8방향 시트</button>
+      <button id="btnGif" class="btn">프레임 PNG 묶음</button>
+    </div>
+    <div id="status" class="status hidden"></div>
+  </div>
+</div>`;
   const CHUNK = 96, VIEW = [516, 600];
   // category cards and slot boxes, 5 per row. Transform cloaks have their own screen (the '변신 망토' card in the picker).
   const CAT_ORDER = ['head', 'face', 'body', 'back', 'foot', 'hair', 'costume', 'weapon_av', 'weapon_eq', 'sub'];   // the list buttons
@@ -28,42 +86,28 @@
   const tdbUrl = (slot, id) => TDB_SLOTS.has(slot) && TDB.icons[id] ? TDB.base + TDB.icons[id].split('/').map(encodeURIComponent).join('/') : null;
   const tdbImg = url => `<img class="tdb" src="${url}" alt="" loading="lazy" decoding="async" draggable="false">`;
 
-  // where the exported data lives: 'data/' next to this page, or a CDN (window.TW_DATA_BASE, set before app.js:
-  // e.g. 'https://cdn.jsdelivr.net/gh/<user>/<repo>@v1.0.0/'); images from another origin are loaded with CORS
-  const DATA_BASE = String(window.TW_DATA_BASE || 'data/').replace(/\/?$/, '/');
-  // inside TalesDB (an iframe on talesdb.xyz, see README): ?embed=1, and TalesDB's own CDN for the avatar list icons
-  // (?tdb= its AVATAR_ICON_BASE) and the character art (?art= its CHARACTER_IMAGE_BASE) - the same files its other pages
-  // use, so the browser already has them. Only TalesDB's own image hosts are taken from the query (its R2 CDN, or the
-  // TWHome-Git jsDelivr addresses it used before).
-  const Q = new URLSearchParams(location.search);
-  const cdnParam = k => { const u = Q.get(k); return u && /^https:\/\/(cdn\.talesdb\.xyz\/|cdn\.jsdelivr\.net\/gh\/TWHome-Git\/)[^?#]*$/.test(u) ? u.replace(/\/?$/, '/') : ''; };
-  const EMBED = Q.has('embed') || window.parent !== window;
-  const TDB_BASE = cdnParam('tdb') || window.TW_TDB_BASE || '';
-  const ART_BASE = cdnParam('art') || window.TW_ART_BASE || '';
+  // where the exported data lives (opts.data): 'data/' next to this page, or the CDN; images from another origin are
+  // loaded with CORS. Inside TalesDB, its own CDN gives the avatar list icons (opts.tdb) and the character art
+  // (opts.art) - the same files its other pages use, so the browser already has them.
+  let DATA_BASE = 'data/', TDB_BASE = '', ART_BASE = '';
   const artUrl = name => (ART_BASE || DATA_BASE + 'art/') + encodeURIComponent(name) + '.png';
-  // the frame follows the content: the page reports its height to TalesDB (only a number; TalesDB checks the origin).
-  // Called after every redraw as well as by a ResizeObserver: a page that is not being painted (a background tab, a
-  // covered window) runs no observers, but its refreshes still run
-  let reportHeight = () => {};
-  if (EMBED) {
-    document.documentElement.classList.add('embed');
-    let lastH = 0;
-    const report = reportHeight = () => {
-      const h = Math.ceil(document.body.getBoundingClientRect().height);
-      if (h && h !== lastH && window.parent !== window) { lastH = h; window.parent.postMessage({ type: 'tw-avatar-height', height: h }, '*'); }
-    };
-    const watch = () => { new ResizeObserver(() => report()).observe(document.body); report(); };
-    if (document.readyState === 'loading') window.addEventListener('DOMContentLoaded', watch); else watch();
-  }
 
   async function main() {
+    // everything the first screen needs is asked for at once: the data files, TalesDB's icon list and the last
+    // character (TW.load and TW.loadChar run side by side; a character's file needs nothing from index.json)
+    const q = new URLSearchParams(location.search), tf = q.has('tf'), first = q.has('char') ? +q.get('char') : (settings.lastChar ?? 0);
+    TW.setBase(DATA_BASE);
+    const tdbP = fetch(DATA_BASE + 'tdbicons.json', { cache: 'no-cache' }).then(r => r.json()).catch(() => null);
+    const charP = TW.loadChar(tf ? 0 : first).catch(() => null);   // a wrong ?char= fails again (and reports) in selectChar
     const idx = await TW.load(DATA_BASE);
-    try { TDB = await (await fetch(DATA_BASE + 'tdbicons.json', { cache: 'no-cache' })).json(); } catch (e) { /* no TalesDB icons: the exported sheets are used */ }
-    if (TDB_BASE) TDB.base = TDB_BASE;                     // TalesDB passes its current avatar image tag
+    TDB = (await tdbP) || TDB;                             // no TalesDB icons: the exported sheets are used
+    if (TDB_BASE) TDB.base = TDB_BASE;                     // TalesDB passes its current avatar image address
+    await charP;
     const g = $('pickGrid'); g.innerHTML = '';
     for (const c of idx.chars) {
+      // the art loads when the picker first opens (19 pictures the first screen does not show)
       const d = document.createElement('div'); d.className = 'pick-card';
-      d.innerHTML = `<img src="${artUrl(c.art)}" alt=""><div class="nm">${c.name}</div>`; d.title = c.full;
+      d.innerHTML = `<img data-src="${artUrl(c.art)}" alt=""><div class="nm">${c.name}</div>`; d.title = c.full;
       d.onclick = () => selectChar(c.idx);
       g.appendChild(d);
     }
@@ -77,15 +121,14 @@
     $('pickClose').onclick = hidePicker;
     $('pick').onclick = e => { if (e.target === $('pick')) hidePicker(); };
     document.addEventListener('keydown', e => { if (e.key === 'Escape') hidePicker(); });
-    const q = new URLSearchParams(location.search);
-    if (q.has('tf')) selectTransforms();
-    else selectChar(q.has('char') ? +q.get('char') : (settings.lastChar ?? 0));   // no picker page first: open the last character
+    if (tf) selectTransforms();
+    else selectChar(first);                                // no picker page first: open the last character
   }
   function buildStatic(idx) {
     group($('zooms'), [[1, '1x'], [2, '2x']], v => { st.zoom = v; applyZoom(); }, () => st.zoom);
     buildHairToggles();
     group($('presets'), [['1', '1'], ['2', '2'], ['3', '3']], v => preset(v, false), () => null, v => preset(v, true));
-    document.querySelectorAll('.arrow').forEach(b => b.onclick = () => { if (b.dataset.motion) stepMotion(+b.dataset.motion); else stepDir(+b.dataset.step); });
+    root.querySelectorAll('.arrow').forEach(b => b.onclick = () => { if (b.dataset.motion) stepMotion(+b.dataset.motion); else stepDir(+b.dataset.step); });
     $('whoCard').onclick = showPicker;
     $('grid').onscroll = () => { const g = $('grid'); if (g.scrollTop + g.clientHeight > g.scrollHeight - 300) appendCards(); };
     $('search').oninput = () => { st.q = $('search').value.trim().toLowerCase(); fillGrid(); };
@@ -135,7 +178,10 @@
     syncGroup(el, get);
   }
   function syncGroup(el, get) { const cur = get(); el.querySelectorAll('.btn').forEach(b => b.classList.toggle('on', String(b.dataset.v) === String(cur))); }
-  function showPicker() { $('pick').classList.remove('hidden'); }
+  function showPicker() {
+    $('pickGrid').querySelectorAll('img[data-src]').forEach(im => { im.src = im.dataset.src; im.removeAttribute('data-src'); });
+    $('pick').classList.remove('hidden');
+  }
   function hidePicker() { if (st.ci >= 0) $('pick').classList.add('hidden'); }
 
   async function selectChar(ci) {
@@ -169,7 +215,7 @@
     for (const id of ['cats', 'kinds', 'slots']) $(id).classList.toggle('hidden', tf);
     $('sim').classList.toggle('tf', tf);                 // transform screen: a taller preview takes the slots' place (css)
     $('whoArt').classList.toggle('hidden', tf); $('whoTf').classList.toggle('hidden', !tf);
-    document.querySelector('.ov-right').classList.toggle('hidden', tf);          // hair toggles: a transform hides the hair
+    root.querySelector('.ov-right').classList.toggle('hidden', tf);          // hair toggles: a transform hides the hair
   }
   // paint one icon-sheet cell into a box, scaled to fit `size`
   function drawCellInto(box, cell, size) {
@@ -337,7 +383,7 @@
   const esc = s => String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
   function markSelected() {
     const on = new Set(st.mode === 'tf' ? [st.tf] : Object.values(st.equip)); if (st.cat === 'hair') on.add(st.hair);
-    document.querySelectorAll('#grid .card').forEach(d => d.classList.toggle('on', on.has(+d.dataset.id)));
+    root.querySelectorAll('#grid .card').forEach(d => d.classList.toggle('on', on.has(+d.dataset.id)));
   }
   async function pick(e) {
     if (st.mode === 'tf') { st.tf = e.id; tfMotionButtons(); fitTransformMotion(e.id); markSelected(); refresh(); return; }
@@ -377,14 +423,14 @@
     const c = document.createElement('div'); c.className = 'slot clear'; c.title = '착용한 아이템을 전부 벗습니다';
     c.innerHTML = '<div class="sym">⟲</div><div>전부 해제</div>';
     c.onclick = () => { st.equip = {}; st.hidden.clear(); st.cdye = {}; st.hair = TW.S.index.chars[st.ci].default_hair; st.hairHidden = false; st.hairMode = 'all';
-                        st.dye = 0; st.dyeBy[st.hair] = 0; const cd = document.querySelector(`#grid .card[data-id="${st.hair}"]`); if (cd && st.cat === 'hair') cardIcon(cd, st.char.hairById[st.hair]);
+                        st.dye = 0; st.dyeBy[st.hair] = 0; const cd = root.querySelector(`#grid .card[data-id="${st.hair}"]`); if (cd && st.cat === 'hair') cardIcon(cd, st.char.hairById[st.hair]);
                         syncHair(); markSelected(); refresh(); };
     el.appendChild(c);
   }
   function refreshSlots() {
     if (st.mode === 'tf') return;
     const short = {};
-    document.querySelectorAll('#slots .slot:not(.clear)').forEach(d => {
+    root.querySelectorAll('#slots .slot:not(.clear)').forEach(d => {
       const key = d.dataset.key, ic = d.querySelector('.ic'), cb = d.querySelector('input'), lb = d.querySelector('.lb');
       let id = key === 'hair' ? st.hair : st.equip[key], name = '';
       if (key === 'hair' && id >= 0) { const h = st.char.hairById[id], dn = st.dye ? (TW.dyes(id)[st.dye - 1] || [])[0] : ''; name = (h ? hairLabel(id) : String(id)) + (dn ? ` (${dn})` : ''); }
@@ -479,7 +525,6 @@
     { const [w, h] = logical(); anchor = TW.centeredAnchor(p, w, h); } st.lastPose = p;
     stageLabel();
     drawNow(); status(`${TW.S.index.chars[st.ci].name}: 아이템 ${Object.keys(st.equip).length}개, ${st.maxT + 1}틱`);
-    reportHeight();
   }
   function drawNow() {
     if (st.ci < 0 || !TW.S.chars[st.ci]) return;
@@ -511,11 +556,25 @@
   const MOBILE = /Android|iPhone|iPad|iPod|Mobile|Windows Phone/i.test(navigator.userAgent) ||
                  (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent)) ||               // iPadOS asks as a Mac
                  (matchMedia('(pointer: coarse)').matches && !matchMedia('(any-pointer: fine)').matches);
-  if (MOBILE) {
-    $('pick').classList.add('hidden'); $('sim').classList.add('hidden');
-    const n = document.createElement('div'); n.className = 'mobile-block';
-    n.innerHTML = '<b>아바타 시뮬레이터는 PC에서만 이용할 수 있습니다.</b><span>PC 브라우저로 접속해 주세요.</span>';
-    document.body.appendChild(n); reportHeight(); return;
+
+  function mount(host, opts = {}) {
+    if (root) return;                                      // one simulator per page
+    root = host.shadowRoot || host.attachShadow({ mode: 'open' });
+    const dir = u => String(u).replace(/\/?$/, '/');
+    DATA_BASE = dir(opts.data || window.TW_DATA_BASE || 'data/');
+    TDB_BASE = opts.tdb ? dir(opts.tdb) : '';
+    ART_BASE = opts.art ? dir(opts.art) : '';
+    if (opts.embed) host.classList.add('embed');
+    // the host stays invisible until app.css has loaded (app.css makes it visible), so the bare markup never flashes
+    root.innerHTML = '<style>:host { display: block; visibility: hidden; } .hidden { display: none !important; }</style>' +
+                     `<link rel="stylesheet" href="${esc(opts.css || 'css/app.css')}">` + MARKUP;
+    if (MOBILE) {
+      $('pick').classList.add('hidden'); $('sim').classList.add('hidden');
+      const n = document.createElement('div'); n.className = 'mobile-block';
+      n.innerHTML = '<b>아바타 시뮬레이터는 PC에서만 이용할 수 있습니다.</b><span>PC 브라우저로 접속해 주세요.</span>';
+      root.appendChild(n); return;
+    }
+    main().catch(e => { $('pickStatus').textContent = '데이터를 읽지 못했습니다: ' + e.message; $('pick').classList.remove('hidden'); console.error(e); });
   }
-  main().catch(e => { $('pickStatus').textContent = '데이터를 읽지 못했습니다: ' + e.message + ' (web/data 가 있는지, TW_Web.bat 로 열었는지 확인)'; console.error(e); });
+  window.TWAvatarSim = { mount };
 })();

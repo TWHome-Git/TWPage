@@ -1,13 +1,12 @@
-:root {
+/* the simulator lives in a shadow root (app.js mount): :host is its box; visible once this file has loaded */
+:host {
   --primary: #0f6b62; --primary-dark: #0b544d; --primary-soft: #e3f1ee;
   --bg1: #eef6f3; --bg2: #f7faf8; --panel: #fff; --line: #dfe6e3; --line-strong: #c9d4cf;
   --text: #1f2a28; --muted: #6b7a76; --icon: #f1f4f3; --stage: #3b4442;
   --radius: 12px; --shadow: 0 1px 2px rgba(20, 40, 36, .06), 0 6px 18px rgba(20, 40, 36, .06);
 }
 * { box-sizing: border-box; }
-html, body { height: 100%; }
-body { margin: 0; font: 13px/1.45 "Pretendard", "Malgun Gothic", "맑은 고딕", system-ui, sans-serif; color: var(--text);
-       background: linear-gradient(135deg, var(--bg1), var(--bg2) 55%, #eaf3ef); }
+:host { display: block; visibility: visible; font: 13px/1.45 "Pretendard", "Malgun Gothic", "맑은 고딕", system-ui, sans-serif; color: var(--text); }
 .hidden { display: none !important; }
 .screen { padding: 14px 16px; min-height: 100vh; max-width: 1200px; margin: 0 auto; }   /* talesdb content width */
 h1 { font-size: 22px; margin: 6px 0 14px; letter-spacing: -.5px; }
@@ -206,14 +205,11 @@ input[type=search]:focus { outline: none; border-color: var(--primary); box-shad
 .ov-dye.closed .row, .ov-dye.closed .foot { display: none; }
 .ov-dye .btn { font-size: 12px; padding: 3px 10px; }
 
-/* inside TalesDB (iframe, ?embed=1): no page background / padding of its own, TalesDB's font stack, and nothing sized by
-   the viewport - the frame takes the page's height, so a vh-sized box would grow the frame without end */
-.embed, .embed body { height: auto; min-height: 0; background: transparent; }
-.embed body { font-family: "IBM Plex Sans KR", "Noto Sans KR", "Malgun Gothic", sans-serif; }
-.embed .screen { padding: 0; max-width: none; min-height: 0; }
-.embed .pick-modal { align-items: flex-start; padding-top: 72px; }
-.embed .pick-box { max-height: 640px; }
-@media (max-width: 900px) { .embed .left .grid { height: 520px; } }
+/* inside TalesDB (mount opts.embed): no padding of its own, TalesDB's font stack, and nothing sized by the viewport */
+:host(.embed) { font-family: "IBM Plex Sans KR", "Noto Sans KR", "Malgun Gothic", sans-serif; }
+:host(.embed) .screen { padding: 0; max-width: none; min-height: 0; }
+:host(.embed) .pick-box { max-height: min(640px, 90vh); }
+@media (max-width: 900px) { :host(.embed) .left .grid { height: 520px; } }
 /* phones / tablets: a notice instead of the simulator */
 .mobile-block { display: flex; flex-direction: column; gap: 6px; align-items: center; justify-content: center; text-align: center; padding: 48px 16px; color: var(--muted); font-size: 14px; }
 .mobile-block b { color: var(--text); font-size: 15px; }

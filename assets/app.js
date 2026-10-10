@@ -4090,34 +4090,42 @@ function activateSimulatorTab(key) {
   routeWrite();
 }
 
-// 아바타 시뮬레이터는 avatar-sim/ 의 페이지(TW_Tools 의 TW_Publish.bat 가 복사해 넣음)를 iframe으로 띄운다.
-// 그 페이지의 데이터(애니메이션·텍스처 약 450MB)는 R2(https://cdn.talesdb.xyz/avatar-sim/)에 있다.
+// 아바타 시뮬레이터는 avatar-sim/ 의 코드(TW_Tools 의 TW_Publish.bat 가 복사해 넣음)를 탭을 처음 열 때 불러와
+// #avatarSimHost 안에 그린다. iframe 없이 이 페이지에 바로 들어가고, shadow root 안이라 스타일·id가 이 사이트와 섞이지 않는다.
+// 데이터(애니메이션·텍스처 약 450MB)는 R2(https://cdn.talesdb.xyz/avatar-sim/)에 있다.
 // 목록 아이콘·캐릭터 그림은 이 사이트의 이미지 주소를 넘겨 같은 파일(브라우저 캐시)을 쓰게 한다.
-// 주소는 탭을 처음 열 때만 넣는다. 다른 화면만 보는 방문자가 시뮬레이터를 받지 않게.
-const AVATAR_SIM_URL = "/avatar-sim/";
-// PC 전용: 휴대폰·태블릿에서는 iframe을 불러오지 않고 안내만 보여 준다 (데이터도 받지 않게)
+const AVATAR_SIM_ROOT = "/avatar-sim/";
+// PC 전용: 휴대폰·태블릿에서는 코드를 불러오지 않고 안내만 보여 준다 (데이터도 받지 않게)
 const AVATAR_SIM_MOBILE = /Android|iPhone|iPad|iPod|Mobile|Windows Phone/i.test(navigator.userAgent) ||
   (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent)) ||
   (matchMedia("(pointer: coarse)").matches && !matchMedia("(any-pointer: fine)").matches);
 function openAvatarSim() {
-  const frame = document.getElementById("avatarSimFrame");
-  if (!frame || frame.getAttribute("src")) return;
+  const host = document.getElementById("avatarSimHost");
+  if (!host || host.dataset.started) return;
+  host.dataset.started = "1";
   if (AVATAR_SIM_MOBILE) {
     const note = document.getElementById("avatarSimMobile");
     if (note) note.hidden = false;
-    frame.hidden = true;
+    host.hidden = true;
     return;
   }
-  const q = new URLSearchParams({ embed: "1", tdb: AVATAR_ICON_BASE, art: CHARACTER_IMAGE_BASE });
-  frame.src = `${AVATAR_SIM_URL}?${q}`;
+  // 두 파일을 동시에 받되 순서대로 실행한다 (app.js가 compose.js의 TW를 쓴다). ?v= 는 코드가 바뀔 때마다 새로 받게
+  const v = host.dataset.simV ? `?v=${host.dataset.simV}` : "";
+  const load = (src) => new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = src; s.async = false; s.onload = resolve; s.onerror = () => reject(new Error(src));
+    document.head.appendChild(s);
+  });
+  Promise.all([load(`${AVATAR_SIM_ROOT}js/compose.js${v}`), load(`${AVATAR_SIM_ROOT}js/app.js${v}`)])
+    .then(() => window.TWAvatarSim.mount(host, {
+      css: `${AVATAR_SIM_ROOT}css/app.css${v}`, data: `${CDN_ROOT}avatar-sim/`,
+      tdb: AVATAR_ICON_BASE, art: CHARACTER_IMAGE_BASE, embed: true,
+    }))
+    .catch((err) => {
+      console.error(err);
+      host.textContent = "아바타 시뮬레이터를 불러오지 못했습니다. 새로고침해 주세요.";
+    });
 }
-// 시뮬레이터가 자기 높이를 알려 오면 iframe을 그 높이로 맞춘다 (안쪽 스크롤 없이 페이지처럼 보이게)
-window.addEventListener("message", (event) => {
-  const frame = document.getElementById("avatarSimFrame");
-  if (!frame || event.source !== frame.contentWindow || event.origin !== new URL(AVATAR_SIM_URL, location.href).origin) return;
-  const h = event.data && event.data.type === "tw-avatar-height" ? Number(event.data.height) : 0;
-  if (h > 0) frame.style.height = `${Math.min(Math.ceil(h), 4000)}px`;
-});
 
 const INFO_TITLES = { seed: "주간 시드 한도", exp: "경험치 버프", rare: "레어 버프", soul: "소울 링크" };
 

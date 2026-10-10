@@ -26,19 +26,25 @@ const TW = (() => {
     return S.pending[key];
   }
 
+  // every start-up file in one round trip (they used to come one after another: 6 round trips before the first
+  // animation). Only the animations / textures carry ?v= (force-cached); these small files are revalidated (no-cache),
+  // so they need no version and need not wait for version.json. setBase() lets loadChar() start alongside load().
+  function setBase(base) { S.base = base.replace(/\/?$/, '/'); }
   async function load(base) {
-    S.base = base.replace(/\/?$/, '/');
-    try { S.ver = (await getJSON(S.base + 'version.json')).stamp || 0; } catch (e) { S.ver = 0; }
-    [S.index, S.extras] = await Promise.all([getJSON(S.base + 'index.json'), getJSON(S.base + 'extras.json')]);
-    try { S.dye = await getJSON(S.base + 'hairdye.json' + v()); S.dyeTex = new Set(S.dye.tex); } catch (e) { /* no dye data: hair undyed */ }
-    try { S.cdye = await getJSON(S.base + 'costumedye.json' + v()); for (const t of S.cdye.tex) S.dyeTex.add(t); } catch (e) { /* no costume dye data */ }
+    setBase(base);
+    const [ver, index, extras, dye, cdye] = await Promise.all([
+      getJSON(S.base + 'version.json').catch(() => ({})), getJSON(S.base + 'index.json'), getJSON(S.base + 'extras.json'),
+      getJSON(S.base + 'hairdye.json').catch(() => null), getJSON(S.base + 'costumedye.json').catch(() => null)]);
+    S.ver = ver.stamp || 0; S.index = index; S.extras = extras;
+    if (dye) { S.dye = dye; S.dyeTex = new Set(dye.tex); }               // no dye data: hair undyed
+    if (cdye) { S.cdye = cdye; for (const t of cdye.tex) S.dyeTex.add(t); }   // no costume dye data
     return S.index;
   }
   async function loadChar(ci) {
     if (S.chars[ci]) return S.chars[ci];
     return once('char' + ci, async () => {
-      const c = await getJSON(S.base + 'chars/' + ci + '.json');
-      try { c.iconMap = await getJSON(S.base + 'icons/' + ci + '/map.json' + v()); } catch (e) { c.iconMap = { i: {}, h: {}, stamp: 0 }; }
+      const [c, map] = await Promise.all([getJSON(S.base + 'chars/' + ci + '.json'), getJSON(S.base + 'icons/' + ci + '/map.json').catch(() => null)]);
+      c.iconMap = map || { i: {}, h: {}, stamp: 0 };
       c.byId = {}; c.items.forEach((it, i) => { it.index = i; c.byId[it.id] = it; });
       c.hairById = {}; c.hair.forEach((h, i) => { h.index = i; c.hairById[h.id] = h; });
       S.chars[ci] = c; return c;
@@ -460,8 +466,8 @@ const TW = (() => {
   async function loadTransforms() {
     if (S.tlist) return S.tlist;
     return once('tlist', async () => {
-      const t = await getJSON(S.base + 'transforms.json' + v());
-      try { t.iconMap = await getJSON(S.base + 'icons/t/map.json' + v()); } catch (e) { t.iconMap = { i: {}, stamp: 0 }; }
+      const [t, map] = await Promise.all([getJSON(S.base + 'transforms.json' + v()), getJSON(S.base + 'icons/t/map.json' + v()).catch(() => null)]);
+      t.iconMap = map || { i: {}, stamp: 0 };
       t.byId = {}; t.items.forEach((it, i) => { it.index = i; it.slot = 'transform'; t.byId[it.id] = it; });
       S.tlist = t; return t;
     });
@@ -549,6 +555,6 @@ const TW = (() => {
     return null;
   }
 
-  return { S, load, loadChar, loadAnim, loadTex, prepare, plan, compose, render, drawLayers, centeredAnchor, bounds,
+  return { S, setBase, load, loadChar, loadAnim, loadTex, prepare, plan, compose, render, drawLayers, centeredAnchor, bounds,
            maxDuration, frameTimes, iconSheet, itemIcon, hairIcon, dyes, costumeDyes, loadTransforms, transformIcon, resolveMotion, motionsOf };
 })();
