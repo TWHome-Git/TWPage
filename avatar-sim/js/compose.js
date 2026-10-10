@@ -15,9 +15,14 @@ const TW = (() => {
   const v = () => '?v=' + S.ver;            // data version (version.json): changes on every TW_WebExport run
   const ext = () => (S.index && S.index.img_ext) || '.png';   // image format of atlases / icon sheets (index.json img_ext)
 
+  // browser-cache generation of the CDN files (cg=): bump it when browsers hold copies they cannot use. Generation 2:
+  // copies saved before cdn.talesdb.xyz (CloudFront since 2026-10-10) sent Access-Control-Allow-Origin. A revalidation
+  // of such a copy is answered 304 without CORS headers, so the browser kept the header-less copy and blocked it
+  const CG = 'cg=2';
+  const bust = url => url + (url.includes('?') ? '&' : '?') + CG;
   async function getJSON(url) {
     // animations / textures never change once exported -> cache hard; the small index files are revalidated
-    const r = await fetch(url, { cache: /\/(anim|tex)\//.test(url) ? 'force-cache' : 'no-cache' });
+    const r = await fetch(bust(url), { cache: /\/(anim|tex)\//.test(url) ? 'force-cache' : 'no-cache' });
     if (!r.ok) throw new Error(url + ': ' + r.status);
     return r.json();
   }
@@ -76,7 +81,7 @@ const TW = (() => {
   function loadImage(url) {
     // crossOrigin: the atlases are read back with getImageData (dyes, additive layers), which a CDN-hosted image
     // only allows when it was requested with CORS (jsDelivr / R2 answer with Access-Control-Allow-Origin: *)
-    return new Promise((res, rej) => { const im = new Image(); im.crossOrigin = 'anonymous'; im.onload = () => res(im); im.onerror = () => rej(new Error(url)); im.src = url; });
+    return new Promise((res, rej) => { const im = new Image(); im.crossOrigin = 'anonymous'; im.onload = () => res(im); im.onerror = () => rej(new Error(url)); im.src = bust(url); });
   }
   async function loadTex(tid) {
     if (S.texs[tid] !== undefined) return S.texs[tid];
@@ -559,6 +564,6 @@ const TW = (() => {
     return null;
   }
 
-  return { S, setBase, load, loadChar, loadAnim, loadTex, prepare, plan, compose, render, drawLayers, centeredAnchor, bounds,
+  return { S, setBase, bust, load, loadChar, loadAnim, loadTex, prepare, plan, compose, render, drawLayers, centeredAnchor, bounds,
            maxDuration, frameTimes, iconSheet, itemIcon, hairIcon, dyes, costumeDyes, loadTransforms, transformIcon, resolveMotion, motionsOf };
 })();

@@ -97,7 +97,7 @@
     // character (TW.load and TW.loadChar run side by side; a character's file needs nothing from index.json)
     const q = new URLSearchParams(location.search), tf = q.has('tf'), first = q.has('char') ? +q.get('char') : (settings.lastChar ?? 0);
     TW.setBase(DATA_BASE);
-    const tdbP = fetch(DATA_BASE + 'tdbicons.json', { cache: 'no-cache' }).then(r => r.json()).catch(() => null);
+    const tdbP = fetch(TW.bust(DATA_BASE + 'tdbicons.json'), { cache: 'no-cache' }).then(r => r.json()).catch(() => null);
     const charP = TW.loadChar(tf ? 0 : first).catch(() => null);   // a wrong ?char= fails again (and reports) in selectChar
     const idx = await TW.load(DATA_BASE);
     TDB = (await tdbP) || TDB;                             // no TalesDB icons: the exported sheets are used
