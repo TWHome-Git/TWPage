@@ -41,12 +41,14 @@ const TW = (() => {
   function setBase(base) { S.base = base.replace(/\/?$/, '/'); }
   async function load(base) {
     setBase(base);
-    const [ver, index, extras, dye, cdye] = await Promise.all([
+    const [ver, index, extras, dye, cdye, bdye] = await Promise.all([
       getJSON(S.base + 'version.json').catch(() => ({})), getJSON(S.base + 'index.json'), getJSON(S.base + 'extras.json'),
-      getJSON(S.base + 'hairdye.json').catch(() => null), getJSON(S.base + 'costumedye.json').catch(() => null)]);
+      getJSON(S.base + 'hairdye.json').catch(() => null), getJSON(S.base + 'costumedye.json').catch(() => null),
+      getJSON(S.base + 'basedye.json').catch(() => null)]);
     S.ver = ver.stamp || 0; S.index = index; S.extras = extras;
     if (dye) { S.dye = dye; S.dyeTex = new Set(dye.tex); }               // no dye data: hair undyed
     if (cdye) { S.cdye = cdye; for (const t of cdye.tex) S.dyeTex.add(t); }   // no costume dye data
+    if (bdye) { S.bdye = bdye; for (const t of bdye.tex) S.dyeTex.add(t); }   // no base outfit dye data
     return S.index;
   }
   async function loadChar(ci) {
@@ -155,6 +157,18 @@ const TW = (() => {
       const b0 = parseInt(base[0] || '000000', 16), cl = v => v < 0 ? 0 : v > 255 ? 255 : v;   // the part's first ramp entry = the chosen colour
       idx.forEach((pi, i) => { const b = parseInt(base[i] || 'ffffff', 16); lut[pi] = [cl(cr + (b >> 16 & 255) - (b0 >> 16 & 255)), cl(cg + (b >> 8 & 255) - (b0 >> 8 & 255)), cl(cb + (b & 255) - (b0 & 255))]; });
     }
+    return lutImage(t, key, lut);
+  }
+
+  // 기본 의상 염색 (basedye.json / DB 0186 + 0068): each character's own outfit has up to 6 parts, each with up to 10
+  // preset ramps {palette index: rrggbb} - the colours the game offers. choice = {part index: preset index}
+  function baseDyes(ci) { return ((S.bdye || {}).chars || {})[ci] || []; }
+  function baseImage(t, ci, choice) {
+    const parts = baseDyes(ci), ks = Object.keys(choice || {}).filter(k => parts[k] && parts[k][2][choice[k]]).sort();
+    if (!ks.length) return t.img;
+    const key = 'b' + ci + ':' + ks.map(k => k + '=' + choice[k]).join(','); if (t.dyed[key]) return t.dyed[key];
+    const lut = new Array(256).fill(null);
+    for (const k of ks) { const ramp = parts[k][2][choice[k]]; for (const i in ramp) { const c = parseInt(ramp[i], 16); lut[+i] = [c >> 16 & 255, c >> 8 & 255, c & 255]; } }
     return lutImage(t, key, lut);
   }
 
@@ -380,8 +394,13 @@ const TW = (() => {
     if (cdi !== undefined && body.a !== S.extras.transforms[cdi].anim) {
       cdye = {}; costumeDyes(cdi).forEach(([n], k) => { if (pose.cdye[k] && !n.startsWith('머리')) cdye[k] = pose.cdye[k]; });
     }
+    // 기본 의상 염색: pose.bdye = {part index: preset index}, only while the character's own body is drawn (its weapon
+    // bodies included), not a costume / transform standing in for it
+    const cb = S.chars[pose.char], ownBody = cb && (body.a === S.index.chars[pose.char].body || Object.values(cb.weapon_body || {}).includes(body.a));
+    const bdye = ownBody && pose.bdye && Object.keys(pose.bdye).length ? pose.bdye : null;
     if (body.m !== null) for (const L of animLayers(S.anims[body.a], body.m, pose.dir, t, null, attach, true)) {
       if (cdi !== undefined) L.img = costumeImage(L.tex, cdi, cdye);
+      else if (bdye) L.img = baseImage(L.tex, pose.char, bdye);
       layers.push(Object.assign(L, { z: BODY_Z, pri: 0, tag: 'body' }));
     }
     for (const p of P.slice(1)) {
@@ -592,6 +611,6 @@ const TW = (() => {
     return null;
   }
 
-  return { S, setBase, bust, getJSON, load, loadChar, loadAnim, loadTex, prepare, plan, compose, render, drawLayers, centeredAnchor, bounds,
+  return { S, setBase, bust, getJSON, baseDyes, load, loadChar, loadAnim, loadTex, prepare, plan, compose, render, drawLayers, centeredAnchor, bounds,
            maxDuration, frameTimes, iconSheet, itemIcon, hairIcon, dyes, costumeDyes, loadTransforms, transformIcon, resolveMotion, motionsOf };
 })();

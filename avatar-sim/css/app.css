@@ -269,3 +269,12 @@ input[type=search]:focus { outline: none; border-color: var(--primary); box-shad
 .cpick .act .btn { font-size: 12px; padding: 4px 14px; }
 .cpick .act .ok { background: var(--primary); border-color: var(--primary); color: #fff; font-weight: 600; }
 .cpick .act .ok:hover { background: var(--primary-dark); }
+/* 기본 의상 염색 (app.js basePanel): per part its name (× clears) and the game's colours as dots under it */
+.ov-dye .brow { display: flex; flex-direction: column; gap: 3px; color: #e6ecea; font-size: 12px; }
+.ov-dye .btop { display: flex; align-items: center; gap: 6px; }
+.ov-dye .btop span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ov-dye .btop .x.unset { opacity: .35; }
+.ov-dye .bsw { display: flex; flex-wrap: wrap; gap: 3px; }
+.ov-dye .bsw .p { width: 14px; height: 14px; padding: 0; border: 1px solid rgba(255, 255, 255, .35); border-radius: 50%; cursor: pointer; }
+.ov-dye .bsw .p:hover { border-color: #fff; }
+.ov-dye .bsw .p.on { border: 2px solid #fff; box-shadow: 0 0 0 1px var(--primary); }

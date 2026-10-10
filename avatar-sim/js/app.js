@@ -96,7 +96,8 @@
                motion: 0, dir: 10, tick: 0, maxT: 0, zoom: 2, cat: 'head', kind: 'all', q: '', shown: 0, list: [],
                playing: true, loading: 0, timer: null, lastPose: null, mode: 'char', tf: 0,     // mode 'tf' = transform cloak screen
                secret: false,                                                                    // the hidden items are listed
-               part: 'all' };                                                                    // weapon type shown (PART_CATS lists)
+               part: 'all',                                                                      // weapon type shown (PART_CATS lists)
+               bdye: {} };                                                                       // 기본 의상 염색: {part index: preset index}
   const settings = loadLS('tw_avatar_settings', { hatHairModes: {}, presets: {}, lastChar: null });
   function loadLS(k, def) { try { return Object.assign(def, JSON.parse(localStorage.getItem(k) || '{}')); } catch (e) { return def; } }
   function saveLS() { try { localStorage.setItem('tw_avatar_settings', JSON.stringify(settings)); } catch (e) { } }
@@ -215,7 +216,7 @@
     $('pickStatus').textContent = '불러오는 중…';
     const idx = TW.S.index, c = await TW.loadChar(ci);
     setMode('char');
-    st.ci = ci; st.char = c; st.equip = {}; st.hidden.clear(); st.hairHidden = false; st.dye = 0; st.dyeBy = {}; st.cdye = {};
+    st.ci = ci; st.char = c; st.equip = {}; st.hidden.clear(); st.hairHidden = false; st.dye = 0; st.dyeBy = {}; st.cdye = {}; st.bdye = {};
     if (!CAT_ORDER.includes(st.cat)) st.cat = 'head';   // coming from the transform cloak screen: start on 투구 확장
     st.hair = idx.chars[ci].default_hair; st.motion = 0; st.dir = 10; st.tick = 0; st.q = ''; $('search').value = '';
     settings.lastChar = ci; saveLS();
@@ -469,7 +470,7 @@
     }
     const c = document.createElement('div'); c.className = 'slot clear'; c.title = '착용한 아이템을 전부 벗습니다';
     c.innerHTML = '<div class="sym">⟲</div><div>전부 해제</div>';
-    c.onclick = () => { st.equip = {}; st.hidden.clear(); st.cdye = {}; st.hair = TW.S.index.chars[st.ci].default_hair; st.hairHidden = false; st.hairMode = 'all';
+    c.onclick = () => { st.equip = {}; st.hidden.clear(); st.cdye = {}; st.bdye = {}; st.hair = TW.S.index.chars[st.ci].default_hair; st.hairHidden = false; st.hairMode = 'all';
                         st.dye = 0; st.dyeBy[st.hair] = 0; const cd = root.querySelector(`#grid .card[data-id="${st.hair}"]`); if (cd && st.cat === 'hair') cardIcon(cd, st.char.hairById[st.hair]);
                         syncHair(); markSelected(); refresh(); };
     el.appendChild(c);
@@ -523,7 +524,7 @@
   function pose() {
     if (st.mode === 'tf') return { char: st.ci, motion: st.motion, dir: st.dir, hair: -1, items: st.tf ? [st.tf] : [], hairMode: 'all', hidden: new Set(), raw: true };
     return { char: st.ci, motion: st.motion, dir: st.dir, hair: st.hairHidden ? -1 : st.hair, dye: st.dye, items: Object.values(st.equip), hairMode: st.hairMode, hidden: st.hidden,
-             cdye: st.equip.costume ? st.cdye[st.equip.costume] || null : null };
+             cdye: st.equip.costume ? st.cdye[st.equip.costume] || null : null, bdye: st.equip.costume ? null : st.bdye };
   }
   function setDir(d) { st.dir = d; stageLabel(); refresh(); }
   function stepDir(s) { const o = TW.S.index.dir_order; setDir(o[(o.indexOf(st.dir) + s + o.length) % o.length]); }
@@ -531,31 +532,16 @@
   function stageLabel() { const ix = TW.S.index; $('dirLabel').textContent = `${ix.dir_names[st.dir] || st.dir} · ${ix.motion_names[st.motion] || st.motion}`; }
   function applyZoom() { const v = $('view'); v.width = VIEW[0]; v.height = VIEW[1]; if (st.lastPose) { const [w, h] = logical(); anchor = TW.centeredAnchor(pose(), w, h); } drawNow(); }
   let anchor = null;
-  // ---------------------------------------------------------------- 확장 의상 염색 (DB 0351): per-part colour pickers on the stage
+  // ---------------------------------------------------------------- 염색 window on the stage: the worn 확장 의상 (DB 0351,
+  // free colours per part) or, with no 확장 의상, the character's own outfit (DB 0186 / 0068, the game's 10 colours per part)
   function dyePanel() {
     const box = $('cdye'), iid = st.mode !== 'tf' && st.equip.costume, parts = iid ? TW.costumeDyes(iid) : [];
+    if (st.mode !== 'tf' && !st.equip.costume) { basePanel(box); return; }
     if (!parts.length) { box.classList.add('hidden'); return; }
     const cur = st.cdye[iid] || (st.cdye[iid] = {});
     if (box.dataset.iid !== String(iid)) {
-      box.dataset.iid = String(iid); box.innerHTML = ''; box.classList.toggle('closed', !st.cdyeOpen);
-      const head = document.createElement('button'); head.className = 'btn head'; head.textContent = '염색'; head.title = '부위별로 색을 고릅니다 (게임의 염색 UI처럼 자유 색상; 부위의 첫 음영 칸 = 고른 색, 나머지는 기준 음영 차이만큼 밝게)';
-      head.onclick = () => { st.cdyeOpen = true; box.classList.remove('closed'); placeDye(); }; box.appendChild(head);
-      // the open window: a title bar to drag it around the stage, × at its right end closes it back to the 염색 button
-      const bar = document.createElement('div'); bar.className = 'bar'; bar.title = '끌어서 옮기기';
-      const ttl = document.createElement('span'); ttl.textContent = '염색';
-      const cls = document.createElement('button'); cls.className = 'close'; cls.textContent = '×'; cls.title = '닫기';
-      cls.onclick = () => { st.cdyeOpen = false; box.classList.add('closed'); placeDye(); };
-      bar.onpointerdown = ev => {
-        if (ev.button !== 0 || ev.target === cls) return;
-        ev.preventDefault(); bar.setPointerCapture(ev.pointerId);
-        const S = box.parentElement.getBoundingClientRect(), B = box.getBoundingClientRect(), dx = ev.clientX - B.left, dy = ev.clientY - B.top;
-        bar.onpointermove = e => {
-          st.cdyePos = { x: Math.max(0, Math.min(S.width - B.width, e.clientX - S.left - dx)), y: Math.max(0, Math.min(S.height - B.height, e.clientY - S.top - dy)) };
-          placeDye();
-        };
-        bar.onpointerup = bar.onpointercancel = () => { bar.onpointermove = null; };
-      };
-      bar.appendChild(ttl); bar.appendChild(cls); box.appendChild(bar);
+      box.dataset.iid = String(iid); box.innerHTML = '';
+      dyeChrome(box, '부위별로 색을 고릅니다 (게임의 염색 UI처럼 자유 색상; 부위의 첫 음영 칸 = 고른 색, 나머지는 기준 음영 차이만큼 밝게)');
       parts.forEach(([name], k) => {
         const row = document.createElement('div'); row.className = 'row'; if (name.startsWith('머리')) row.dataset.hairPart = '1';
         // the part's colour: a swatch opening colorPicker (previews while picking; 확인 keeps it, 취소 puts the old one back)
@@ -580,6 +566,61 @@
     const hairOn = st.hair >= 0 && !st.hairHidden;
     box.querySelectorAll('.row[data-hair-part]').forEach(r => { r.classList.toggle('off', hairOn); r.title = hairOn ? '헤어를 골라서 의상의 머리 대신 그 헤어가 보입니다. 헤어를 벗기면 이 염색이 적용됩니다' : ''; });
     box.classList.remove('hidden'); placeDye();
+  }
+  // the window's frame: the 염색 button (closed) and, open, a title bar to drag it around the stage with × at its right
+  // end closing it back to the button
+  function dyeChrome(box, title) {
+    box.classList.toggle('closed', !st.cdyeOpen);
+    const head = document.createElement('button'); head.className = 'btn head'; head.textContent = '염색'; head.title = title;
+    head.onclick = () => { st.cdyeOpen = true; box.classList.remove('closed'); placeDye(); }; box.appendChild(head);
+    const bar = document.createElement('div'); bar.className = 'bar'; bar.title = '끌어서 옮기기';
+    const ttl = document.createElement('span'); ttl.textContent = '염색';
+    const cls = document.createElement('button'); cls.className = 'close'; cls.textContent = '×'; cls.title = '닫기';
+    cls.onclick = () => { st.cdyeOpen = false; box.classList.add('closed'); placeDye(); };
+    bar.onpointerdown = ev => {
+      if (ev.button !== 0 || ev.target === cls) return;
+      ev.preventDefault(); bar.setPointerCapture(ev.pointerId);
+      const S = box.parentElement.getBoundingClientRect(), B = box.getBoundingClientRect(), dx = ev.clientX - B.left, dy = ev.clientY - B.top;
+      bar.onpointermove = e => {
+        st.cdyePos = { x: Math.max(0, Math.min(S.width - B.width, e.clientX - S.left - dx)), y: Math.max(0, Math.min(S.height - B.height, e.clientY - S.top - dy)) };
+        placeDye();
+      };
+      bar.onpointerup = bar.onpointercancel = () => { bar.onpointermove = null; };
+    };
+    bar.appendChild(ttl); bar.appendChild(cls); box.appendChild(bar);
+  }
+  // 기본 의상 염색: per part the game's colours (up to 10 presets) as dots; the same dot again or × = undyed. The part
+  // called 머리 is the hair, which the body does not draw (hair styles have their own dyes): not offered
+  const presetSwatch = ramp => { const ks = Object.keys(ramp).map(Number).sort((a, b) => a - b); return ramp[ks[Math.floor(ks.length * 0.45)]] || 'ffffff'; };
+  function basePanel(box) {
+    const parts = TW.baseDyes(st.ci).map((p, k) => [p, k]).filter(([p]) => p[0] !== '머리');
+    if (!parts.length) { box.classList.add('hidden'); box.dataset.iid = ''; return; }
+    const mark = () => box.querySelectorAll('.brow').forEach(r => {
+      const k = +r.dataset.k; r.querySelectorAll('.p').forEach(b => b.classList.toggle('on', st.bdye[k] === +b.dataset.j));
+      r.querySelector('.x').classList.toggle('unset', st.bdye[k] === undefined);
+    });
+    if (box.dataset.iid !== 'base' + st.ci) {
+      box.dataset.iid = 'base' + st.ci; box.innerHTML = '';
+      dyeChrome(box, '기본 옷을 부위별로 게임의 염색 색 중에서 골라 입힙니다 (확장 의상을 입으면 그 의상의 염색으로 바뀝니다)');
+      for (const [[name, , presets], k] of parts) {
+        const row = document.createElement('div'); row.className = 'brow'; row.dataset.k = k;
+        const top = document.createElement('div'); top.className = 'btop';
+        const nm = document.createElement('span'); nm.textContent = name; nm.title = name;
+        const x = document.createElement('button'); x.className = 'x'; x.textContent = '×'; x.title = '이 부위 염색 지우기';
+        x.onclick = () => { delete st.bdye[k]; mark(); refresh(); };
+        top.appendChild(nm); top.appendChild(x); row.appendChild(top);
+        const dots = document.createElement('div'); dots.className = 'bsw';
+        presets.forEach((ramp, j) => {
+          const b = document.createElement('button'); b.className = 'p'; b.dataset.j = j; b.style.background = '#' + presetSwatch(ramp); b.title = `${name} ${j + 1}번 색`;
+          b.onclick = () => { if (st.bdye[k] === j) delete st.bdye[k]; else st.bdye[k] = j; mark(); refresh(); };
+          dots.appendChild(b);
+        });
+        row.appendChild(dots); box.appendChild(row);
+      }
+      const all = document.createElement('button'); all.className = 'btn foot'; all.textContent = '전부 지우기';
+      all.onclick = () => { st.bdye = {}; mark(); refresh(); }; box.appendChild(all);
+    }
+    mark(); box.classList.remove('hidden'); placeDye();
   }
   // ---------------------------------------------------------------- colour picker (확장 의상 염색)
   // The browser's own picker has no 확인 / 취소, so this one: saturation / brightness square, hue bar, R G B, the
