@@ -227,5 +227,6 @@ input[type=search]:focus { outline: none; border-color: var(--primary); box-shad
 }
 /* the outfit's 머리 dye while a hair style is worn (not applied) */
 .ov-dye .row.off { opacity: .4; }
-/* the V button (app.js SECRET_CMD): a narrow button right of 다리 확장, shown only while the command is typed */
-#cats .btn.secret-v { grid-column: 6; grid-row: 1; width: 34px; padding: 0; font-weight: 700; font-size: 15px; }
+/* the V button (app.js SECRET_CMD): a small round button right of 다리 확장, shown only while the command is typed */
+#cats .btn.secret-v { grid-column: 6; grid-row: 1; align-self: center; width: 20px; height: 20px; padding: 0; border-radius: 50%;
+                      font-size: 10px; font-weight: 700; line-height: 1; box-shadow: none; }
