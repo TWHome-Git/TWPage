@@ -355,12 +355,12 @@ const TW = (() => {
     for (const e of d.e) for (const k of e) if (k[0] === 6) l = k[1];
     return l;
   }
-  // weapons / off-hand items: an animation without layer keys is the glow of the weapon (금빛 은하, 인퍼널, 여명의 파편 ...,
-  // all additive): it takes the layer of the item's own weapon animation in this motion / facing - in front with a blade
-  // held in front, behind when the character turns away - instead of the default layer 1 (always behind the body)
   // 예프넨's 소드셰이프 light blades: shared by most of them (motion 0 only) and keyed to layer 1, so the blade stayed behind
-  // the body while the hilt is in front - they follow the hilt's layer like the glows above
+  // the body while the hilt is in front - they follow the hilt's layer (in front, behind when she turns away). The
+  // glows of other weapons without layer keys (금빛 은하, 인퍼널 ...) are left on the default layer 1 as before
   const WEAPON_BEAM = new Set([108892, 113556]);
+  // the layer of each worn weapon / off-hand item's own weapon animation in this motion / facing (the first of its
+  // animations with a layer key, beams left out): the WEAPON_BEAM animations are drawn on it
   function weaponLayers(pose, P) {
     const c = S.chars[pose.char], out = {};
     for (const p of P) {
@@ -399,7 +399,7 @@ const TW = (() => {
       // an effect animation without layer keys: in front / behind by its kind (avatarlib.fx_layer: 하트 뿅뿅 in front)
       const dd = p.fl !== null ? dirData(S.anims[p.a], p.m, dv) : null;
       let fl = dd && !dd.e.some(e => e.some(k => k[0] === 6)) ? p.fl : null;
-      if (fl === null && WL[p.tag] !== undefined && (WEAPON_BEAM.has(p.a) || keyLayer(S.anims[p.a], p.m, dv) === null)) fl = WL[p.tag];   // a weapon's glow / light blade
+      if (fl === null && WL[p.tag] !== undefined && WEAPON_BEAM.has(p.a)) fl = WL[p.tag];   // 소드셰이프 light blade
       for (const L of animLayers(S.anims[p.a], p.m, dv, t, attach, attach, false)) {
         if (fl !== null) L.layer = fl;
         if (p.tag === 'hair' && ((pose.hairMode === 'front' && B.includes(L.layer)) || (pose.hairMode === 'back' && F.includes(L.layer)))) continue;   // a hair animation can hold both pieces
