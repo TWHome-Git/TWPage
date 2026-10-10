@@ -78,7 +78,8 @@
   const isSecret = it => it.kind === 'avatar' ? /^여명의 (파편|인도자|여신)/.test(it.name) : /^테네브리스/.test(it.name);
   const shown = it => st.secret || !isSecret(it);
   // lists split by weapon type (index part_names: 세검 장검 ...): a row of type buttons above the list when there are two or more
-  const PART_CATS = new Set(['weapon_av', 'weapon_eq']);
+  // (보조: 이솔렛 물리검 / 마법검, 조슈아 수정구 / 스펠북)
+  const PART_CATS = new Set(['weapon_av', 'weapon_eq', 'sub']);
   // 확장 무기 order: by series, as asked (names differ by character - 슈팅스타(검) / 테일즈 슈팅스타(소드셰이프) - and the
   // collaborations are told apart by their item number ranges); the rest after them in their own order
   const AV_WEAPON_SERIES = [/^별빛/, /^코스믹/, /^드래고닉 레거시/, /탄생석/, /슈팅스타/, /쿠루쿠루/, /뮤직/, /야채/, /키친/, /^아발론/,
@@ -302,10 +303,11 @@
   function partChips() {
     const el = $('parts'), on = st.mode !== 'tf' && PART_CATS.has(st.cat);
     const kind = catKind(st.cat), PN = TW.S.index.part_names;
-    const types = on ? [...new Set(st.char.items.filter(it => it.slot === 'weapon' && it.kind === kind && shown(it)).map(it => it.part))].sort((a, b) => a - b) : [];
+    const types = on ? [...new Set(st.char.items.filter(it => it.slot === catSlot(st.cat) && (!kind || it.kind === kind) && shown(it)).map(it => it.part))].sort((a, b) => a - b) : [];
     if (types.length < 2) { st.part = 'all'; el.classList.add('hidden'); el.innerHTML = ''; return; }
     if (st.part !== 'all' && !types.includes(+st.part)) st.part = 'all';
-    group(el, [['all', '전체'], ...types.map(p => [p, PN[p] || ('종류 ' + p)])], v => { st.part = v; fillGrid(); }, () => st.part);
+    // 이솔렛's off-hand swords are 물리서브검 / 마법서브검 in the data: in the 보조 무기 list just 물리검 / 마법검
+    group(el, [['all', '전체'], ...types.map(p => [p, (PN[p] || ('종류 ' + p)).replace('서브', '')])], v => { st.part = v; fillGrid(); }, () => st.part);
     el.classList.remove('hidden');
   }
   // list buttons without a fixed icon: the first entry of that list (this character's) drawn above the label
