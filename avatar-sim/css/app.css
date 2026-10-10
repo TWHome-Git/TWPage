@@ -244,3 +244,5 @@ input[type=search]:focus { outline: none; border-color: var(--primary); box-shad
 /* weapon types of 확장 무기 / 일반 무기 (app.js partChips): one row between the search box and the list, not scrolled with it */
 .parts { flex: none; margin: 0 0 8px; }
 .parts .btn { font-size: 12px; padding: 3px 12px; }
+/* the closed 염색 window (just its button) sits in the stage's bottom right corner; opened, it keeps its own place */
+.ov-dye.closed { right: 8px; bottom: 8px; }
