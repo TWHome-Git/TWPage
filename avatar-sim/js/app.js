@@ -548,7 +548,7 @@
         let last = 0;
         inp.oninput = () => { cur[k] = inp.value.slice(1); inp.classList.remove('unset'); const now = Date.now(); if (now - last > 120) { last = now; drawNow(); } };
         inp.onchange = () => { cur[k] = inp.value.slice(1); inp.classList.remove('unset'); refresh(); };
-        const nm = document.createElement('span'); nm.textContent = name;
+        const nm = document.createElement('span'); nm.textContent = name; nm.title = name;   // cut short by css: whole on hover
         const x = document.createElement('button'); x.className = 'x'; x.textContent = '×'; x.title = '이 부위 염색 지우기';
         x.onclick = () => { delete cur[k]; inp.value = '#ffffff'; inp.classList.add('unset'); refresh(); };
         row.appendChild(inp); row.appendChild(nm); row.appendChild(x); box.appendChild(row);
