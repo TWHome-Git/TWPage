@@ -1194,10 +1194,18 @@ function materialImageUrls(material) {
     .map((name) => `${IMAGE_BASE}${encodeURIComponent(`${name.replace(/\s+/g, "_")}.png`)}`);
 }
 
+// 재료 칸에 아이템이 아닌 글(획득처)이 오는 경우: 그림 파일이 없으니 받으러 가지 않는다
+const MATERIAL_NO_ICON = new Set(["이벤트 획득"]);
+
 function materialImageNameCandidates(material) {
   const source = clean(material).split("/").map((part) => part.trim()).find(Boolean) || clean(material);
   const base = stripTrailingQuantity(source);
+  if (MATERIAL_NO_ICON.has(base)) return [];
   const candidates = new Set();
+  // 파일 이름이 늘 이 꼴인 것은 맨 앞 후보로 둔다 (없는 이름부터 받으러 가면 404가 한 번씩 난다)
+  //   ○○ 오브 디펜시오 → ○○_오브_-_디펜시오.png,  세크리드 주화(무기) → 세크리드_주화.png
+  if (/ 오브 디펜시오$/.test(base)) candidates.add(base.replace(/ 오브 디펜시오$/, " 오브 - 디펜시오"));
+  if (/^세크리드 주화\(.+\)$/.test(base)) candidates.add("세크리드 주화");
   const add = (value) => {
     const next = clean(value);
     if (next) candidates.add(next);
