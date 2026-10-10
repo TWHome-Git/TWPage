@@ -558,14 +558,20 @@
       bar.appendChild(ttl); bar.appendChild(cls); box.appendChild(bar);
       parts.forEach(([name], k) => {
         const row = document.createElement('div'); row.className = 'row'; if (name.startsWith('머리')) row.dataset.hairPart = '1';
-        const inp = document.createElement('input'); inp.type = 'color'; inp.value = cur[k] ? '#' + cur[k] : '#ffffff'; inp.classList.toggle('unset', !cur[k]); inp.title = name;
-        let last = 0;
-        inp.oninput = () => { cur[k] = inp.value.slice(1); inp.classList.remove('unset'); const now = Date.now(); if (now - last > 120) { last = now; drawNow(); } };
-        inp.onchange = () => { cur[k] = inp.value.slice(1); inp.classList.remove('unset'); refresh(); };
+        // the part's colour: a swatch opening colorPicker (previews while picking; 확인 keeps it, 취소 puts the old one back)
+        const sw = document.createElement('button'); sw.className = 'sw'; sw.title = name;
+        const show = () => { sw.style.background = '#' + (cur[k] || 'ffffff'); sw.classList.toggle('unset', !cur[k]); };
+        show();
+        sw.onclick = () => {
+          const before = cur[k]; let last = 0;
+          colorPicker(sw, cur[k] || 'ffffff',
+            hex => { cur[k] = hex; show(); const now = Date.now(); if (now - last > 120) { last = now; drawNow(); } },
+            hex => { if (hex) cur[k] = hex; else if (before) cur[k] = before; else delete cur[k]; show(); refresh(); });
+        };
         const nm = document.createElement('span'); nm.textContent = name; nm.title = name;   // cut short by css: whole on hover
         const x = document.createElement('button'); x.className = 'x'; x.textContent = '×'; x.title = '이 부위 염색 지우기';
-        x.onclick = () => { delete cur[k]; inp.value = '#ffffff'; inp.classList.add('unset'); refresh(); };
-        row.appendChild(inp); row.appendChild(nm); row.appendChild(x); box.appendChild(row);
+        x.onclick = () => { delete cur[k]; show(); refresh(); };
+        row.appendChild(sw); row.appendChild(nm); row.appendChild(x); box.appendChild(row);
       });
       const all = document.createElement('button'); all.className = 'btn foot'; all.textContent = '전부 지우기';
       all.onclick = () => { st.cdye[iid] = {}; box.dataset.iid = ''; dyePanel(); refresh(); }; box.appendChild(all);
@@ -574,6 +580,65 @@
     const hairOn = st.hair >= 0 && !st.hairHidden;
     box.querySelectorAll('.row[data-hair-part]').forEach(r => { r.classList.toggle('off', hairOn); r.title = hairOn ? '헤어를 골라서 의상의 머리 대신 그 헤어가 보입니다. 헤어를 벗기면 이 염색이 적용됩니다' : ''; });
     box.classList.remove('hidden'); placeDye();
+  }
+  // ---------------------------------------------------------------- colour picker (확장 의상 염색)
+  // The browser's own picker has no 확인 / 취소, so this one: saturation / brightness square, hue bar, R G B, the
+  // eyedropper where the browser has one. onLive(hex) while picking; onDone(hex) on 확인, onDone(null) on 취소 / Esc /
+  // a click outside it. One open at a time.
+  let pickerClose = null;
+  const hsv2rgb = (h, s, v) => { const f = n => { const k = (n + h / 60) % 6; return Math.round(255 * (v - v * s * Math.max(0, Math.min(k, 4 - k, 1)))); }; return [f(5), f(3), f(1)]; };
+  const rgb2hsv = (r, g, b) => { r /= 255; g /= 255; b /= 255; const mx = Math.max(r, g, b), d = mx - Math.min(r, g, b);
+    const h = !d ? 0 : mx === r ? ((g - b) / d + 6) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; return [h * 60, mx ? d / mx : 0, mx]; };
+  const hex2rgb = hex => [0, 2, 4].map(i => parseInt(hex.slice(i, i + 2), 16));
+  const rgb2hex = rgb => rgb.map(v => Math.max(0, Math.min(255, v | 0)).toString(16).padStart(2, '0')).join('');
+  function colorPicker(anchor, hex, onLive, onDone) {
+    if (pickerClose) pickerClose(null);
+    let [h, s, v] = rgb2hsv(...hex2rgb(hex));
+    const el = document.createElement('div'); el.className = 'cpick';
+    el.innerHTML = `<div class="sv"><canvas width="200" height="132"></canvas><i></i></div>
+      <div class="mid">${window.EyeDropper ? '<button class="eye" title="화면에서 색 가져오기"><svg viewBox="0 0 24 24" width="18" height="18"><path d="M19.4 3.6a2.1 2.1 0 0 0-3 0l-2.6 2.6-1.1-1.1-1.4 1.4 1.1 1.1-7.2 7.2V18h3.2l7.2-7.2 1.1 1.1 1.4-1.4-1.1-1.1 2.6-2.6a2.1 2.1 0 0 0 0-3zM7.6 16H6v-1.6l7-7 1.6 1.6z" fill="currentColor"/></svg></button>' : ''}
+        <span class="now"></span><div class="hue"><i></i></div></div>
+      <div class="rgb">${['R', 'G', 'B'].map(c => `<label><input type="number" min="0" max="255" step="1">${c}</label>`).join('')}</div>
+      <div class="act"><button class="btn cancel">취소</button><button class="btn ok">확인</button></div>`;
+    root.appendChild(el);
+    const sv = el.querySelector('.sv'), cv = sv.querySelector('canvas'), dot = sv.querySelector('i'), hue = el.querySelector('.hue'), knob = hue.querySelector('i');
+    const now = el.querySelector('.now'), nums = [...el.querySelectorAll('.rgb input')];
+    const paint = (fromNums) => {
+      const g = cv.getContext('2d'), W = cv.width, H = cv.height;
+      g.fillStyle = `hsl(${h}, 100%, 50%)`; g.fillRect(0, 0, W, H);
+      let gr = g.createLinearGradient(0, 0, W, 0); gr.addColorStop(0, '#fff'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
+      gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, '#000'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
+      dot.style.left = s * 100 + '%'; dot.style.top = (1 - v) * 100 + '%'; knob.style.left = h / 360 * 100 + '%';
+      const rgb = hsv2rgb(h, s, v); now.style.background = '#' + rgb2hex(rgb);
+      if (!fromNums) nums.forEach((n, i) => { n.value = rgb[i]; });
+      return rgb2hex(rgb);
+    };
+    const live = fromNums => onLive(paint(fromNums));
+    const drag = (target, set) => target.onpointerdown = ev => {
+      if (ev.button !== 0) return; ev.preventDefault(); target.setPointerCapture(ev.pointerId);
+      const at = e => { const b = target.getBoundingClientRect(); set(Math.max(0, Math.min(1, (e.clientX - b.left) / b.width)), Math.max(0, Math.min(1, (e.clientY - b.top) / b.height))); live(); };
+      at(ev); target.onpointermove = at; target.onpointerup = target.onpointercancel = () => { target.onpointermove = null; };
+    };
+    drag(sv, (x, y) => { s = x; v = 1 - y; });
+    drag(hue, x => { h = Math.min(359.9, x * 360); });
+    nums.forEach(n => n.oninput = () => { const rgb = nums.map(i => Math.max(0, Math.min(255, +i.value || 0))); [h, s, v] = rgb2hsv(...rgb); live(true); });
+    const eye = el.querySelector('.eye');
+    if (eye) eye.onclick = async () => { try { const r = await new window.EyeDropper().open(); [h, s, v] = rgb2hsv(...hex2rgb(r.sRGBHex.slice(1))); live(); } catch (e) { /* dismissed */ } };
+    // beside the swatch, inside the window
+    const a = anchor.getBoundingClientRect(), P = el.getBoundingClientRect();
+    let x = a.left - P.width - 8; if (x < 8) x = Math.min(a.right + 8, innerWidth - P.width - 8);
+    el.style.left = Math.max(8, x) + 'px'; el.style.top = Math.max(8, Math.min(a.top - 40, innerHeight - P.height - 8)) + 'px';
+    const close = result => {
+      pickerClose = null; el.remove(); document.removeEventListener('pointerdown', outside, true); document.removeEventListener('keydown', key, true);
+      onDone(result);
+    };
+    const outside = ev => { if (!ev.composedPath().includes(el)) close(null); };
+    const key = ev => { if (ev.key === 'Escape') { ev.stopPropagation(); close(null); } else if (ev.key === 'Enter') close(paint()); };
+    el.querySelector('.ok').onclick = () => close(paint());
+    el.querySelector('.cancel').onclick = () => close(null);
+    setTimeout(() => { document.addEventListener('pointerdown', outside, true); document.addEventListener('keydown', key, true); });
+    pickerClose = close;
+    paint();
   }
   // the open window sits where it was last dragged (st.cdyePos, stage pixels); closed, the 염색 button is in its own corner (css)
   function placeDye() {
