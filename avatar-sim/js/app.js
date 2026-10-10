@@ -72,10 +72,27 @@
   const NO_KIND_FILTER = new Set(['weapon_av', 'weapon_eq', 'sub']);   // lists that are all one kind: no 전체/아바타/장비 chips, no [장비] tag
   const SUB_LABEL = { '이솔렛': '보조 무기', '조슈아': '보조 무기' };                          // 이솔렛's off-hand is a second sword
   const hasSub = () => st.char.items.some(it => it.slot === 'sub');
-  // hidden items: not listed until 전부 해제 is pressed while the search box holds SECRET_CMD (exactly, case-sensitive) -
-  // that press only shows them (the outfit stays on). Nothing is saved: a reload hides them again, and so does leaving
-  // the simulator (hideSecret)
+  // hidden items: not listed until 전부 해제 is pressed while the search box holds this week's password - that press only
+  // shows them (the outfit stays on). Nothing is saved: a reload hides them again, and so does leaving the simulator
+  // (hideSecret). The password (16 characters) changes every Monday 0:00 KST and is mailed to the site owner by the
+  // Apps Script web app SECRET_URL (TWPage avatar-secret-apps-script.gs); the page gets only that week's hash from it and
+  // compares the hash of what was typed. Until SECRET_URL is set, the fixed command SECRET_CMD does it instead
+  const SECRET_URL = '';
   const SECRET_CMD = '/HomeSR';
+  const SECRET_SALT = 'TWSIM|';                     // as in avatar-secret-apps-script.gs
+  let secretWeek = null;                            // {week, hash, at} from SECRET_URL, asked again after 10 minutes
+  async function secretOk(typed) {
+    if (!SECRET_URL) return typed === SECRET_CMD;
+    if (typed.length !== 16 || !window.crypto || !crypto.subtle) return false;
+    try {
+      if (!secretWeek || Date.now() - secretWeek.at > 600000) {
+        const j = await (await fetch(SECRET_URL, { cache: 'no-store' })).json();
+        secretWeek = { week: j.week, hash: j.hash, at: Date.now() };
+      }
+      const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(SECRET_SALT + secretWeek.week + '|' + typed));
+      return [...new Uint8Array(d)].map(v => v.toString(16).padStart(2, '0')).join('') === secretWeek.hash;
+    } catch (e) { return false; }
+  }
   const isSecret = it => it.kind === 'avatar' ? /^여명의 (파편|인도자|여신)/.test(it.name) : /^테네브리스/.test(it.name);
   const shown = it => st.secret || !isSecret(it);
   // lists split by weapon type (index part_names: 세검 장검 ...): a row of type buttons above the list when there are two or more
@@ -159,7 +176,7 @@
     $('whoCard').onclick = showPicker;
     $('grid').onscroll = () => { const g = $('grid'); if (g.scrollTop + g.clientHeight > g.scrollHeight - 300) appendCards(); };
     $('search').oninput = () => {
-      const cmd = $('search').value.trim() === SECRET_CMD;   // the command is not a search: the list stays as it is
+      const cmd = !SECRET_URL && $('search').value.trim() === SECRET_CMD;   // the command is not a search: the list stays as it is
       st.q = cmd ? '' : $('search').value.trim().toLowerCase(); fillGrid();
     };
     $('btnPlay').onclick = togglePlay;
@@ -474,8 +491,9 @@
     }
     const c = document.createElement('div'); c.className = 'slot clear'; c.title = '착용한 아이템을 전부 벗습니다';
     c.innerHTML = '<div class="sym">⟲</div><div>전부 해제</div>';
-    c.onclick = () => {
-      if (!st.secret && $('search').value.trim() === SECRET_CMD) {          // see SECRET_CMD: show the hidden items instead
+    c.onclick = async () => {
+      const typed = $('search').value.trim();
+      if (!st.secret && typed && await secretOk(typed)) {                    // see SECRET_URL: show the hidden items instead
         st.secret = true; $('search').value = ''; st.q = ''; catIcons(); partChips(); fillGrid(); return;
       }
       st.equip = {}; st.hidden.clear(); st.cdye = {}; st.bdye = {}; st.hair = TW.S.index.chars[st.ci].default_hair; st.hairHidden = false; st.hairMode = 'all';
