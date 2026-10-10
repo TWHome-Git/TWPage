@@ -89,7 +89,7 @@
   // where the exported data lives (opts.data): 'data/' next to this page, or the CDN; images from another origin are
   // loaded with CORS. Inside TalesDB, its own CDN gives the avatar list icons (opts.tdb) and the character art
   // (opts.art) - the same files its other pages use, so the browser already has them.
-  let DATA_BASE = 'data/', TDB_BASE = '', ART_BASE = '';
+  let DATA_BASE = 'data/', TDB_BASE = '', ART_BASE = '', cssReady = Promise.resolve();
   const artUrl = name => (ART_BASE || DATA_BASE + 'art/') + encodeURIComponent(name) + '.png';
 
   async function main() {
@@ -121,6 +121,7 @@
     $('pickClose').onclick = hidePicker;
     $('pick').onclick = e => { if (e.target === $('pick')) hidePicker(); };
     document.addEventListener('keydown', e => { if (e.key === 'Escape') hidePicker(); });
+    await cssReady;                                        // see mount(): the list needs its size first
     if (tf) selectTransforms();
     else selectChar(first);                                // no picker page first: open the last character
   }
@@ -568,6 +569,10 @@
     // the host stays invisible until app.css has loaded (app.css makes it visible), so the bare markup never flashes
     root.innerHTML = '<style>:host { display: block; visibility: hidden; } .hidden { display: none !important; }</style>' +
                      `<link rel="stylesheet" href="${esc(opts.css || 'css/app.css')}">` + MARKUP;
+    // the item list may only be filled once app.css sizes it: without it the list box has no height, so
+    // appendCards() keeps adding cards to "fill" it and draws the whole list (500+ cards and icons) at once
+    const link = root.querySelector('link');
+    cssReady = new Promise(res => { link.onload = link.onerror = res; });
     if (MOBILE) {
       $('pick').classList.add('hidden'); $('sim').classList.add('hidden');
       const n = document.createElement('div'); n.className = 'mobile-block';

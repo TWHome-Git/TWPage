@@ -4116,9 +4116,14 @@ function openAvatarSim() {
     s.src = src; s.async = false; s.onload = resolve; s.onerror = () => reject(new Error(src));
     document.head.appendChild(s);
   });
+  // 스타일도 지금 같이 받아 둔다 (시뮬레이터는 스타일이 온 뒤에 목록을 그린다)
+  const css = `${AVATAR_SIM_ROOT}css/app.css${v}`;
+  const pre = document.createElement("link");
+  pre.rel = "preload"; pre.as = "style"; pre.href = css;
+  document.head.appendChild(pre);
   Promise.all([load(`${AVATAR_SIM_ROOT}js/compose.js${v}`), load(`${AVATAR_SIM_ROOT}js/app.js${v}`)])
     .then(() => window.TWAvatarSim.mount(host, {
-      css: `${AVATAR_SIM_ROOT}css/app.css${v}`, data: `${CDN_ROOT}avatar-sim/`,
+      css, data: `${CDN_ROOT}avatar-sim/`,
       tdb: AVATAR_ICON_BASE, art: CHARACTER_IMAGE_BASE, embed: true,
     }))
     .catch((err) => {
