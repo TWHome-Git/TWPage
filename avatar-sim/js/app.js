@@ -77,7 +77,7 @@
   // (hideSecret). The password (16 characters) changes every Monday 0:00 KST and is mailed to the site owner by the
   // Apps Script web app SECRET_URL (TWPage avatar-secret-apps-script.gs); the page gets only that week's hash from it and
   // compares the hash of what was typed. Until SECRET_URL is set, the fixed command SECRET_CMD does it instead
-  const SECRET_URL = '';
+  const SECRET_URL = 'https://script.google.com/macros/s/AKfycbwPNU-mDQo96POiOLT8kX2CLS94HrtbdyoN-w2dg6pV4GGLBhLYmUYGdkEaApm2cubc/exec';
   const SECRET_CMD = '/HomeSR';
   const SECRET_SALT = 'TWSIM|';                     // as in avatar-secret-apps-script.gs
   let secretWeek = null;                            // {week, hash, at} from SECRET_URL, asked again after 10 minutes
