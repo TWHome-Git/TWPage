@@ -349,8 +349,26 @@ const TW = (() => {
   // ------------------------------------------------------------------ compose
   const BODY_Z = 0;
   function z(a) { if (S.index.marker_layers.includes(a)) return -1000; return S.index.layer_pos[a] || 0; }
+  // the layer a direction's layer key sets (the last one, as animLayers reads it); null: the direction has none
+  function keyLayer(a, motion, dir) {
+    const d = dirData(a, motion, dir); if (!d) return null; let l = null;
+    for (const e of d.e) for (const k of e) if (k[0] === 6) l = k[1];
+    return l;
+  }
+  // weapons / off-hand items: an animation without layer keys is the glow of the weapon (금빛 은하, 인퍼널, 여명의 파편 ...,
+  // all additive): it takes the layer of the item's own weapon animation in this motion / facing - in front with a blade
+  // held in front, behind when the character turns away - instead of the default layer 1 (always behind the body)
+  function weaponLayers(pose, P) {
+    const c = S.chars[pose.char], out = {};
+    for (const p of P) {
+      if (p.m === null || !String(p.tag).startsWith('item') || out[p.tag] !== undefined) continue;
+      const it = c && c.byId[+p.tag.slice(4)]; if (!it || (it.slot !== 'weapon' && it.slot !== 'sub')) continue;
+      const l = keyLayer(S.anims[p.a], p.m, pose.dir); if (l !== null) out[p.tag] = l;
+    }
+    return out;
+  }
   function compose(pose, t) {
-    const P = plan(pose), body = P[0], layers = [], attach = {};
+    const P = plan(pose), body = P[0], layers = [], attach = {}, WL = weaponLayers(pose, P);
     // loose: a costume standing in for the body may be made of attach keys (리체 잠옷) - no parent exists for the body itself
     // 확장 의상 염색: pose.cdye = {part index: 'rrggbb'} of the worn outfit, applied only while that outfit is the body
     const cdi = pose.cdye && Object.keys(pose.cdye).length ? (pose.items || []).find(i => S.extras.transforms[i] && [S.extras.transforms[i].anim, S.extras.transforms[i].bald].includes(body.a) && costumeDyes(i).length) : undefined;
@@ -377,7 +395,8 @@ const TW = (() => {
       const dv = p.fd !== null && dirData(S.anims[p.a], p.m, p.fd) && (FX_FIXED_DIR.has(p.a) || !dirData(S.anims[p.a], p.m, pose.dir)) ? p.fd : pose.dir;
       // an effect animation without layer keys: in front / behind by its kind (avatarlib.fx_layer: 하트 뿅뿅 in front)
       const dd = p.fl !== null ? dirData(S.anims[p.a], p.m, dv) : null;
-      const fl = dd && !dd.e.some(e => e.some(k => k[0] === 6)) ? p.fl : null;
+      let fl = dd && !dd.e.some(e => e.some(k => k[0] === 6)) ? p.fl : null;
+      if (fl === null && WL[p.tag] !== undefined && keyLayer(S.anims[p.a], p.m, dv) === null) fl = WL[p.tag];   // a weapon's glow
       for (const L of animLayers(S.anims[p.a], p.m, dv, t, attach, attach, false)) {
         if (fl !== null) L.layer = fl;
         if (p.tag === 'hair' && ((pose.hairMode === 'front' && B.includes(L.layer)) || (pose.hairMode === 'back' && F.includes(L.layer)))) continue;   // a hair animation can hold both pieces
