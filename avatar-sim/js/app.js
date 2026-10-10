@@ -72,8 +72,9 @@
   const NO_KIND_FILTER = new Set(['weapon_av', 'weapon_eq', 'sub']);   // lists that are all one kind: no 전체/아바타/장비 chips, no [장비] tag
   const SUB_LABEL = { '이솔렛': '보조 무기', '조슈아': '보조 무기' };                          // 이솔렛's off-hand is a second sword
   const hasSub = () => st.char.items.some(it => it.slot === 'sub');
-  // hidden items: not listed until the search box holds SECRET_CMD (exactly, case-sensitive) and the V button that then
-  // appears next to 다리 확장 is pressed. Only for this page view: a reload hides them again (nothing is saved)
+  // hidden items: not listed until 전부 해제 is pressed while the search box holds SECRET_CMD (exactly, case-sensitive) -
+  // that press only shows them (the outfit stays on). Nothing is saved: a reload hides them again, and so does leaving
+  // the simulator (hideSecret)
   const SECRET_CMD = '/HomeSR';
   const isSecret = it => it.kind === 'avatar' ? /^여명의 (파편|인도자|여신)/.test(it.name) : /^테네브리스/.test(it.name);
   const shown = it => st.secret || !isSecret(it);
@@ -159,7 +160,7 @@
     $('grid').onscroll = () => { const g = $('grid'); if (g.scrollTop + g.clientHeight > g.scrollHeight - 300) appendCards(); };
     $('search').oninput = () => {
       const cmd = $('search').value.trim() === SECRET_CMD;   // the command is not a search: the list stays as it is
-      st.q = cmd ? '' : $('search').value.trim().toLowerCase(); secretBtn(); fillGrid();
+      st.q = cmd ? '' : $('search').value.trim().toLowerCase(); fillGrid();
     };
     $('btnPlay').onclick = togglePlay;
     $('tick').oninput = () => { st.tick = +$('tick').value; drawNow(); };
@@ -230,7 +231,7 @@
     group($('cats'), CAT_ORDER.map(k => k === 'hair' ? ['hair', '헤어', '헤어 스타일'] : byKey[k]).filter(Boolean),
           v => { st.cat = v; st.part = 'all'; $('kinds').classList.toggle('hidden', NO_KIND_FILTER.has(v)); partChips(); fillGrid(); }, () => st.cat);
     $('kinds').classList.toggle('hidden', NO_KIND_FILTER.has(st.cat));
-    secretBtn(); st.part = 'all'; partChips();
+    st.part = 'all'; partChips();
     catIcons();
     $('motions').classList.remove('many');
     group($('motions'), idx.chars[ci].motions.map(m => [m, idx.motion_names[m] || ('동작 ' + m)]), v => { st.motion = +v; st.tick = 0; refresh(); }, () => st.motion);
@@ -289,15 +290,16 @@
     if (ms.length && !ms.includes(st.motion)) { st.motion = ms.includes(0) ? 0 : ms.includes(1) ? 1 : ms[0]; st.tick = 0; syncGroup($('motions'), () => st.motion); }
   }
 
-  // the V button (see SECRET_CMD): on the category grid right of 다리 확장 while the command is in the search box
-  function secretBtn() {
-    let b = $('cats').querySelector('.secret-v');
-    const want = !st.secret && st.mode !== 'tf' && $('search').value.trim() === SECRET_CMD;
-    if (!want) { if (b) b.remove(); return; }
-    if (b) return;
-    b = document.createElement('button'); b.className = 'btn secret-v'; b.textContent = 'V'; b.title = '숨겨진 장비 보기';
-    b.onclick = () => { st.secret = true; b.remove(); $('search').value = ''; st.q = ''; catIcons(); partChips(); fillGrid(); };
-    $('cats').appendChild(b);
+  // the hidden items hidden again (and taken off if worn) once the simulator is left: the page left (back / forward
+  // can bring it back from the browser's page cache) or, inside TalesDB, another tab opened (the host is not displayed)
+  function hideSecret() {
+    if (!st.secret) return;
+    st.secret = false;
+    if (!st.char) return;
+    let off = false;
+    for (const [k, id] of Object.entries(st.equip)) { const it = st.char.byId[id]; if (it && isSecret(it)) { delete st.equip[k]; off = true; } }
+    catIcons(); partChips(); fillGrid();
+    if (off) { markSelected(); refresh(); }
   }
   // the weapon-type buttons (전체 + this character's types in the open list); hidden for every other list
   function partChips() {
@@ -472,9 +474,14 @@
     }
     const c = document.createElement('div'); c.className = 'slot clear'; c.title = '착용한 아이템을 전부 벗습니다';
     c.innerHTML = '<div class="sym">⟲</div><div>전부 해제</div>';
-    c.onclick = () => { st.equip = {}; st.hidden.clear(); st.cdye = {}; st.bdye = {}; st.hair = TW.S.index.chars[st.ci].default_hair; st.hairHidden = false; st.hairMode = 'all';
-                        st.dye = 0; st.dyeBy[st.hair] = 0; const cd = root.querySelector(`#grid .card[data-id="${st.hair}"]`); if (cd && st.cat === 'hair') cardIcon(cd, st.char.hairById[st.hair]);
-                        syncHair(); markSelected(); refresh(); };
+    c.onclick = () => {
+      if (!st.secret && $('search').value.trim() === SECRET_CMD) {          // see SECRET_CMD: show the hidden items instead
+        st.secret = true; $('search').value = ''; st.q = ''; catIcons(); partChips(); fillGrid(); return;
+      }
+      st.equip = {}; st.hidden.clear(); st.cdye = {}; st.bdye = {}; st.hair = TW.S.index.chars[st.ci].default_hair; st.hairHidden = false; st.hairMode = 'all';
+      st.dye = 0; st.dyeBy[st.hair] = 0; const cd = root.querySelector(`#grid .card[data-id="${st.hair}"]`); if (cd && st.cat === 'hair') cardIcon(cd, st.char.hairById[st.hair]);
+      syncHair(); markSelected(); refresh();
+    };
     el.appendChild(c);
   }
   function refreshSlots() {
@@ -779,6 +786,8 @@
       n.innerHTML = '<b>아바타 시뮬레이터는 PC에서만 이용할 수 있습니다.</b><span>PC 브라우저로 접속해 주세요.</span>';
       root.appendChild(n); return;
     }
+    addEventListener('pagehide', hideSecret);
+    if (window.ResizeObserver) new ResizeObserver(es => { for (const e of es) if (!e.contentRect.width && !e.contentRect.height) hideSecret(); }).observe(host);
     main().catch(e => { $('pickStatus').textContent = '데이터를 읽지 못했습니다: ' + e.message; $('pick').classList.remove('hidden'); console.error(e); });
   }
   window.TWAvatarSim = { mount };
