@@ -244,6 +244,10 @@ const TW = (() => {
     for (const e of d.e) for (const k of e) { if (k[0] === 6) layer = k[1]; else if (k[0] === 10) blend[k[1]] = k[2]; else if (k[0] === 9) akeys.push(k); }
     const tt = d.mt > 0 ? t % (d.mt + 1) : 0;
     const alpha = elementAlpha(akeys, tt);
+    // attach points: within one animation the first element that has a point keeps it. A later small piece can carry a
+    // copy of the body's whole list measured from its own frame (로아미니 idle, facing 12 / 8: a 4x3 sprite at the feet from
+    // tick 90 lists Head / Hair1 ... too), which put the hair at her feet. Other animations (items) may still override
+    const own = new Set();
     d.e.forEach((e, ei) => {
       let cur = null;
       for (const k of e) {
@@ -266,7 +270,7 @@ const TW = (() => {
         }
         else if (!loose || name.startsWith('Effect')) return;   // no such point: not shown; loose (icons) only for parts hanging on the body
       }
-      if (attachOut && attr && attr.s) for (const n in attr.s) { const s = attr.s[n]; attachOut[n] = [ux + s[0], uy + s[1], ox, oy, s[2] || 0, s[3] || 1, s[4] || 1]; }
+      if (attachOut && attr && attr.s) for (const n in attr.s) { if (own.has(n)) continue; own.add(n); const s = attr.s[n]; attachOut[n] = [ux + s[0], uy + s[1], ox, oy, s[2] || 0, s[3] || 1, s[4] || 1]; }
       if (hidden) return;
       if (rot) {                                                   // drawn with a transform (drawLayers); x / y / w / h = its box
         const flip = (cur[4] & 8) !== 0, bx = ux - pv0(attr) + rot.minx;    // ux - pivot = the parent point
