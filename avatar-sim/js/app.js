@@ -602,7 +602,7 @@
     if (box.dataset.iid !== 'base' + st.ci) {
       box.dataset.iid = 'base' + st.ci; box.innerHTML = '';
       dyeChrome(box, '기본 옷을 부위별로 게임의 염색 색 중에서 골라 입힙니다 (확장 의상을 입으면 그 의상의 염색으로 바뀝니다)');
-      for (const [[name, , presets], k] of parts) {
+      for (const [[name, , presets, order, names], k] of parts) {
         const row = document.createElement('div'); row.className = 'brow'; row.dataset.k = k;
         const top = document.createElement('div'); top.className = 'btop';
         const nm = document.createElement('span'); nm.textContent = name; nm.title = name;
@@ -610,8 +610,11 @@
         x.onclick = () => { delete st.bdye[k]; mark(); refresh(); };
         top.appendChild(nm); top.appendChild(x); row.appendChild(top);
         const dots = document.createElement('div'); dots.className = 'bsw';
-        presets.forEach((ramp, j) => {
-          const b = document.createElement('button'); b.className = 'p'; b.dataset.j = j; b.style.background = '#' + presetSwatch(ramp); b.title = `${name} ${j + 1}번 색`;
+        // in the order the shop sells the dyes (basedye.json: columns without a dye item last); the dye's name on hover
+        (order || presets.map((_, j) => j)).forEach((j, pos) => {
+          const ramp = presets[j]; if (!ramp) return;
+          const b = document.createElement('button'); b.className = 'p'; b.dataset.j = j; b.style.background = '#' + presetSwatch(ramp);
+          b.title = names && names[j] ? `${name} · ${names[j]}` : `${name} · ${pos + 1}번 색`;
           b.onclick = () => { if (st.bdye[k] === j) delete st.bdye[k]; else st.bdye[k] = j; mark(); refresh(); };
           dots.appendChild(b);
         });
