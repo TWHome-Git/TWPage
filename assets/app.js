@@ -3946,6 +3946,45 @@ function renderAvatarDetail() {
   els.avatarDetailCard.querySelector(".avatar-detail-thumb img")?.addEventListener("error", (event) => {
     event.currentTarget.hidden = true;
   });
+  startAvatarPreview(record);
+}
+
+// 착용 이미지 첫 장(아나이스 정지 그림) 자리에 시뮬레이터로 그린 움직이는 모습을 넣는다 (avatar-sim/js/preview.js):
+// 투구·머리·몸·효과 확장은 기본 동작(앉아야 보이는 것은 앉기)으로 왼쪽으로 8방향을 돌고, 다리 확장은 왼쪽을 보고 달린다.
+// 휴대폰·태블릿과 시뮬레이터 데이터에 없는 아바타는 정지 그림 그대로 둔다
+let avatarPreview = null;
+let avatarPreviewToken = null;
+function startAvatarPreview(record) {
+  avatarPreview?.stop();
+  avatarPreview = null;
+  const token = (avatarPreviewToken = {});
+  const frame = els.avatarDetailCard.querySelector(".avatar-wear-frame");
+  if (AVATAR_SIM_MOBILE || !record.listImage || !frame) return;
+  // 그리기 시작 전에 자리에 붙여 둔다 (화면에 붙지 않은 캔버스는 재생을 멈춘다). 준비될 때까지는 숨김
+  const still = record.detailImages.length ? frame.querySelector(".avatar-wear-image") : null;
+  const canvas = document.createElement("canvas");
+  canvas.className = "avatar-wear-canvas";
+  canvas.hidden = true;
+  canvas.setAttribute("role", "img");
+  canvas.setAttribute("aria-label", `${record.displayName} 착용 모습`);
+  frame.insertBefore(canvas, still || frame.firstChild);
+  loadAvatarSimScripts(["compose.js", "preview.js"])
+    .then(() => window.TWAvatarPreview.play(canvas, { data: `${CDN_ROOT}avatar-sim/`, icon: record.listImage }))
+    .then((handle) => {
+      if (!handle || avatarPreviewToken !== token || !canvas.isConnected) {
+        handle?.stop();
+        canvas.remove();
+        return;
+      }
+      avatarPreview = handle;
+      canvas.hidden = false;
+      if (still) still.hidden = true;
+      frame.querySelector(".avatar-wear-missing")?.setAttribute("hidden", "");
+    })
+    .catch((err) => {
+      console.warn("avatar preview", err);
+      canvas.remove();
+    });
 }
 
 function populateAbilityCategorySelect() {
@@ -4099,6 +4138,27 @@ const AVATAR_SIM_ROOT = "/avatar-sim/";
 const AVATAR_SIM_MOBILE = /Android|iPhone|iPad|iPod|Mobile|Windows Phone/i.test(navigator.userAgent) ||
   (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent)) ||
   (matchMedia("(pointer: coarse)").matches && !matchMedia("(any-pointer: fine)").matches);
+// 시뮬레이터 코드의 버전(?v=): #avatarSimHost 의 data-sim-v (TW_Publish.bat 가 고친다). 코드가 바뀔 때마다 새로 받게
+function avatarSimVersion() {
+  const v = document.getElementById("avatarSimHost")?.dataset.simV;
+  return v ? `?v=${v}` : "";
+}
+// avatar-sim/js/ 의 파일들을 한 번씩만 받는다 (시뮬레이터 탭과 아바타 상세 화면이 같이 쓴다).
+// 동시에 받되 넘긴 순서대로 실행한다 (app.js·preview.js가 compose.js의 TW를 쓴다)
+const avatarSimScripts = new Map();
+function loadAvatarSimScripts(files) {
+  return Promise.all(files.map((file) => {
+    if (!avatarSimScripts.has(file)) {
+      avatarSimScripts.set(file, new Promise((resolve, reject) => {
+        const s = document.createElement("script");
+        s.src = `${AVATAR_SIM_ROOT}js/${file}${avatarSimVersion()}`; s.async = false;
+        s.onload = resolve; s.onerror = () => { avatarSimScripts.delete(file); reject(new Error(s.src)); };
+        document.head.appendChild(s);
+      }));
+    }
+    return avatarSimScripts.get(file);
+  }));
+}
 function openAvatarSim() {
   const host = document.getElementById("avatarSimHost");
   if (!host || host.dataset.started) return;
@@ -4109,19 +4169,12 @@ function openAvatarSim() {
     host.hidden = true;
     return;
   }
-  // 두 파일을 동시에 받되 순서대로 실행한다 (app.js가 compose.js의 TW를 쓴다). ?v= 는 코드가 바뀔 때마다 새로 받게
-  const v = host.dataset.simV ? `?v=${host.dataset.simV}` : "";
-  const load = (src) => new Promise((resolve, reject) => {
-    const s = document.createElement("script");
-    s.src = src; s.async = false; s.onload = resolve; s.onerror = () => reject(new Error(src));
-    document.head.appendChild(s);
-  });
   // 스타일도 지금 같이 받아 둔다 (시뮬레이터는 스타일이 온 뒤에 목록을 그린다)
-  const css = `${AVATAR_SIM_ROOT}css/app.css${v}`;
+  const css = `${AVATAR_SIM_ROOT}css/app.css${avatarSimVersion()}`;
   const pre = document.createElement("link");
   pre.rel = "preload"; pre.as = "style"; pre.href = css;
   document.head.appendChild(pre);
-  Promise.all([load(`${AVATAR_SIM_ROOT}js/compose.js${v}`), load(`${AVATAR_SIM_ROOT}js/app.js${v}`)])
+  loadAvatarSimScripts(["compose.js", "app.js"])
     .then(() => window.TWAvatarSim.mount(host, {
       css, data: `${CDN_ROOT}avatar-sim/`,
       tdb: AVATAR_ICON_BASE, art: CHARACTER_IMAGE_BASE, embed: true,

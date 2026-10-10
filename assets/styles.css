@@ -3577,6 +3577,26 @@ img.dmg-chk-icon {
   max-width: 100%;
 }
 
+/* 착용 모습 움직이는 그림(시뮬레이터로 그린 캔버스, app.js startAvatarPreview): 정지 그림 자리에 같은 크기 규칙으로.
+   폭이 줄면 높이도 같이 줄어든다(캔버스 비율 유지) */
+.avatar-wear-canvas {
+  max-width: 100%;
+  max-height: 420px;
+  image-rendering: pixelated;
+}
+
+.avatar-wear-canvas[hidden] {
+  display: none;
+}
+
+.avatar-wear-frame[data-count="2"] .avatar-wear-canvas {
+  max-width: 48%;
+}
+
+.avatar-wear-frame[data-count="3"] .avatar-wear-canvas {
+  grid-column: 1 / -1;
+}
+
 /* 3장이면 첫 장(개별 착용 이미지)을 윗줄에 혼자, 세트 대표 2장을 아랫줄에 */
 .avatar-wear-frame[data-count="3"] {
   display: grid;
