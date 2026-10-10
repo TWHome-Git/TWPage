@@ -71,7 +71,7 @@
   const SUB_LABEL = { '이솔렛': '보조 무기', '조슈아': '보조 무기' };                          // 이솔렛's off-hand is a second sword
   const hasSub = () => st.char.items.some(it => it.slot === 'sub');
   const logical = () => [VIEW[0] / st.zoom, VIEW[1] / st.zoom];   // VIEW = preview canvas in pixels; the zoom only changes the drawing scale
-  const st = { ci: -1, char: null, hair: -1, hairHidden: false, hairMode: 'all', equip: {}, hidden: new Set(), dye: 0, dyeBy: {}, cdye: {}, hairNo: {},   // dye: of the worn hair; dyeBy: last dye per style (card previews)
+  const st = { ci: -1, char: null, hair: -1, hairHidden: false, hairMode: 'all', equip: {}, hidden: new Set(), dye: 0, dyeBy: {}, cdye: {},   // dye: of the worn hair; dyeBy: last dye per style (card previews)
                motion: 0, dir: 10, tick: 0, maxT: 0, zoom: 2, cat: 'head', kind: 'all', q: '', shown: 0, list: [],
                playing: true, loading: 0, timer: null, lastPose: null, mode: 'char', tf: 0 };   // mode 'tf' = transform cloak screen
   const settings = loadLS('tw_avatar_settings', { hatHairModes: {}, presets: {}, lastChar: null });
@@ -191,7 +191,7 @@
     setMode('char');
     st.ci = ci; st.char = c; st.equip = {}; st.hidden.clear(); st.hairHidden = false; st.dye = 0; st.dyeBy = {}; st.cdye = {};
     if (!CAT_ORDER.includes(st.cat)) st.cat = 'head';   // coming from the transform cloak screen: start on 투구 확장
-    st.hair = idx.chars[ci].default_hair; hairNumbers(); st.motion = 0; st.dir = 10; st.tick = 0; st.q = ''; $('search').value = '';
+    st.hair = idx.chars[ci].default_hair; st.motion = 0; st.dir = 10; st.tick = 0; st.q = ''; $('search').value = '';
     settings.lastChar = ci; saveLS();
     $('whoArt').src = artUrl(idx.chars[ci].art); $('whoName').textContent = idx.chars[ci].name; $('whoCard').title = idx.chars[ci].full + ' (클릭 = 캐릭터 바꾸기)';
     // 5 per row: 머리 얼굴 의상 등 발자국 / 헤어 확장의상 무기 보조 변신
@@ -294,19 +294,14 @@
   }
 
   // ---------------------------------------------------------------- item grid
-  // hair styles are shown with their own numbers: the character's default style is 1, the rest 2, 3 ... in list order
-  // (the client style ids have gaps and the shared styles keep the same number for every character)
-  function hairNumbers() {
-    const def = TW.S.index.chars[st.ci].default_hair; st.hairNo = {}; let n = 2;
-    for (const h of st.char.hair) st.hairNo[h.id] = h.id === def ? 1 : n++;
-  }
-  const hairLabel = id => { const h = st.char.hairById[id]; return (st.hairNo[id] || id) + ' ' + (h ? h.name : ''); };
+  // hair styles are shown by name only (they used to carry a list number in front)
+  const hairLabel = id => { const h = st.char.hairById[id]; return h ? h.name : String(id); };
   function listFor() {
     if (st.mode === 'tf') return TW.S.tlist.items.filter(it => !st.q || it.name.toLowerCase().includes(st.q) || String(it.id) === st.q);
     const c = st.char;
     if (st.cat === 'hair') {                                   // the character's own style (default) first
       const def = TW.S.index.chars[st.ci].default_hair;
-      const hs = c.hair.filter(h => !st.q || h.name.toLowerCase().includes(st.q) || String(st.hairNo[h.id]) === st.q);
+      const hs = c.hair.filter(h => !st.q || h.name.toLowerCase().includes(st.q));
       return [...hs.filter(h => h.id === def), ...hs.filter(h => h.id !== def)];
     }
     const slot = catSlot(st.cat), kind = catKind(st.cat) || (st.kind === 'all' ? null : st.kind);
