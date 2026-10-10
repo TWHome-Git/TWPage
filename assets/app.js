@@ -3573,6 +3573,9 @@ const AVATAR_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS78Pnup
 // 시트는 폴더 없이 파일명만 주므로 여기서 폴더를 붙인다.
 const AVATAR_ICON_BASE = `${CDN_AVATAR_ROOT}avatar-images/Icons/`;
 const AVATAR_DETAIL_BASE = `${CDN_AVATAR_DETAIL_ROOT}avatar-images/Details/`;
+// 상세 이미지를 같은 파일 이름으로 다시 그려 올리면 바꾼다: 브라우저·CDN 이 하루 동안 예전 그림을 쓰지 않게
+// (CloudFront 캐시 키에 v 가 들어간다). 2026-10-10: 기본 동작에서 손을 내린 모습으로 다시 그림
+const AVATAR_DETAIL_V = "?v=20261010";
 // 세트 대표 이미지는 개별 상세와 성격이 달라 폴더를 나눠 둔다
 const AVATAR_SET_BASE = `${CDN_AVATAR_ROOT}avatar-images/Sets/`;
 
@@ -3795,7 +3798,7 @@ function avatarCardHtml(record, index) {
   const detail = record.detailImages[0];
   const [base, file] = detail ? [AVATAR_DETAIL_BASE, detail] : [AVATAR_ICON_BASE, record.listImage];
   const img = file
-    ? `<img src="${base}${encodeImagePath(file)}" alt="" loading="lazy" decoding="async" />`
+    ? `<img src="${base}${encodeImagePath(file)}${detail ? AVATAR_DETAIL_V : ""}" alt="" loading="lazy" decoding="async" />`
     : "";
   return `
     <button class="avatar-card" type="button" data-index="${index}">
@@ -3890,7 +3893,7 @@ function renderAvatarDetail() {
   // 개별 착용 이미지만 보인다. 세트 대표 이미지(Sets, 시트 8열)는 움직이는 착용 모습과 겹쳐 보여 넣지 않는다
   const wearFiles = record.detailImages.map((file) => [AVATAR_DETAIL_BASE, file]);
   const wearHtml = wearFiles
-    .map(([base, file]) => `<img class="avatar-wear-image" src="${base}${encodeImagePath(file)}" alt="${escapeHtml(record.displayName)} 착용 이미지" decoding="async" />`)
+    .map(([base, file]) => `<img class="avatar-wear-image" src="${base}${encodeImagePath(file)}${AVATAR_DETAIL_V}" alt="${escapeHtml(record.displayName)} 착용 이미지" decoding="async" />`)
     .join("");
 
   const sourceRows = record.sources.length
