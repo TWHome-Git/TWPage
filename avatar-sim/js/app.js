@@ -39,8 +39,9 @@
       <div class="ov ov-right"><span class="ov-title">헤어</span><div id="hairModes" class="ov-col"></div></div>
       <div id="cdye" class="ov-dye hidden closed"></div>   <!-- 확장 의상 염색: shown while a dyeable outfit is worn -->
       <button class="arrow ar-up" data-motion="-1" title="이전 동작">▲</button>
-      <button class="arrow ar-left" data-step="-1" title="왼쪽으로 한 칸 회전">◀</button>
-      <button class="arrow ar-right" data-step="1" title="오른쪽으로 한 칸 회전">▶</button>
+      <!-- dir_order runs 정면 → 정면좌 → 좌 → …: ◀ steps forward (the character turns to the left), ▶ back (to the right) -->
+      <button class="arrow ar-left" data-step="1" title="왼쪽으로 한 칸 회전">◀</button>
+      <button class="arrow ar-right" data-step="-1" title="오른쪽으로 한 칸 회전">▶</button>
       <button class="arrow ar-down" data-motion="1" title="다음 동작">▼</button><span id="dirLabel" class="ar-label"></span>
     </div>
     <div id="slots" class="slots"></div>
