@@ -553,7 +553,7 @@
   function pose() {
     if (st.mode === 'tf') return { char: st.ci, motion: st.motion, dir: st.dir, hair: -1, items: st.tf ? [st.tf] : [], hairMode: 'all', hidden: new Set(), raw: true };
     return { char: st.ci, motion: st.motion, dir: st.dir, hair: st.hairHidden ? -1 : st.hair, dye: st.dye, items: Object.values(st.equip), hairMode: st.hairMode, hidden: st.hidden,
-             cdye: st.equip.costume ? st.cdye[st.equip.costume] || null : null, bdye: st.equip.costume ? null : st.bdye };
+             cdye: st.equip.costume && !NO_DYE.has(st.equip.costume) ? st.cdye[st.equip.costume] || null : null, bdye: st.equip.costume ? null : st.bdye };
   }
   function setDir(d) { st.dir = d; refresh(); }
   function stepDir(s) { const o = TW.S.index.dir_order; setDir(o[(o.indexOf(st.dir) + s + o.length) % o.length]); }
@@ -562,8 +562,10 @@
   let anchor = null;
   // ---------------------------------------------------------------- 염색 window on the stage: the worn 확장 의상 (DB 0351,
   // free colours per part) or, with no 확장 의상, the character's own outfit (DB 0186 / 0068, the game's 10 colours per part)
+  // outfits the data lists as dyeable that the game does not let you dye (confirmed in game): no 염색 window for them
+  const NO_DYE = new Set([1040556]);                // 멜빵바지 (이스핀)
   function dyePanel() {
-    const box = $('cdye'), iid = st.mode !== 'tf' && st.equip.costume, parts = iid ? TW.costumeDyes(iid) : [];
+    const box = $('cdye'), iid = st.mode !== 'tf' && st.equip.costume, parts = iid && !NO_DYE.has(iid) ? TW.costumeDyes(iid) : [];
     if (st.mode !== 'tf' && !st.equip.costume) { basePanel(box); return; }
     if (!parts.length) { box.classList.add('hidden'); return; }
     const cur = st.cdye[iid] || (st.cdye[iid] = {});
