@@ -74,7 +74,7 @@
   // hidden items: not listed until the search box holds SECRET_CMD (exactly, case-sensitive) and the V button that then
   // appears next to 다리 확장 is pressed. Only for this page view: a reload hides them again (nothing is saved)
   const SECRET_CMD = '/HomeSR';
-  const isSecret = it => it.kind === 'avatar' ? /^여명의 (파편|인도자)/.test(it.name) : /^테네브리스/.test(it.name);
+  const isSecret = it => it.kind === 'avatar' ? /^여명의 (파편|인도자|여신)/.test(it.name) : /^테네브리스/.test(it.name);
   const shown = it => st.secret || !isSecret(it);
   // lists split by weapon type (index part_names: 세검 장검 ...): a row of type buttons above the list when there are two or more
   const PART_CATS = new Set(['weapon_av', 'weapon_eq']);
