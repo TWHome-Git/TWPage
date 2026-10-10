@@ -3409,11 +3409,12 @@ img.dmg-chk-icon {
 /* ── 아바타 DB ──────────────────────────────────────── */
 
 .avatar-control-grid {
-  grid-template-columns: minmax(150px, 0.8fr) auto minmax(120px, 0.6fr) minmax(200px, 1.3fr);
+  grid-template-columns: auto minmax(150px, 0.8fr) minmax(120px, 0.6fr) minmax(200px, 1.3fr);
 }
 
-/* 카테고리와 분류 사이의 아바타 시뮬레이터 바로가기: 옆 칸(select)과 같은 높이의 버튼 */
+/* 카테고리 왼쪽의 아바타 시뮬레이터 바로가기: 옆 칸(select)과 같은 높이, 제목 줄 없이 아래쪽에 맞춘 버튼 */
 .avatar-sim-link {
+  align-self: end;
   display: flex;
   align-items: center;
   justify-content: center;

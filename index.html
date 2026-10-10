@@ -30,7 +30,7 @@
     <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"테일즈DB","alternateName":["테일즈 DB","테일즈위버 DB","테일즈디비","TW DB","TalesDB"],"url":"https://talesdb.xyz/","inLanguage":"ko","description":"테일즈DB(테일즈위버 DB)는 테일즈위버 에타 순위와 인구 통계, 에타 돌파 기록, 장비·어빌리티·아바타 DB, 대미지·명중·주간 시드 계산기, 강화·인크립트 시뮬레이터를 한곳에 모은 팬 사이트입니다."}</script>
     <!-- 이미지 CDN. 첫 이미지 요청 전에 DNS+TLS를 미리 끝내둔다 -->
     <link rel="preconnect" href="https://cdn.talesdb.xyz" crossorigin />
-    <link rel="stylesheet" href="./assets/styles.css?v=20261010-avnav" />
+    <link rel="stylesheet" href="./assets/styles.css?v=20261010-avnav2" />
     <!-- 모바일 전용. media 속성 덕에 넓은 화면에서는 렌더링을 막지 않는다 -->
     <link rel="stylesheet" href="./assets/mobile.css?v=20261006-board" media="(max-width: 720px)" />
   </head>
@@ -508,15 +508,12 @@
             </div>
 
             <div class="control-grid avatar-control-grid">
+              <!-- 아바타 시뮬레이터 바로가기 (시뮬레이터 > 아바타): 제목 없이 옆 칸 입력란과 아래쪽을 맞춘다 -->
+              <a class="avatar-sim-link" href="/simulator/avatar/" data-route>아바타 시뮬레이터 →</a>
               <label class="field">
                 <span>카테고리</span>
                 <select id="avatarSourceSelect"></select>
               </label>
-              <!-- 아바타 시뮬레이터 바로가기 (시뮬레이터 > 아바타) -->
-              <div class="field avatar-sim-nav">
-                <span>시뮬레이터</span>
-                <a class="avatar-sim-link" href="/simulator/avatar/" data-route>아바타 시뮬레이터 →</a>
-              </div>
               <label class="field">
                 <span>분류</span>
                 <select id="avatarSlotSelect"></select>
