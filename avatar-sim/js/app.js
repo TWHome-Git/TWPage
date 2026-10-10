@@ -29,6 +29,7 @@
         </div>
       </div>
     </div>
+    <div id="parts" class="group parts hidden"></div>   <!-- weapon types of 확장 무기 / 일반 무기: outside the list, so it never scrolls -->
     <div id="grid" class="grid"></div>
   </div>
   <div class="right panel">
@@ -75,11 +76,14 @@
   const SECRET_CMD = '/HomeSR';
   const isSecret = it => it.kind === 'avatar' ? /^여명의 (파편|인도자)/.test(it.name) : /^테네브리스/.test(it.name);
   const shown = it => st.secret || !isSecret(it);
+  // lists split by weapon type (index part_names: 세검 장검 ...): a row of type buttons above the list when there are two or more
+  const PART_CATS = new Set(['weapon_av', 'weapon_eq']);
   const logical = () => [VIEW[0] / st.zoom, VIEW[1] / st.zoom];   // VIEW = preview canvas in pixels; the zoom only changes the drawing scale
   const st = { ci: -1, char: null, hair: -1, hairHidden: false, hairMode: 'all', equip: {}, hidden: new Set(), dye: 0, dyeBy: {}, cdye: {},   // dye: of the worn hair; dyeBy: last dye per style (card previews)
                motion: 0, dir: 10, tick: 0, maxT: 0, zoom: 2, cat: 'head', kind: 'all', q: '', shown: 0, list: [],
                playing: true, loading: 0, timer: null, lastPose: null, mode: 'char', tf: 0,     // mode 'tf' = transform cloak screen
-               secret: false };                                                                  // the hidden items are listed
+               secret: false,                                                                    // the hidden items are listed
+               part: 'all' };                                                                    // weapon type shown (PART_CATS lists)
   const settings = loadLS('tw_avatar_settings', { hatHairModes: {}, presets: {}, lastChar: null });
   function loadLS(k, def) { try { return Object.assign(def, JSON.parse(localStorage.getItem(k) || '{}')); } catch (e) { return def; } }
   function saveLS() { try { localStorage.setItem('tw_avatar_settings', JSON.stringify(settings)); } catch (e) { } }
@@ -209,9 +213,9 @@
     if (byKey.sub && SUB_LABEL[idx.chars[ci].name]) byKey.sub = ['sub', SUB_LABEL[idx.chars[ci].name], byKey.sub[2]];
     if (!hasSub()) { delete byKey.sub; if (st.cat === 'sub') st.cat = 'head'; }          // nothing to hold in the off hand
     group($('cats'), CAT_ORDER.map(k => k === 'hair' ? ['hair', '헤어', '헤어 스타일'] : byKey[k]).filter(Boolean),
-          v => { st.cat = v; $('kinds').classList.toggle('hidden', NO_KIND_FILTER.has(v)); fillGrid(); }, () => st.cat);
+          v => { st.cat = v; st.part = 'all'; $('kinds').classList.toggle('hidden', NO_KIND_FILTER.has(v)); partChips(); fillGrid(); }, () => st.cat);
     $('kinds').classList.toggle('hidden', NO_KIND_FILTER.has(st.cat));
-    secretBtn();
+    secretBtn(); st.part = 'all'; partChips();
     catIcons();
     $('motions').classList.remove('many');
     group($('motions'), idx.chars[ci].motions.map(m => [m, idx.motion_names[m] || ('동작 ' + m)]), v => { st.motion = +v; st.tick = 0; refresh(); }, () => st.motion);
@@ -224,6 +228,7 @@
   function setMode(m) {
     st.mode = m; const tf = m === 'tf';
     for (const id of ['cats', 'kinds', 'slots']) $(id).classList.toggle('hidden', tf);
+    if (tf) $('parts').classList.add('hidden');            // the weapon-type row comes back with the character screen (partChips)
     $('sim').classList.toggle('tf', tf);                 // transform screen: a taller preview takes the slots' place (css)
     $('whoArt').classList.toggle('hidden', tf); $('whoTf').classList.toggle('hidden', !tf);
     root.querySelector('.ov-right').classList.toggle('hidden', tf);          // hair toggles: a transform hides the hair
@@ -276,8 +281,18 @@
     if (!want) { if (b) b.remove(); return; }
     if (b) return;
     b = document.createElement('button'); b.className = 'btn secret-v'; b.textContent = 'V'; b.title = '숨겨진 장비 보기';
-    b.onclick = () => { st.secret = true; b.remove(); $('search').value = ''; st.q = ''; catIcons(); fillGrid(); };
+    b.onclick = () => { st.secret = true; b.remove(); $('search').value = ''; st.q = ''; catIcons(); partChips(); fillGrid(); };
     $('cats').appendChild(b);
+  }
+  // the weapon-type buttons (전체 + this character's types in the open list); hidden for every other list
+  function partChips() {
+    const el = $('parts'), on = st.mode !== 'tf' && PART_CATS.has(st.cat);
+    const kind = catKind(st.cat), PN = TW.S.index.part_names;
+    const types = on ? [...new Set(st.char.items.filter(it => it.slot === 'weapon' && it.kind === kind && shown(it)).map(it => it.part))].sort((a, b) => a - b) : [];
+    if (types.length < 2) { st.part = 'all'; el.classList.add('hidden'); el.innerHTML = ''; return; }
+    if (st.part !== 'all' && !types.includes(+st.part)) st.part = 'all';
+    group(el, [['all', '전체'], ...types.map(p => [p, PN[p] || ('종류 ' + p)])], v => { st.part = v; fillGrid(); }, () => st.part);
+    el.classList.remove('hidden');
   }
   // list buttons without a fixed icon: the first entry of that list (this character's) drawn above the label
   const LIVE_CAT_ICONS = ['hair', 'weapon_av', 'weapon_eq', 'sub'];
@@ -325,7 +340,9 @@
       return [...hs.filter(h => h.id === def), ...hs.filter(h => h.id !== def)];
     }
     const slot = catSlot(st.cat), kind = catKind(st.cat) || (st.kind === 'all' ? null : st.kind);
-    return c.items.filter(it => it.slot === slot && (!kind || it.kind === kind) && shown(it) && (!st.q || it.name.toLowerCase().includes(st.q) || String(it.id) === st.q));
+    const part = PART_CATS.has(st.cat) && st.part !== 'all' ? +st.part : null;
+    return c.items.filter(it => it.slot === slot && (!kind || it.kind === kind) && shown(it) && (part === null || it.part === part) &&
+                                (!st.q || it.name.toLowerCase().includes(st.q) || String(it.id) === st.q));
   }
   function fillGrid() {
     st.list = listFor(); st.shown = 0;
@@ -508,7 +525,23 @@
     if (box.dataset.iid !== String(iid)) {
       box.dataset.iid = String(iid); box.innerHTML = ''; box.classList.toggle('closed', !st.cdyeOpen);
       const head = document.createElement('button'); head.className = 'btn head'; head.textContent = '염색'; head.title = '부위별로 색을 고릅니다 (게임의 염색 UI처럼 자유 색상; 부위의 첫 음영 칸 = 고른 색, 나머지는 기준 음영 차이만큼 밝게)';
-      head.onclick = () => { st.cdyeOpen = box.classList.toggle('closed') ? false : true; }; box.appendChild(head);
+      head.onclick = () => { st.cdyeOpen = true; box.classList.remove('closed'); placeDye(); }; box.appendChild(head);
+      // the open window: a title bar to drag it around the stage, × at its right end closes it back to the 염색 button
+      const bar = document.createElement('div'); bar.className = 'bar'; bar.title = '끌어서 옮기기';
+      const ttl = document.createElement('span'); ttl.textContent = '염색';
+      const cls = document.createElement('button'); cls.className = 'close'; cls.textContent = '×'; cls.title = '닫기';
+      cls.onclick = () => { st.cdyeOpen = false; box.classList.add('closed'); placeDye(); };
+      bar.onpointerdown = ev => {
+        if (ev.button !== 0 || ev.target === cls) return;
+        ev.preventDefault(); bar.setPointerCapture(ev.pointerId);
+        const S = box.parentElement.getBoundingClientRect(), B = box.getBoundingClientRect(), dx = ev.clientX - B.left, dy = ev.clientY - B.top;
+        bar.onpointermove = e => {
+          st.cdyePos = { x: Math.max(0, Math.min(S.width - B.width, e.clientX - S.left - dx)), y: Math.max(0, Math.min(S.height - B.height, e.clientY - S.top - dy)) };
+          placeDye();
+        };
+        bar.onpointerup = bar.onpointercancel = () => { bar.onpointermove = null; };
+      };
+      bar.appendChild(ttl); bar.appendChild(cls); box.appendChild(bar);
       parts.forEach(([name], k) => {
         const row = document.createElement('div'); row.className = 'row'; if (name.startsWith('머리')) row.dataset.hairPart = '1';
         const inp = document.createElement('input'); inp.type = 'color'; inp.value = cur[k] ? '#' + cur[k] : '#ffffff'; inp.classList.toggle('unset', !cur[k]); inp.title = name;
@@ -526,7 +559,12 @@
     // a chosen hair style replaces the outfit's painted hair: its '머리' part is not dyed then (compose.js)
     const hairOn = st.hair >= 0 && !st.hairHidden;
     box.querySelectorAll('.row[data-hair-part]').forEach(r => { r.classList.toggle('off', hairOn); r.title = hairOn ? '헤어를 골라서 의상의 머리 대신 그 헤어가 보입니다. 헤어를 벗기면 이 염색이 적용됩니다' : ''; });
-    box.classList.remove('hidden');
+    box.classList.remove('hidden'); placeDye();
+  }
+  // the open window sits where it was last dragged (st.cdyePos, stage pixels); closed, the 염색 button is in its own corner (css)
+  function placeDye() {
+    const box = $('cdye'), p = !box.classList.contains('closed') && st.cdyePos;
+    Object.assign(box.style, p ? { left: p.x + 'px', top: p.y + 'px', right: 'auto', bottom: 'auto' } : { left: '', top: '', right: '', bottom: '' });
   }
   async function refresh() {
     refreshSlots(); dyePanel();
