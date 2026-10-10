@@ -301,8 +301,10 @@ const TW = (() => {
       }
       // flag 8: mirrored about the anchor (the mirrored directions); flag 0x40: the picture flipped where it stands - a
       // texture without mirrored copies of its frames reuses them this way (이스핀 이클립스 방패 = the 어비스 shield's
-      // mirrored frames 5-7; a spinning object's second half). Both: the picture comes out unflipped, placed mirrored
-      const about = (cur[4] & 8) !== 0, flip = about !== ((cur[4] & 64) !== 0);
+      // mirrored frames 5-7; a spinning object's second half). Both: the picture comes out unflipped, placed mirrored.
+      // Not on attach-point keys: 0x40 there is not a flip (천상의 날개 / 골드윙의 날개 in 필드 정면좌 came out mirrored and
+      // off the back; without it they match the game, and 315 back items of 루시안 sit closer to where they sit in 기본)
+      const about = (cur[4] & 8) !== 0, flip = about !== (!cur[7] && (cur[4] & 64) !== 0);
       const x = about ? -(ux + fr[2]) + ox : ux + ox;
       out.push({ img: tex.img, tex, sx: fr[0], sy: fr[1], w: fr[2], h: fr[3], x, y: uy + oy, flip, layer, ei, blend: blend[ei] || 0, alpha: alpha[ei] !== undefined ? alpha[ei] / 255 : 1 });
     });
