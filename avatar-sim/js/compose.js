@@ -276,8 +276,11 @@ const TW = (() => {
                    rot: { deg: rotDeg, scx: rot.scx, scy: rot.scy, cx: rot.cx, cy: rot.cy, px: (flip ? -(ux - pv0(attr)) : ux - pv0(attr)) + ox, py: uy - pv1(attr) + oy, fw: fr[2], fh: fr[3] } });
         return;
       }
-      const flip = (cur[4] & 8) !== 0;
-      const x = flip ? -(ux + fr[2]) + ox : ux + ox;
+      // flag 8: mirrored about the anchor (the mirrored directions); flag 0x40: the picture flipped where it stands - a
+      // texture without mirrored copies of its frames reuses them this way (이스핀 이클립스 방패 = the 어비스 shield's
+      // mirrored frames 5-7; a spinning object's second half). Both: the picture comes out unflipped, placed mirrored
+      const about = (cur[4] & 8) !== 0, flip = about !== ((cur[4] & 64) !== 0);
+      const x = about ? -(ux + fr[2]) + ox : ux + ox;
       out.push({ img: tex.img, tex, sx: fr[0], sy: fr[1], w: fr[2], h: fr[3], x, y: uy + oy, flip, layer, ei, blend: blend[ei] || 0, alpha: alpha[ei] !== undefined ? alpha[ei] / 255 : 1 });
     });
     return out;
