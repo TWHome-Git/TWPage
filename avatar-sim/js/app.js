@@ -78,6 +78,18 @@
   const shown = it => st.secret || !isSecret(it);
   // lists split by weapon type (index part_names: 세검 장검 ...): a row of type buttons above the list when there are two or more
   const PART_CATS = new Set(['weapon_av', 'weapon_eq']);
+  // 확장 무기 order: by series, as asked (names differ by character - 슈팅스타(검) / 테일즈 슈팅스타(소드셰이프) - and the
+  // collaborations are told apart by their item number ranges); the rest after them in their own order
+  const AV_WEAPON_SERIES = [/^별빛/, /^코스믹/, /^드래고닉 레거시/, /탄생석/, /슈팅스타/, /쿠루쿠루/, /뮤직/, /야채/, /키친/, /^아발론/,
+    /^프리즘 플라워/, /^금빛 은하/, /보노보노/,
+    [1045754, 1045762],                                    // 로그 호라이즌 (신도 코가라스마루, 선혈의 마인 도끼, 요변천목도 ...)
+    [1046284, 1046318],                                    // 슬레이어즈 (빛의 검, 붉은 눈의 마왕, 제로스의 지팡이, 영왕결마탄)
+    /^하트리본/,
+    [1047348, 1047362],                                    // 던전밥 (검돌이, 파린의 메이스, 암브로시아, 미믹의 발톱 ...)
+    [1047823, 1047852],                                    // 베스페리아 (브레이브 베스페리아, 에스텔 로드, 칼로리안 해머, 금성 2호 ...)
+    /^엔젤릭/, /^여명/];
+  const avSeries = it => { const k = AV_WEAPON_SERIES.findIndex(s => Array.isArray(s) ? it.id >= s[0] && it.id <= s[1] : s.test(it.name)); return k < 0 ? AV_WEAPON_SERIES.length : k; };
+  const avOrder = list => list.map((it, i) => [avSeries(it), i, it]).sort((a, b) => a[0] - b[0] || a[1] - b[1]).map(x => x[2]);
   const logical = () => [VIEW[0] / st.zoom, VIEW[1] / st.zoom];   // VIEW = preview canvas in pixels; the zoom only changes the drawing scale
   const st = { ci: -1, char: null, hair: -1, hairHidden: false, hairMode: 'all', equip: {}, hidden: new Set(), dye: 0, dyeBy: {}, cdye: {},   // dye: of the worn hair; dyeBy: last dye per style (card previews)
                motion: 0, dir: 10, tick: 0, maxT: 0, zoom: 2, cat: 'head', kind: 'all', q: '', shown: 0, list: [],
@@ -305,7 +317,7 @@
       box.innerHTML = '';
       // the first entries of the list, in order, until one has a picture (투명 아바타 (방패) draws nothing)
       const cands = k === 'hair' ? [c.hairById[TW.S.index.chars[ci].default_hair] || c.hair[0]]
-                                 : c.items.filter(it => it.slot === catSlot(k) && (!catKind(k) || it.kind === catKind(k)) && shown(it)).slice(0, 6);
+                                 : (k === 'weapon_av' ? avOrder : x => x)(c.items.filter(it => it.slot === catSlot(k) && (!catKind(k) || it.kind === catKind(k)) && shown(it))).slice(0, 6);
       (async () => {
         for (const e of cands) {
           if (!e) continue;
@@ -341,8 +353,9 @@
     }
     const slot = catSlot(st.cat), kind = catKind(st.cat) || (st.kind === 'all' ? null : st.kind);
     const part = PART_CATS.has(st.cat) && st.part !== 'all' ? +st.part : null;
-    return c.items.filter(it => it.slot === slot && (!kind || it.kind === kind) && shown(it) && (part === null || it.part === part) &&
-                                (!st.q || it.name.toLowerCase().includes(st.q) || String(it.id) === st.q));
+    const list = c.items.filter(it => it.slot === slot && (!kind || it.kind === kind) && shown(it) && (part === null || it.part === part) &&
+                                      (!st.q || it.name.toLowerCase().includes(st.q) || String(it.id) === st.q));
+    return st.cat === 'weapon_av' ? avOrder(list) : list;
   }
   function fillGrid() {
     st.list = listFor(); st.shown = 0;
