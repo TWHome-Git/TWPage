@@ -227,3 +227,5 @@ input[type=search]:focus { outline: none; border-color: var(--primary); box-shad
 }
 /* the outfit's 머리 dye while a hair style is worn (not applied) */
 .ov-dye .row.off { opacity: .4; }
+/* the V button (app.js SECRET_CMD): a narrow button right of 다리 확장, shown only while the command is typed */
+#cats .btn.secret-v { grid-column: 6; grid-row: 1; width: 34px; padding: 0; font-weight: 700; font-size: 15px; }

@@ -70,10 +70,16 @@
   const NO_KIND_FILTER = new Set(['weapon_av', 'weapon_eq', 'sub']);   // lists that are all one kind: no 전체/아바타/장비 chips, no [장비] tag
   const SUB_LABEL = { '이솔렛': '보조 무기', '조슈아': '보조 무기' };                          // 이솔렛's off-hand is a second sword
   const hasSub = () => st.char.items.some(it => it.slot === 'sub');
+  // hidden items: not listed until the search box holds SECRET_CMD (exactly, case-sensitive) and the V button that then
+  // appears next to 다리 확장 is pressed. Only for this page view: a reload hides them again (nothing is saved)
+  const SECRET_CMD = '/HomeSR';
+  const isSecret = it => it.kind === 'avatar' ? /^여명의 (파편|인도자)/.test(it.name) : /^테네브리스/.test(it.name);
+  const shown = it => st.secret || !isSecret(it);
   const logical = () => [VIEW[0] / st.zoom, VIEW[1] / st.zoom];   // VIEW = preview canvas in pixels; the zoom only changes the drawing scale
   const st = { ci: -1, char: null, hair: -1, hairHidden: false, hairMode: 'all', equip: {}, hidden: new Set(), dye: 0, dyeBy: {}, cdye: {},   // dye: of the worn hair; dyeBy: last dye per style (card previews)
                motion: 0, dir: 10, tick: 0, maxT: 0, zoom: 2, cat: 'head', kind: 'all', q: '', shown: 0, list: [],
-               playing: true, loading: 0, timer: null, lastPose: null, mode: 'char', tf: 0 };   // mode 'tf' = transform cloak screen
+               playing: true, loading: 0, timer: null, lastPose: null, mode: 'char', tf: 0,     // mode 'tf' = transform cloak screen
+               secret: false };                                                                  // the hidden items are listed
   const settings = loadLS('tw_avatar_settings', { hatHairModes: {}, presets: {}, lastChar: null });
   function loadLS(k, def) { try { return Object.assign(def, JSON.parse(localStorage.getItem(k) || '{}')); } catch (e) { return def; } }
   function saveLS() { try { localStorage.setItem('tw_avatar_settings', JSON.stringify(settings)); } catch (e) { } }
@@ -132,7 +138,10 @@
     root.querySelectorAll('.arrow').forEach(b => b.onclick = () => { if (b.dataset.motion) stepMotion(+b.dataset.motion); else stepDir(+b.dataset.step); });
     $('whoCard').onclick = showPicker;
     $('grid').onscroll = () => { const g = $('grid'); if (g.scrollTop + g.clientHeight > g.scrollHeight - 300) appendCards(); };
-    $('search').oninput = () => { st.q = $('search').value.trim().toLowerCase(); fillGrid(); };
+    $('search').oninput = () => {
+      const cmd = $('search').value.trim() === SECRET_CMD;   // the command is not a search: the list stays as it is
+      st.q = cmd ? '' : $('search').value.trim().toLowerCase(); secretBtn(); fillGrid();
+    };
     $('btnPlay').onclick = togglePlay;
     $('tick').oninput = () => { st.tick = +$('tick').value; drawNow(); };
     $('btnPng').onclick = savePng; $('btnSheet').onclick = saveSheet; $('btnGif').onclick = saveFrames;
@@ -202,6 +211,7 @@
     group($('cats'), CAT_ORDER.map(k => k === 'hair' ? ['hair', '헤어', '헤어 스타일'] : byKey[k]).filter(Boolean),
           v => { st.cat = v; $('kinds').classList.toggle('hidden', NO_KIND_FILTER.has(v)); fillGrid(); }, () => st.cat);
     $('kinds').classList.toggle('hidden', NO_KIND_FILTER.has(st.cat));
+    secretBtn();
     catIcons();
     $('motions').classList.remove('many');
     group($('motions'), idx.chars[ci].motions.map(m => [m, idx.motion_names[m] || ('동작 ' + m)]), v => { st.motion = +v; st.tick = 0; refresh(); }, () => st.motion);
@@ -259,6 +269,16 @@
     if (ms.length && !ms.includes(st.motion)) { st.motion = ms.includes(0) ? 0 : ms.includes(1) ? 1 : ms[0]; st.tick = 0; syncGroup($('motions'), () => st.motion); }
   }
 
+  // the V button (see SECRET_CMD): on the category grid right of 다리 확장 while the command is in the search box
+  function secretBtn() {
+    let b = $('cats').querySelector('.secret-v');
+    const want = !st.secret && st.mode !== 'tf' && $('search').value.trim() === SECRET_CMD;
+    if (!want) { if (b) b.remove(); return; }
+    if (b) return;
+    b = document.createElement('button'); b.className = 'btn secret-v'; b.textContent = 'V'; b.title = '숨겨진 장비 보기';
+    b.onclick = () => { st.secret = true; b.remove(); $('search').value = ''; st.q = ''; catIcons(); fillGrid(); };
+    $('cats').appendChild(b);
+  }
   // list buttons without a fixed icon: the first entry of that list (this character's) drawn above the label
   const LIVE_CAT_ICONS = ['hair', 'weapon_av', 'weapon_eq', 'sub'];
   function catIcons() {
@@ -270,7 +290,7 @@
       box.innerHTML = '';
       // the first entries of the list, in order, until one has a picture (투명 아바타 (방패) draws nothing)
       const cands = k === 'hair' ? [c.hairById[TW.S.index.chars[ci].default_hair] || c.hair[0]]
-                                 : c.items.filter(it => it.slot === catSlot(k) && (!catKind(k) || it.kind === catKind(k))).slice(0, 6);
+                                 : c.items.filter(it => it.slot === catSlot(k) && (!catKind(k) || it.kind === catKind(k)) && shown(it)).slice(0, 6);
       (async () => {
         for (const e of cands) {
           if (!e) continue;
@@ -305,7 +325,7 @@
       return [...hs.filter(h => h.id === def), ...hs.filter(h => h.id !== def)];
     }
     const slot = catSlot(st.cat), kind = catKind(st.cat) || (st.kind === 'all' ? null : st.kind);
-    return c.items.filter(it => it.slot === slot && (!kind || it.kind === kind) && (!st.q || it.name.toLowerCase().includes(st.q) || String(it.id) === st.q));
+    return c.items.filter(it => it.slot === slot && (!kind || it.kind === kind) && shown(it) && (!st.q || it.name.toLowerCase().includes(st.q) || String(it.id) === st.q));
   }
   function fillGrid() {
     st.list = listFor(); st.shown = 0;
