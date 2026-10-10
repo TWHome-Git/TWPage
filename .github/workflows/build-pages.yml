@@ -1,4 +1,5 @@
 # 화면별 HTML(eta/index.html 등)과 404.html, sitemap.xml을 index.html에서 다시 만든다.
+# 자원(app.js·styles.css·mobile.css)이 바뀌면 index.html 의 ?v= 와 사이트 판(assets/site-version.json)도 다시 적는다.
 #
 # 이 파일들은 scripts/build-pages.mjs가 index.html을 틀로 찍어 낸 복사본이라, index.html을 고치면
 # 같이 다시 만들어야 한다. 손으로 돌리는 것을 잊고 올려도 여기서 대신 돌려 커밋한다.
@@ -11,6 +12,9 @@ on:
     paths:
       - index.html
       - scripts/build-pages.mjs
+      - assets/app.js
+      - assets/styles.css
+      - assets/mobile.css
   workflow_dispatch:
 
 permissions:

@@ -606,7 +606,38 @@ function routeWrite({ replace = false } = {}) {
   if (routeSamePath(path, location.pathname) && !legacyHash) return;
   const url = path + location.search;
   if (replace || !route.ready || legacyHash) history.replaceState(null, "", url);
-  else history.pushState(null, "", url);
+  else {
+    history.pushState(null, "", url);
+    if (siteStale) location.reload();      // 새 배포가 올라와 있으면 화면을 옮기는 김에 새 판으로 연다
+  }
+}
+
+// ── 새 배포 알아채기 ──
+// 페이지에 박힌 사이트 판(meta tw-site-version, scripts/build-pages.mjs 가 자원 내용으로 적는다)을
+// assets/site-version.json 과 견준다. 다르면 사이트가 새로 올라간 것: 화면이 가려져 있으면(다른 탭을 보는 중) 바로,
+// 보고 있으면 다음에 다른 화면으로 옮길 때 새로고침한다 (보던 화면이 갑자기 바뀌지 않게).
+// 5분마다, 그리고 이 탭으로 돌아올 때 확인한다
+const SITE_VERSION = document.querySelector('meta[name="tw-site-version"]')?.content || "";
+let siteStale = false;
+
+async function siteVersionCheck() {
+  if (!SITE_VERSION || siteStale) return;
+  try {
+    const res = await fetch(`/assets/site-version.json?t=${Date.now()}`, { cache: "no-store" });
+    const { v } = await res.json();
+    if (v && v !== SITE_VERSION) {
+      siteStale = true;
+      if (document.hidden) location.reload();
+    }
+  } catch { /* 오프라인 등: 다음 확인 때 다시 */ }
+}
+
+function wireSiteVersion() {
+  setInterval(siteVersionCheck, 5 * 60 * 1000);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) siteVersionCheck();
+    else if (siteStale) location.reload();
+  });
 }
 
 // ── 탭 제목 ──
@@ -832,7 +863,9 @@ function wireRoute() {
     // 팝업이 열려 있으면 먼저 닫는다. 팝업 칸만 벗어난 것이면 주소는 그대로라 화면을 건드리지 않는다
     modalPop();
     const want = routeParse();
-    if (!routeSamePath(routeToPath(want), routeToPath(routeCurrent()))) routeApply(want);
+    if (routeSamePath(routeToPath(want), routeToPath(routeCurrent()))) return;
+    if (siteStale) { location.reload(); return; }     // 뒤로·앞으로 가기로 화면을 옮길 때도 새 판이 있으면 새로 연다
+    routeApply(want);
   });
   // 페이지를 연 채 주소창에 옛 해시 주소를 넣은 경우
   addEventListener("hashchange", () => {
@@ -864,6 +897,7 @@ async function boot() {
   wireEvents();
   setAvatarViewMode(avatar.viewMode); // 저장된 선택을 버튼에 반영
   wireRoute();
+  wireSiteVersion();
   wireEtaAutoRefresh();
   visit.ready = true;
   routeApply(initialRoute);

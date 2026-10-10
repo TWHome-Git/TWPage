@@ -9,11 +9,15 @@
 //   <탭>/index.html, <탭>/<하위탭>/index.html   화면별 페이지
 //   404.html                                     파일이 없는 주소(장비 이름 등)에서 앱을 띄우는 페이지
 //   sitemap.xml                                  위 화면 주소 전부
+//   assets/site-version.json                     사이트 판 (앱이 새 배포를 알아채고 새로고침한다)
+// 그리고 index.html 의 자원 주소(app.js · styles.css · mobile.css 의 ?v=)를 파일 내용의 해시로 맞추고,
+// <meta name="tw-site-version"> 에 사이트 판을 적는다 (손으로 ?v= 를 올리지 않아도 된다)
 //
 // index.html이나 이 파일을 고쳤으면 다시 돌린다:  node scripts/build-pages.mjs
 // (올릴 때 잊어도 .github/workflows/build-pages.yml이 대신 돌려 커밋한다)
 
 import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -82,8 +86,32 @@ function pageHtml(template, { title, description, url, noindex }) {
   return html.replace(/<!doctype html>/i, (line) => `${line}\n${GENERATED}`);
 }
 
+// 자원 주소의 ?v= 와 사이트 판은 내용의 해시다. 줄바꿈은 LF로 맞춰 센다 (윈도우 작업본은 CRLF, GitHub은 LF라
+// 그대로 세면 워크플로가 매번 다른 값을 적는다)
+const STAMPED_ASSETS = ["assets/app.js", "assets/styles.css", "assets/mobile.css"];
+const SITE_VERSION_META = /<meta name="tw-site-version" content="[^"]*" \/>/;
+const digest = (text) => createHash("sha256").update(text.replace(/\r\n/g, "\n")).digest("hex").slice(0, 10);
+
+async function stampVersions(source) {
+  let html = source;
+  for (const file of STAMPED_ASSETS) {
+    const v = digest(await readFile(join(ROOT, file), "utf8"));
+    const url = `./${file}`;
+    const at = html.indexOf(`${url}?v=`);
+    if (at < 0) throw new Error(`틀에서 ${file} 주소 자리를 찾지 못했습니다`);
+    html = html.slice(0, at) + `${url}?v=${v}` + html.slice(html.indexOf('"', at));
+  }
+  // 사이트 판: 판 표시 줄을 뺀 틀 전체. 자원 판과 아바타 시뮬레이터 판(data-sim-v)이 다 이 안에 들어 있다
+  const site = digest(html.replace(SITE_VERSION_META, ""));
+  html = replaceOnce(html, SITE_VERSION_META, `<meta name="tw-site-version" content="${site}" />`, "tw-site-version");
+  return { html, site };
+}
+
 async function main() {
-  const template = await readFile(join(ROOT, "index.html"), "utf8");
+  const source = await readFile(join(ROOT, "index.html"), "utf8");
+  const { html: template, site } = await stampVersions(source);
+  if (template !== source) await writeFile(join(ROOT, "index.html"), template, "utf8");
+  await writeFile(join(ROOT, "assets", "site-version.json"), JSON.stringify({ v: site }) + "\n", "utf8");
   if (!/<base href="\/" \/>/.test(template)) throw new Error('index.html에 <base href="/" />가 없습니다. 하위 폴더의 페이지가 자원을 찾지 못합니다');
 
   const meta = JSON.parse(await readFile(join(ROOT, "assets", "route-meta.json"), "utf8"));
