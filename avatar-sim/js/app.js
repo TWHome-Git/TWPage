@@ -707,6 +707,12 @@
   function placeDye() {
     const box = $('cdye'), p = !box.classList.contains('closed') && st.cdyePos;
     Object.assign(box.style, p ? { left: p.x + 'px', top: p.y + 'px', right: 'auto', bottom: 'auto' } : { left: '', top: '', right: '', bottom: '' });
+    if (!p) return;
+    // another outfit can make the window taller (more parts): moved up / left as far as it takes to stay whole on the
+    // stage; st.cdyePos keeps the place chosen, so a shorter window goes back there
+    const S = box.parentElement.getBoundingClientRect();
+    box.style.left = Math.max(0, Math.min(p.x, S.width - box.offsetWidth)) + 'px';
+    box.style.top = Math.max(0, Math.min(p.y, S.height - box.offsetHeight)) + 'px';
   }
   async function refresh() {
     refreshSlots(); dyePanel();
