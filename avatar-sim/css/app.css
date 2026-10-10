@@ -196,8 +196,8 @@ input[type=search]:focus { outline: none; border-color: var(--primary); box-shad
 /* 확장 의상 염색 (DB 0351): per-part colour pickers, bottom right of the stage; closed = just the 염색 button */
 .ov-dye { position: absolute; right: 8px; bottom: 48px; display: flex; flex-direction: column; gap: 4px; align-items: stretch; background: rgba(28, 38, 36, .88); border-radius: 8px; padding: 6px; }
 .ov-dye .row { display: flex; align-items: center; gap: 6px; color: #e6ecea; font-size: 12px; white-space: nowrap; }
-/* at most 220 px wide (2/3 of the widest outfit, 수려한 한복): a long part list ends in … and shows whole on hover (title) */
-.ov-dye { max-width: 220px; }
+/* at most 190 px wide (a bit under 2/3 of the widest outfit, 수려한 한복): a long part list ends in … and shows whole on hover (title) */
+.ov-dye { max-width: 190px; }
 .ov-dye .row span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .ov-dye .row input, .ov-dye .row .x { flex: none; }
 .ov-dye input[type=color] { width: 26px; height: 20px; padding: 0; border: 1px solid #5d6966; border-radius: 4px; background: none; cursor: pointer; }
