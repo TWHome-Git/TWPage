@@ -1,7 +1,8 @@
 // TW avatar compositor for the browser: a port of src/avatarlib.py (plan / compose_layers / render) that works on
-// the files written by src/tw_webexport.py.  No framework; everything is plain functions on a shared `TW` object.
+// the files written by src/tw_webexport.py (+ src/tw_webbundle.py).  No framework; everything is plain functions on a
+// shared `TW` object.
 //
-//   TW.load(baseUrl)                         -> index.json + extras.json
+//   TW.load(baseUrl)                         -> boot.json (or index.json + extras.json + dyes)
 //   TW.loadChar(ci)                          -> chars/<ci>.json (cached)
 //   TW.prepare(pose)                         -> fetches every animation and texture the pose needs
 //   TW.compose(pose, tick)                   -> [{z, pri, ei, img, sx, sy, w, h, x, y, flip, tag, blend}]
@@ -11,7 +12,8 @@
 // pose = {char, motion, dir, hair, dye (0 = none, 1-6), items: [...], hairMode: 'all'|'front'|'back'|'none', hidden: Set}
 'use strict';
 const TW = (() => {
-  const S = { base: '', ver: 0, index: null, extras: null, chars: {}, anims: {}, texs: {}, pending: {}, dye: { styles: {}, tex: [] }, dyeTex: new Set(), cdye: { items: {}, tex: [] } };
+  const S = { base: '', ver: 0, verP: null, index: null, extras: null, chars: {}, anims: {}, texs: {}, tm: {}, pending: {}, dye: { styles: {}, tex: [] }, dyeTex: new Set(), cdye: { items: {}, tex: [] },
+              tdb: null, tdbSheet: null };
   const v = () => '?v=' + S.ver;            // data version (version.json): changes on every TW_WebExport run
   const ext = () => (S.index && S.index.img_ext) || '.png';   // image format of atlases / icon sheets (index.json img_ext)
 
@@ -21,9 +23,10 @@ const TW = (() => {
   const CG = 'cg=2';
   const bust = url => url + (url.includes('?') ? '&' : '?') + CG;
   async function getJSON(url) {
-    // animations / textures never change once exported -> cache hard; the small index files are revalidated
+    // a file asked for with the data version (?v=) never changes under that address -> cache hard (no request at all
+    // the next time; CloudFront bills per request); version.json and anything without a version is revalidated
     let r;
-    try { r = await fetch(bust(url), { cache: /\/(anim|tex)\//.test(url) ? 'force-cache' : 'no-cache' }); }
+    try { r = await fetch(bust(url), { cache: /[?&]v=[1-9]/.test(url) ? 'force-cache' : 'no-cache' }); }
     // a cached copy without CORS headers fails the request (and a 304 revalidation keeps it): fetch it whole once,
     // which also replaces that copy in the browser cache
     catch (e) { r = await fetch(bust(url), { cache: 'reload' }); }
@@ -35,17 +38,25 @@ const TW = (() => {
     return S.pending[key];
   }
 
-  // every start-up file in one round trip (they used to come one after another: 6 round trips before the first
-  // animation). Only the animations / textures carry ?v= (force-cached); these small files are revalidated (no-cache),
-  // so they need no version and need not wait for version.json. setBase() lets loadChar() start alongside load().
-  function setBase(base) { S.base = base.replace(/\/?$/, '/'); }
+  // start-up: version.json is the one file the browser always asks about; the rest (boot.json = index, extras, dyes,
+  // TalesDB icon list and sheet map in one file; chars/<n>.json with its icon map) carries ?v=<version> and comes from
+  // the browser cache on a later visit. An export without boot.json (or no version): the separate files, revalidated.
+  // setBase() starts version.json, so loadChar() can run alongside load().
+  function setBase(base) {
+    const b = base.replace(/\/?$/, '/');
+    if (b !== S.base || !S.verP) { S.base = b; S.verP = getJSON(b + 'version.json').then(j => (S.ver = j.stamp || 0)).catch(() => 0); }
+  }
+  const ver = () => S.verP || Promise.resolve(0);
   async function load(base) {
     setBase(base);
-    const [ver, index, extras, dye, cdye, bdye] = await Promise.all([
-      getJSON(S.base + 'version.json').catch(() => ({})), getJSON(S.base + 'index.json'), getJSON(S.base + 'extras.json'),
+    const vv = await ver();
+    const boot = vv ? await getJSON(S.base + 'boot.json?v=' + vv).catch(() => null) : null;
+    const [index, extras, dye, cdye, bdye] = boot && boot.index && boot.extras ? [boot.index, boot.extras, boot.hairdye, boot.costumedye, boot.basedye] : await Promise.all([
+      getJSON(S.base + 'index.json'), getJSON(S.base + 'extras.json'),
       getJSON(S.base + 'hairdye.json').catch(() => null), getJSON(S.base + 'costumedye.json').catch(() => null),
       getJSON(S.base + 'basedye.json').catch(() => null)]);
-    S.ver = ver.stamp || 0; S.index = index; S.extras = extras;
+    if (boot) { S.tdb = boot.tdbicons || null; S.tdbSheet = boot.tdbsheet || null; }
+    S.index = index; S.extras = extras;
     if (dye) { S.dye = dye; S.dyeTex = new Set(dye.tex); }               // no dye data: hair undyed
     if (cdye) { S.cdye = cdye; for (const t of cdye.tex) S.dyeTex.add(t); }   // no costume dye data
     if (bdye) { S.bdye = bdye; for (const t of bdye.tex) S.dyeTex.add(t); }   // no base outfit dye data
@@ -54,7 +65,10 @@ const TW = (() => {
   async function loadChar(ci) {
     if (S.chars[ci]) return S.chars[ci];
     return once('char' + ci, async () => {
-      const [c, map] = await Promise.all([getJSON(S.base + 'chars/' + ci + '.json'), getJSON(S.base + 'icons/' + ci + '/map.json').catch(() => null)]);
+      const vv = await ver();
+      const c = await getJSON(S.base + 'chars/' + ci + '.json' + (vv ? '?v=' + vv : ''));
+      // the icon map is inside the character file (tw_webbundle); an older export has it on its own
+      const map = c.iconMap || await getJSON(S.base + 'icons/' + ci + '/map.json').catch(() => null);
       c.iconMap = map || { i: {}, h: {}, stamp: 0 };
       c.byId = {}; c.items.forEach((it, i) => { it.index = i; c.byId[it.id] = it; });
       c.hairById = {}; c.hair.forEach((h, i) => { h.index = i; c.hairById[h.id] = h; });
@@ -64,8 +78,11 @@ const TW = (() => {
   async function loadAnim(id) {
     if (S.anims[id] !== undefined) return S.anims[id];
     return once('anim' + id, async () => {
-      let a = null;
+      await ver(); let a = null;
       try { a = await getJSON(S.base + 'anim/' + id + '.json' + v()); } catch (e) { a = null; }
+      // the texture frames this animation draws (tw_webbundle 't'): with them loadTex needs only the atlas image.
+      // S.tm[tid] is the very object loadTex hands out as meta.f, so frames another animation brings in later show up
+      if (a && a.t) { for (const tid in a.t) Object.assign(S.tm[tid] || (S.tm[tid] = {}), a.t[tid]); delete a.t; }
       if (a) unmirror(a);
       S.anims[id] = a; return a;
     });
@@ -94,10 +111,12 @@ const TW = (() => {
   async function loadTex(tid) {
     if (S.texs[tid] !== undefined) return S.texs[tid];
     return once('tex' + tid, async () => {
-      let t = null;
+      await ver(); let t = null;
       try {
-        const [meta, img, idx] = await Promise.all([getJSON(S.base + 'tex/' + tid + '.json' + v()), loadImage(S.base + 'tex/' + tid + ext() + v()),
+        const known = S.tm[tid] && Object.keys(S.tm[tid]).length;   // frames came with the animations: no tex/<id>.json
+        const [meta, img, idx] = await Promise.all([known ? { f: S.tm[tid] } : getJSON(S.base + 'tex/' + tid + '.json' + v()), loadImage(S.base + 'tex/' + tid + ext() + v()),
                                                     S.dyeTex.has(+tid) ? loadImage(S.base + 'tex/' + tid + '.idx' + ext() + v()).catch(() => null) : null]);
+        if (!known) S.tm[tid] = Object.assign(meta.f, S.tm[tid] || {});
         t = { id: +tid, meta, img, idx, lum: null, dyed: {} };
       } catch (e) { t = null; }
       S.texs[tid] = t; return t;
@@ -555,6 +574,11 @@ const TW = (() => {
     });
   }
   function transformIcon(id) { return S.tlist ? sheetCell(S.tlist.iconMap, 't', 'i', id) : null; }
+  // TalesDB's avatar list icon of an item in the shared sheets (icons/d, boot.json tdbsheet); null: not in a sheet
+  function tdbCell(id) {
+    const m = S.tdbSheet, c = m && m.d && m.d[id]; if (!c) return null;
+    return { url: S.base + 'icons/d/d' + c[0] + ext() + '?v=' + (m.stamp || 0), x: (c[1] % m.cols) * m.cell, y: Math.floor(c[1] / m.cols) * m.cell, w: m.cell, h: m.cell };
+  }
   // hair icon drawn in the browser (same window as the exporter: head + chest, 60x76)
   async function hairIcon(ci, sid, dye = 0) {
     const pose = { char: ci, motion: 0, dir: 10, hair: sid, dye, items: [], hairMode: 'all' }; await prepare(pose);
@@ -638,5 +662,5 @@ const TW = (() => {
   }
 
   return { S, setBase, bust, getJSON, baseDyes, load, loadChar, loadAnim, loadTex, prepare, plan, compose, render, drawLayers, centeredAnchor, bounds,
-           maxDuration, frameTimes, iconSheet, itemIcon, hairIcon, dyes, costumeDyes, loadTransforms, transformIcon, resolveMotion, motionsOf };
+           maxDuration, frameTimes, iconSheet, itemIcon, hairIcon, dyes, costumeDyes, loadTransforms, transformIcon, tdbCell, resolveMotion, motionsOf };
 })();

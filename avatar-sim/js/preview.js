@@ -16,7 +16,8 @@ const TWAvatarPreview = (() => {
   function init(base) {
     if (!ready) {
       TW.setBase(base);
-      ready = Promise.all([TW.load(base), TW.getJSON(base + 'tdbicons.json').catch(() => null)]).then(([, t]) => {
+      // the TalesDB icon list comes in boot.json (TW.load); an older export has it on its own
+      ready = TW.load(base).then(() => TW.S.tdb || TW.getJSON(base + 'tdbicons.json').catch(() => null)).then(t => {
         if (t) for (const [id, p] of Object.entries(t.icons)) iconIds[p] = +id;
       });
       ready.catch(() => { ready = null; });              // a failed start may be tried again

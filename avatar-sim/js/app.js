@@ -128,6 +128,9 @@
   let TDB = { base: '', icons: {} };
   const tdbUrl = (slot, id) => TDB_SLOTS.has(slot) && TDB.icons[id] ? TDB.base + TDB.icons[id].split('/').map(encodeURIComponent).join('/') : null;
   const tdbImg = url => `<img class="tdb" src="${url}" alt="" loading="lazy" decoding="async" draggable="false">`;
+  // the icon from the shared sheets (icons/d: 64 per file, one request for a screenful) or else its own file
+  const tdbIcon = (slot, id) => { if (!TDB_SLOTS.has(slot)) return null; const cell = TW.tdbCell(id); if (cell) return { cell }; const url = tdbUrl(slot, id); return url ? { url } : null; };
+  const tdbHtml = t => t.cell ? `<span class="tdb" style="background-image:url('${t.cell.url}');background-position:${-t.cell.x}px ${-t.cell.y}px"></span>` : tdbImg(t.url);
 
   // where the exported data lives (opts.data): 'data/' next to this page, or the CDN; images from another origin are
   // loaded with CORS. Inside TalesDB, its own CDN gives the avatar list icons (opts.tdb) and the character art
@@ -140,10 +143,10 @@
     // character (TW.load and TW.loadChar run side by side; a character's file needs nothing from index.json)
     const q = new URLSearchParams(location.search), tf = q.has('tf'), first = q.has('char') ? +q.get('char') : (settings.lastChar ?? 0);
     TW.setBase(DATA_BASE);
-    const tdbP = TW.getJSON(DATA_BASE + 'tdbicons.json').catch(() => null);
     const charP = TW.loadChar(tf ? 0 : first).catch(() => null);   // a wrong ?char= fails again (and reports) in selectChar
     const idx = await TW.load(DATA_BASE);
-    TDB = (await tdbP) || TDB;                             // no TalesDB icons: the exported sheets are used
+    // the TalesDB icon list comes in boot.json; an older export has it on its own
+    TDB = TW.S.tdb || (await TW.getJSON(DATA_BASE + 'tdbicons.json').catch(() => null)) || TDB;   // none: the exported sheets are used
     if (TDB_BASE) TDB.base = TDB_BASE;                     // TalesDB passes its current avatar image address
     await charP;
     const g = $('pickGrid'); g.innerHTML = '';
@@ -398,12 +401,12 @@
       const ic = st.mode === 'tf' ? TW.transformIcon(e.id) : TW.iconSheet(st.ci, st.cat === 'hair' ? 'h' : 'i', e.id);
       const nm = `<div class="nm" title="${esc(tag + name)}">${esc(tag + name)}</div>`;
       d.innerHTML = nm;
-      const tu = st.mode !== 'tf' && tdbUrl(e.slot, e.id);
+      const tu = st.mode !== 'tf' && tdbIcon(e.slot, e.id);
       if (st.cat === 'hair' && st.mode !== 'tf') { dyeDots(d, e); cardIcon(d, e); }
-      else if (tu) {                                           // TalesDB icon; if it cannot load, the exported icon instead
-        d.insertAdjacentHTML('beforeend', `<div class="ic tdbbox" style="width:76px;height:76px;left:18px;top:5px">${tdbImg(tu)}</div>`);
-        const box = d.querySelector('.ic');
-        box.querySelector('img').onerror = () => { box.remove(); if (ic) d.insertAdjacentHTML('beforeend', sheetBox(ic)); else { d.insertAdjacentHTML('beforeend', `<div class="ic live" style="width:76px;height:76px;left:18px;top:5px"></div>`); liveIcon(d.querySelector('.ic.live'), e, 76); } };
+      else if (tu) {                                           // TalesDB icon; if its own file cannot load, the exported icon instead
+        d.insertAdjacentHTML('beforeend', `<div class="ic tdbbox" style="width:76px;height:76px;left:18px;top:5px">${tdbHtml(tu)}</div>`);
+        const box = d.querySelector('.ic'), img = box.querySelector('img');
+        if (img) img.onerror = () => { box.remove(); if (ic) d.insertAdjacentHTML('beforeend', sheetBox(ic)); else { d.insertAdjacentHTML('beforeend', `<div class="ic live" style="width:76px;height:76px;left:18px;top:5px"></div>`); liveIcon(d.querySelector('.ic.live'), e, 76); } };
       }
       else if (ic) d.insertAdjacentHTML('beforeend', sheetBox(ic));
       else { d.insertAdjacentHTML('beforeend', `<div class="ic live" style="width:76px;height:76px;left:18px;top:5px"></div>`); liveIcon(d.querySelector('.ic'), e, 76); }
@@ -515,9 +518,9 @@
       const rec = key === 'hair' ? st.char.hairById[id] : st.char.byId[id];
       const B = 72, sh = key === 'hair' && st.dye ? null : TW.iconSheet(st.ci, key === 'hair' ? 'h' : 'i', id);
       ic.innerHTML = '';
-      const tu = key !== 'hair' && tdbUrl(key, id);
+      const tu = key !== 'hair' && tdbIcon(key, id);
       if (tu) {                                                // TalesDB icon in the slot too
-        ic.style.backgroundImage = ''; ic.style.clipPath = ''; ic.classList.add('tdbbox'); ic.innerHTML = tdbImg(tu); ic.title = name;
+        ic.style.backgroundImage = ''; ic.style.clipPath = ''; ic.classList.add('tdbbox'); ic.innerHTML = tdbHtml(tu); ic.title = name;
         cb.checked = !st.hidden.has(id); lb.textContent = lb.textContent.split(':')[0] + ': ' + name; lb.title = name; return;
       }
       ic.classList.remove('tdbbox');

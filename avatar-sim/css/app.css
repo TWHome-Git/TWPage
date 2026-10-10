@@ -159,6 +159,7 @@ input[type=search]:focus { outline: none; border-color: var(--primary); box-shad
 /* TalesDB avatar list icons (55 x 55) centred in the icon box */
 .ic.tdbbox { display: flex; align-items: center; justify-content: center; }
 .ic.tdbbox img.tdb { width: 55px; height: 55px; }
+.ic.tdbbox span.tdb { display: block; width: 55px; height: 55px; background-repeat: no-repeat; }   /* one cell of icons/d/d<k> */
 /* character picker: a small window over the simulator */
 .pick-modal { position: fixed; inset: 0; z-index: 100; background: rgba(20, 35, 32, .45); display: flex; align-items: center; justify-content: center; padding: 16px; }
 .pick-box { background: var(--panel); border-radius: var(--radius); box-shadow: 0 10px 40px rgba(0, 0, 0, .25); padding: 12px 14px 8px; width: 100%; max-width: 552px; max-height: 90vh; overflow: auto; }
