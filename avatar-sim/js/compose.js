@@ -59,6 +59,10 @@ const TW = (() => {
       S.anims[id] = a; return a;
     });
   }
+  // effect animations shown the same in every facing (always their reference direction): 4449 삐약삐약 젤리삐 - the chick
+  // of direction 0 everywhere (in game); its other facings hold unrelated pieces (a purple spark at 2, no chick at 14 / 6).
+  // Not a rule for every reference other than 2: 수호 부적 (also 0) has a real back view at 2. Same list in avatarlib.py
+  const FX_FIXED_DIR = new Set([4449]);
   // right-facing directions written as 'M' are the mirror image of the left-facing one (tw_webexport MIRROR_PAIRS):
   // frame keys get the mirror flag flipped and the x offset negated, everything else is the same
   const MIRROR_PAIRS = [['0', '4'], ['14', '6'], ['12', '8']];
@@ -358,8 +362,8 @@ const TW = (() => {
       let dx = 0, dy = 0;
       if (p.head && attach.Head) { dx = attach.Head[0]; dy = attach.Head[1] - 8 - animBottom(S.anims[p.a], p.m, pose.dir); }
       const F = S.index.hair_front_layers, B = S.index.hair_back_layers;
-      // an effect without frames for this facing draws its reference's direction (삐약삐약 젤리삐: the chick, direction 0)
-      const dv = p.fd !== null && !dirData(S.anims[p.a], p.m, pose.dir) && dirData(S.anims[p.a], p.m, p.fd) ? p.fd : pose.dir;
+      // an effect without frames for this facing draws its reference's direction; a few always draw it (FX_FIXED_DIR)
+      const dv = p.fd !== null && dirData(S.anims[p.a], p.m, p.fd) && (FX_FIXED_DIR.has(p.a) || !dirData(S.anims[p.a], p.m, pose.dir)) ? p.fd : pose.dir;
       // an effect animation without layer keys: in front / behind by its kind (avatarlib.fx_layer: 하트 뿅뿅 in front)
       const dd = p.fl !== null ? dirData(S.anims[p.a], p.m, dv) : null;
       const fl = dd && !dd.e.some(e => e.some(k => k[0] === 6)) ? p.fl : null;
