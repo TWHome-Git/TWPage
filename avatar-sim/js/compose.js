@@ -22,7 +22,11 @@ const TW = (() => {
   const bust = url => url + (url.includes('?') ? '&' : '?') + CG;
   async function getJSON(url) {
     // animations / textures never change once exported -> cache hard; the small index files are revalidated
-    const r = await fetch(bust(url), { cache: /\/(anim|tex)\//.test(url) ? 'force-cache' : 'no-cache' });
+    let r;
+    try { r = await fetch(bust(url), { cache: /\/(anim|tex)\//.test(url) ? 'force-cache' : 'no-cache' }); }
+    // a cached copy without CORS headers fails the request (and a 304 revalidation keeps it): fetch it whole once,
+    // which also replaces that copy in the browser cache
+    catch (e) { r = await fetch(bust(url), { cache: 'reload' }); }
     if (!r.ok) throw new Error(url + ': ' + r.status);
     return r.json();
   }
@@ -81,7 +85,9 @@ const TW = (() => {
   function loadImage(url) {
     // crossOrigin: the atlases are read back with getImageData (dyes, additive layers), which a CDN-hosted image
     // only allows when it was requested with CORS (jsDelivr / R2 answer with Access-Control-Allow-Origin: *)
-    return new Promise((res, rej) => { const im = new Image(); im.crossOrigin = 'anonymous'; im.onload = () => res(im); im.onerror = () => rej(new Error(url)); im.src = bust(url); });
+    // a failed load (e.g. a cached copy without CORS headers) is tried once more under an address the cache has not seen
+    const one = u => new Promise((res, rej) => { const im = new Image(); im.crossOrigin = 'anonymous'; im.onload = () => res(im); im.onerror = () => rej(new Error(url)); im.src = u; });
+    return one(bust(url)).catch(() => one(bust(url) + '&rt=' + Date.now()));
   }
   async function loadTex(tid) {
     if (S.texs[tid] !== undefined) return S.texs[tid];
@@ -564,6 +570,6 @@ const TW = (() => {
     return null;
   }
 
-  return { S, setBase, bust, load, loadChar, loadAnim, loadTex, prepare, plan, compose, render, drawLayers, centeredAnchor, bounds,
+  return { S, setBase, bust, getJSON, load, loadChar, loadAnim, loadTex, prepare, plan, compose, render, drawLayers, centeredAnchor, bounds,
            maxDuration, frameTimes, iconSheet, itemIcon, hairIcon, dyes, costumeDyes, loadTransforms, transformIcon, resolveMotion, motionsOf };
 })();
